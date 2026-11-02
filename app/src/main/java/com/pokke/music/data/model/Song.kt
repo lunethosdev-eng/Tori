@@ -6,9 +6,13 @@ data class Song(
     val artist: String,
     val album: String = "",
     val coverUrl: String = "",
+    /** URL of the animated cover (gif / webp / video loop) from Ukiyo when available */
+    val animatedCoverUrl: String? = null,
     val durationMs: Long = 0L,
     val lyrics: List<LyricLine> = emptyList()
-)
+) {
+    val hasAnimatedCover: Boolean get() = !animatedCoverUrl.isNullOrBlank()
+}
 
 data class LyricLine(
     val timeMs: Long,
