@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -77,7 +78,7 @@ private val currentSong = Song(
     artist = "Laufey",
     album = "Bewitched",
     coverUrl = "https://i.scdn.co/image/ab67616d0000b273c5649add07ed3740e1a0c3e0",
-    durationMs = 168000L,
+    durationSeconds = 168,
     lyrics = listOf(
         com.pokke.music.data.model.LyricLine(0, "What's a girl to do"),
         com.pokke.music.data.model.LyricLine(5000, "Lying on my bed staring"),
