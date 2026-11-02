@@ -193,7 +193,7 @@ private fun ContinueCard(song: Song, onClick: () -> Unit) {
                 .clip(RoundedCornerShape(12.dp))
                 .background(Color(0xFF2A2A2A))
         ) {
-            if (song.coverUrl.isNotEmpty()) {
+            if (!song.coverUrl.isNullOrEmpty()) {
                 AsyncImage(
                     model = song.coverUrl,
                     contentDescription = null,
