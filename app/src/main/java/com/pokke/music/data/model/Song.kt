@@ -1,21 +1,20 @@
 package com.pokke.music.data.model
 
-/**
- * Matches Ukiyo Server public.songs table
- */
 data class Song(
     val id: String,
     val title: String,
     val artist: String,
     val album: String? = null,
     val coverUrl: String? = null,
-    val animatedCoverUrl: String? = null,   // from animated_cover_url
+    val animatedCoverUrl: String? = null,
     val audioUrl: String? = null,
     val durationSeconds: Int = 0,
     val lyricsText: String? = null,
     val lyricsUrl: String? = null,
     val genre: String? = null,
-    val youtubeId: String? = null
+    val youtubeId: String? = null,
+    // Optional parsed lyrics for UI demos
+    val lyrics: List<LyricLine> = emptyList()
 ) {
     val hasAnimatedCover: Boolean
         get() = !animatedCoverUrl.isNullOrBlank()
@@ -38,9 +37,6 @@ data class Playlist(
     val songCount: Int = 0
 )
 
-/**
- * Matches Kokoro public.profiles
- */
 data class UserProfile(
     val id: String,
     val displayName: String? = null,
