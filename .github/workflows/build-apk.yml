@@ -9,6 +9,9 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      ANDROID_HOME: /usr/local/lib/android/sdk
+      ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -24,21 +27,52 @@ jobs:
           distribution: temurin
           java-version: 17
 
-      - name: Setup Android SDK (runner built-in)
+      - name: Setup Android SDK
         run: |
+          set -e
           echo "ANDROID_HOME=$ANDROID_HOME"
-          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
-          # Accept all licenses non-interactively
-          yes | sdkmanager --licenses >/dev/null || true
-          # Install only what we need (no obsolete "tools" package)
-          sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0" || \
-          sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0"
-          echo "sdk.dir=$ANDROID_HOME" > local.properties || true
+          ls -la "$ANDROID_HOME" || true
+          ls -la "$ANDROID_HOME/cmdline-tools" || true
+
+          # Find sdkmanager (path varies by runner image)
+          SDKMANAGER=""
+          for candidate in \
+            "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" \
+            "$ANDROID_HOME/cmdline-tools/current/bin/sdkmanager" \
+            "$ANDROID_HOME/cmdline-tools/"*/bin/sdkmanager
+          do
+            if [ -x "$candidate" ]; then
+              SDKMANAGER="$candidate"
+              break
+            fi
+          done
+
+          if [ -z "$SDKMANAGER" ]; then
+            echo "sdkmanager not found, listing cmdline-tools:"
+            find "$ANDROID_HOME" -name sdkmanager 2>/dev/null || true
+            # Fallback: install cmdline-tools ourselves
+            mkdir -p "$ANDROID_HOME/cmdline-tools"
+            cd /tmp
+            curl -sL -o cmdtools.zip https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip
+            unzip -q cmdtools.zip
+            rm -rf "$ANDROID_HOME/cmdline-tools/latest"
+            mv cmdline-tools "$ANDROID_HOME/cmdline-tools/latest"
+            SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          fi
+
+          echo "Using SDKMANAGER=$SDKMANAGER"
+          export PATH="$(dirname "$SDKMANAGER"):$ANDROID_HOME/platform-tools:$PATH"
+
+          yes | "$SDKMANAGER" --licenses >/dev/null || true
+          "$SDKMANAGER" "platform-tools" "platforms;android-35" "build-tools;35.0.0" || \
+          "$SDKMANAGER" "platform-tools" "platforms;android-34" "build-tools;34.0.0"
+
+          echo "sdk.dir=$ANDROID_HOME" > "$GITHUB_WORKSPACE/local.properties"
 
       - name: Install JS dependencies
         run: npm install
 
-      - name: Expo prebuild (generate android/)
+      - name: Expo prebuild
         run: npx expo prebuild --platform android --no-install --non-interactive
 
       - name: Build Release APK
@@ -51,8 +85,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: pokke-apk
-          path: |
-            android/app/build/outputs/apk/release/*.apk
-            android/app/build/outputs/apk/release/**/*.apk
+          path: android/app/build/outputs/apk/release/**/*.apk
           if-no-files-found: warn
           retention-days: 14
