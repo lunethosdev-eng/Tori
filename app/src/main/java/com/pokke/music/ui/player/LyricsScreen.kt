@@ -61,7 +61,7 @@ private val demoSong = Song(
     title = "From The Start",
     artist = "Laufey",
     coverUrl = "https://i.scdn.co/image/ab67616d0000b273c5649add07ed3740e1a0c3e0",
-    durationMs = 168000L,
+    durationSeconds = 168,
     lyrics = listOf(
         LyricLine(0, "What's a girl to do"),
         LyricLine(5000, "Lying on my bed staring"),
