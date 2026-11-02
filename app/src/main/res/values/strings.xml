@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Pokke</string>
+    <string name="home">Home</string>
+    <string name="search">Search</string>
+    <string name="library">Library</string>
+    <string name="playing_from">Playing from</string>
+    <string name="queue">Cola</string>
+    <string name="lyrics">Lyrics</string>
+    <string name="audio_output">Audio output</string>
+    <string name="share">Compartir</string>
+    <string name="share_lyrics">Compartir la letra</string>
+</resources>
