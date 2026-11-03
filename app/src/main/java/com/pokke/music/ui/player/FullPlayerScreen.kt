@@ -6,18 +6,7 @@ import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -31,22 +20,8 @@ import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material.icons.outlined.QueueMusic
 import androidx.compose.material.icons.outlined.Speaker
 import androidx.compose.material.icons.outlined.Subtitles
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.Slider
-import androidx.compose.material3.SliderDefaults
-import androidx.compose.material3.Text
-import androidx.compose.material3.rememberModalBottomSheetState
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
@@ -63,77 +38,43 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
-import com.pokke.music.data.model.Song
 import com.pokke.music.player.PlayerController
 import com.pokke.music.ui.sheets.AudioOutputSheet
 import com.pokke.music.ui.sheets.OverflowMenuSheet
 import com.pokke.music.ui.sheets.ShareLyricsSheet
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.isActive
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FullPlayerScreen(
     onBack: () -> Unit,
     onOpenQueue: () -> Unit,
-    onOpenLyrics: () -> Unit,
-    song: Song? = null
+    onOpenLyrics: () -> Unit
 ) {
     val context = LocalContext.current
-    LaunchedEffect(Unit) {
-        PlayerController.init(context)
-    }
-
-    // If a song is passed in, start playing it
-    LaunchedEffect(song?.id) {
-        if (song != null && !song.audioUrl.isNullOrBlank()) {
-            PlayerController.playSong(song)
-        } else if (song != null) {
-            PlayerController.playSong(song)
-        }
-    }
-
     val current by PlayerController.currentSong.collectAsState()
     val isPlaying by PlayerController.isPlaying.collectAsState()
     val positionMs by PlayerController.positionMs.collectAsState()
     val durationMs by PlayerController.durationMs.collectAsState()
 
-    val display = current ?: song
-    val cover = display?.coverUrl ?: display?.animatedCoverUrl
-
-    // Poll position while visible
-    LaunchedEffect(Unit) {
-        while (isActive) {
-            PlayerController.pollPosition()
-            delay(200)
-        }
-    }
+    val cover = current?.coverUrl
 
     var volume by remember { mutableFloatStateOf(0.8f) }
     var showAudioOutput by remember { mutableStateOf(false) }
     var showOverflow by remember { mutableStateOf(false) }
     var showShareLyrics by remember { mutableStateOf(false) }
-    var userSeeking by remember { mutableStateOf(false) }
-    var seekValue by remember { mutableFloatStateOf(0f) }
 
-    val progress = if (userSeeking) seekValue
-    else if (durationMs > 0) (positionMs.toFloat() / durationMs.toFloat()).coerceIn(0f, 1f)
-    else 0f
+    val progress = if (durationMs > 0) (positionMs.toFloat() / durationMs.toFloat()).coerceIn(0f, 1f) else 0f
 
-    val playPauseScale by animateFloatAsState(
+    val playScale by animateFloatAsState(
         targetValue = if (isPlaying) 1f else 0.92f,
         animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
-        label = "playPauseScale"
+        label = "playScale"
     )
 
     Box(modifier = Modifier.fillMaxSize()) {
-        // Blurred cover background
         if (!cover.isNullOrBlank()) {
             AsyncImage(
-                model = ImageRequest.Builder(context)
-                    .data(cover)
-                    .crossfade(true)
-                    .build(),
+                model = ImageRequest.Builder(context).data(cover).crossfade(true).build(),
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
@@ -145,11 +86,7 @@ fun FullPlayerScreen(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(
-                    Brush.verticalGradient(
-                        listOf(Color(0x99000000), Color(0xCC000000), Color(0xEE000000))
-                    )
-                )
+                .background(Brush.verticalGradient(listOf(Color(0x99000000), Color(0xEE000000))))
         )
 
         Column(
@@ -166,26 +103,16 @@ fun FullPlayerScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(onClick = onBack) {
-                    Icon(
-                        Icons.Default.KeyboardArrowDown,
-                        contentDescription = "Close",
-                        tint = Color.White,
-                        modifier = Modifier.size(32.dp)
-                    )
+                    Icon(Icons.Default.KeyboardArrowDown, contentDescription = "Close", tint = Color.White, modifier = Modifier.size(32.dp))
                 }
-                Text(
-                    text = "Now playing",
-                    color = Color.White.copy(alpha = 0.7f),
-                    fontSize = 13.sp
-                )
+                Text("Playing from Buscar", color = Color.White.copy(alpha = 0.7f), fontSize = 13.sp)
                 IconButton(onClick = { showOverflow = true }) {
                     Icon(Icons.Default.MoreHoriz, contentDescription = "More", tint = Color.White)
                 }
             }
 
-            Spacer(modifier = Modifier.weight(0.06f))
+            Spacer(modifier = Modifier.weight(0.05f))
 
-            // Album art
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -196,10 +123,7 @@ fun FullPlayerScreen(
             ) {
                 if (!cover.isNullOrBlank()) {
                     AsyncImage(
-                        model = ImageRequest.Builder(context)
-                            .data(cover)
-                            .crossfade(true)
-                            .build(),
+                        model = ImageRequest.Builder(context).data(cover).crossfade(true).build(),
                         contentDescription = null,
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxSize()
@@ -209,43 +133,30 @@ fun FullPlayerScreen(
 
             Spacer(modifier = Modifier.height(28.dp))
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = display?.title ?: "—",
-                        color = Color.White,
-                        fontSize = 22.sp,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = display?.artist ?: "",
-                        color = Color.White.copy(alpha = 0.7f),
-                        fontSize = 15.sp,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-                IconButton(onClick = { showOverflow = true }) {
-                    Icon(
-                        Icons.Default.MoreHoriz,
-                        contentDescription = "More",
-                        tint = Color.White.copy(alpha = 0.8f)
-                    )
-                }
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    text = current?.title ?: "From The Start",
+                    color = Color.White,
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = current?.artist ?: "Laufey",
+                    color = Color.White.copy(alpha = 0.7f),
+                    fontSize = 15.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
             }
 
             Spacer(modifier = Modifier.height(16.dp))
 
             Text(
-                text = if (display?.audioUrl.isNullOrBlank()) "Sin audio disponible"
-                else "Toca para ver la letra",
-                color = Color.White.copy(alpha = 0.55f),
+                text = "Listening to you harp on 'bout some new s...",
+                color = Color.White.copy(alpha = 0.8f),
                 fontSize = 14.sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -260,14 +171,7 @@ fun FullPlayerScreen(
             Column {
                 Slider(
                     value = progress,
-                    onValueChange = {
-                        userSeeking = true
-                        seekValue = it
-                    },
-                    onValueChangeFinished = {
-                        PlayerController.seekToFraction(seekValue)
-                        userSeeking = false
-                    },
+                    onValueChange = { PlayerController.seekToFraction(it) },
                     modifier = Modifier.fillMaxWidth(),
                     colors = SliderDefaults.colors(
                         thumbColor = Color.White,
@@ -279,16 +183,8 @@ fun FullPlayerScreen(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Text(
-                        text = formatTime(if (userSeeking) (seekValue * durationMs).toLong() else positionMs),
-                        color = Color.White.copy(alpha = 0.6f),
-                        fontSize = 12.sp
-                    )
-                    Text(
-                        text = formatTime(durationMs),
-                        color = Color.White.copy(alpha = 0.6f),
-                        fontSize = 12.sp
-                    )
+                    Text(formatTime(positionMs), color = Color.White.copy(alpha = 0.6f), fontSize = 12.sp)
+                    Text("-${formatTime(durationMs - positionMs)}", color = Color.White.copy(alpha = 0.6f), fontSize = 12.sp)
                 }
             }
 
@@ -299,40 +195,29 @@ fun FullPlayerScreen(
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(onClick = { }, modifier = Modifier.size(56.dp)) {
-                    Icon(
-                        Icons.Default.SkipPrevious,
-                        contentDescription = "Previous",
-                        tint = Color.White,
-                        modifier = Modifier.size(40.dp)
-                    )
+                IconButton(onClick = {}, modifier = Modifier.size(56.dp)) {
+                    Icon(Icons.Default.SkipPrevious, contentDescription = null, tint = Color.White, modifier = Modifier.size(40.dp))
                 }
                 Box(
                     modifier = Modifier
                         .size(72.dp)
-                        .scale(playPauseScale)
+                        .scale(playScale)
                         .clip(CircleShape)
                         .background(Color.White)
-                        .clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = null
-                        ) { PlayerController.togglePlayPause() },
+                        .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {
+                            PlayerController.togglePlayPause()
+                        },
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                        contentDescription = if (isPlaying) "Pause" else "Play",
+                        contentDescription = null,
                         tint = Color.Black,
                         modifier = Modifier.size(40.dp)
                     )
                 }
-                IconButton(onClick = { }, modifier = Modifier.size(56.dp)) {
-                    Icon(
-                        Icons.Default.SkipNext,
-                        contentDescription = "Next",
-                        tint = Color.White,
-                        modifier = Modifier.size(40.dp)
-                    )
+                IconButton(onClick = {}, modifier = Modifier.size(56.dp)) {
+                    Icon(Icons.Default.SkipNext, contentDescription = null, tint = Color.White, modifier = Modifier.size(40.dp))
                 }
             }
 
@@ -342,18 +227,11 @@ fun FullPlayerScreen(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(
-                    Icons.Default.VolumeUp,
-                    contentDescription = null,
-                    tint = Color.White.copy(alpha = 0.6f),
-                    modifier = Modifier.size(20.dp)
-                )
+                Icon(Icons.Default.VolumeUp, contentDescription = null, tint = Color.White.copy(alpha = 0.6f), modifier = Modifier.size(20.dp))
                 Slider(
                     value = volume,
                     onValueChange = { volume = it },
-                    modifier = Modifier
-                        .weight(1f)
-                        .padding(horizontal = 12.dp),
+                    modifier = Modifier.weight(1f).padding(horizontal = 12.dp),
                     colors = SliderDefaults.colors(
                         thumbColor = Color.White,
                         activeTrackColor = Color.White,
@@ -362,67 +240,40 @@ fun FullPlayerScreen(
                 )
             }
 
-            Spacer(modifier = Modifier.weight(0.12f))
+            Spacer(modifier = Modifier.weight(0.1f))
 
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 12.dp),
+                modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(onClick = onOpenLyrics) {
-                    Icon(
-                        Icons.Outlined.Subtitles,
-                        contentDescription = "Lyrics",
-                        tint = Color.White.copy(alpha = 0.85f),
-                        modifier = Modifier.size(26.dp)
-                    )
+                    Icon(Icons.Outlined.Subtitles, contentDescription = "Lyrics", tint = Color.White.copy(alpha = 0.85f), modifier = Modifier.size(26.dp))
                 }
                 IconButton(onClick = { showAudioOutput = true }) {
-                    Icon(
-                        Icons.Outlined.Speaker,
-                        contentDescription = "Audio output",
-                        tint = Color.White.copy(alpha = 0.85f),
-                        modifier = Modifier.size(26.dp)
-                    )
+                    Icon(Icons.Outlined.Speaker, contentDescription = "Audio Output", tint = Color.White.copy(alpha = 0.85f), modifier = Modifier.size(26.dp))
                 }
                 IconButton(onClick = onOpenQueue) {
-                    Icon(
-                        Icons.Outlined.QueueMusic,
-                        contentDescription = "Queue",
-                        tint = Color.White.copy(alpha = 0.85f),
-                        modifier = Modifier.size(26.dp)
-                    )
+                    Icon(Icons.Outlined.QueueMusic, contentDescription = "Queue", tint = Color.White.copy(alpha = 0.85f), modifier = Modifier.size(26.dp))
                 }
             }
 
             Text(
-                text = if (display?.audioUrl.isNullOrBlank()) "Sin stream" else "Streaming",
+                text = "CMF Buds 2a",
                 color = Color.White.copy(alpha = 0.5f),
                 fontSize = 12.sp,
-                modifier = Modifier
-                    .align(Alignment.CenterHorizontally)
-                    .padding(bottom = 16.dp)
+                modifier = Modifier.align(Alignment.CenterHorizontally).padding(bottom = 16.dp)
             )
         }
     }
 
     if (showAudioOutput) {
-        ModalBottomSheet(
-            onDismissRequest = { showAudioOutput = false },
-            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-            containerColor = Color(0xFF1C1C1C)
-        ) {
+        ModalBottomSheet(onDismissRequest = { showAudioOutput = false }, containerColor = Color(0xFF1C1C1C)) {
             AudioOutputSheet(onDismiss = { showAudioOutput = false })
         }
     }
     if (showOverflow) {
-        ModalBottomSheet(
-            onDismissRequest = { showOverflow = false },
-            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-            containerColor = Color(0xFF1C1C1C)
-        ) {
+        ModalBottomSheet(onDismissRequest = { showOverflow = false }, containerColor = Color(0xFF1C1C1C)) {
             OverflowMenuSheet(
                 onDismiss = { showOverflow = false },
                 onShareLyrics = {
@@ -433,11 +284,7 @@ fun FullPlayerScreen(
         }
     }
     if (showShareLyrics) {
-        ModalBottomSheet(
-            onDismissRequest = { showShareLyrics = false },
-            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-            containerColor = Color(0xFF1C1C1C)
-        ) {
+        ModalBottomSheet(onDismissRequest = { showShareLyrics = false }, containerColor = Color(0xFF1C1C1C)) {
             ShareLyricsSheet(onDismiss = { showShareLyrics = false })
         }
     }
@@ -445,8 +292,6 @@ fun FullPlayerScreen(
 
 private fun formatTime(ms: Long): String {
     if (ms <= 0) return "0:00"
-    val totalSeconds = (ms / 1000).toInt()
-    val minutes = totalSeconds / 60
-    val seconds = totalSeconds % 60
-    return "%d:%02d".format(minutes, seconds)
+    val totalSec = (ms / 1000).toInt()
+    return "%d:%02d".format(totalSec / 60, totalSec % 60)
 }
