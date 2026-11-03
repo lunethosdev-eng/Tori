@@ -1,7 +1,5 @@
 package com.pokke.music.ui.home
 
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -10,93 +8,141 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.pokke.music.data.model.Song
+import com.pokke.music.data.repository.MusicRepository
 import com.pokke.music.ui.theme.PokkeBlack
 import com.pokke.music.ui.theme.PokkeOnSurfaceVariant
-
-// Mock data matching the style of the reference player
-private val continueListening = listOf(
-    Song("1", "From The Start", "Laufey", coverUrl = "https://i.scdn.co/image/ab67616d0000b273c5649add07ed3740e1a0c3e0"),
-    Song("2", "Lover Girl", "Laufey", coverUrl = "https://i.scdn.co/image/ab67616d0000b273c5649add07ed3740e1a0c3e0"),
-    Song("3", "rises the moon", "liana flores", coverUrl = "https://i.scdn.co/image/ab67616d0000b273c5649add07ed3740e1a0c3e0")
-)
-
-private val recentSongs = listOf(
-    Song("1", "From The Start", "Laufey"),
-    Song("4", "I Thought I Saw Your Face Today", "She & Him"),
-    Song("5", "Bewitched", "Laufey"),
-    Song("6", "Valentine", "Laufey"),
-    Song("7", "Promise", "Laufey")
-)
 
 @Composable
 fun HomeScreen(
     onSongClick: (Song) -> Unit,
-    onOpenPlayer: () -> Unit
+    onOpenPlayer: () -> Unit,
+    onOpenSettings: () -> Unit = {},
+    onOpenProfile: () -> Unit = {}
 ) {
+    val repo = remember { MusicRepository() }
+    var songs by remember { mutableStateOf<List<Song>>(emptyList()) }
+    var loading by remember { mutableStateOf(true) }
+    var error by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(Unit) {
+        loading = true
+        repo.getRecentSongs(40)
+            .onSuccess {
+                songs = it
+                error = null
+            }
+            .onFailure {
+                error = it.message ?: "Error al cargar"
+            }
+        loading = false
+    }
+
+    val continueList = songs.take(12)
+    val recentList = songs.take(20)
+
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
             .background(PokkeBlack),
-        contentPadding = PaddingValues(bottom = 24.dp)
+        contentPadding = PaddingValues(bottom = 100.dp)
     ) {
-        // Top bar
         item {
-            Row(
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 20.dp, vertical = 16.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                    .statusBarsPadding()
+                    .padding(horizontal = 16.dp, vertical = 12.dp)
             ) {
-                Text(
-                    text = "Pokke",
-                    color = Color.White,
-                    fontSize = 28.sp,
-                    fontWeight = FontWeight.Bold
-                )
-                Row {
-                    IconButton(onClick = { /* Search */ }) {
-                        Icon(Icons.Default.Search, contentDescription = "Search", tint = Color.White)
-                    }
-                    IconButton(onClick = { /* Profile */ }) {
-                        Icon(Icons.Default.Person, contentDescription = "Profile", tint = Color.White)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(28.dp))
+                        .background(Color(0xFF1A1A1A))
+                        .padding(horizontal = 18.dp, vertical = 12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Pokke",
+                        color = Color.White,
+                        fontSize = 24.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        IconButton(
+                            onClick = onOpenSettings,
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clip(CircleShape)
+                                .background(Color(0xFF2A2A2A))
+                        ) {
+                            Icon(
+                                Icons.Default.Settings,
+                                contentDescription = "Settings",
+                                tint = Color.White,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        IconButton(
+                            onClick = onOpenProfile,
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clip(CircleShape)
+                                .background(Color(0xFF2A2A2A))
+                        ) {
+                            Icon(
+                                Icons.Default.Person,
+                                contentDescription = "Profile",
+                                tint = Color.White,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
                     }
                 }
             }
         }
 
-        // Greeting
         item {
             Text(
                 text = "Buenas tardes",
@@ -107,21 +153,40 @@ fun HomeScreen(
             )
         }
 
-        // Continue listening
+        if (loading) {
+            item {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(120.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator(color = Color.White)
+                }
+            }
+        } else if (error != null) {
+            item {
+                Text(
+                    text = error ?: "",
+                    color = Color(0xFFFF8A80),
+                    modifier = Modifier.padding(20.dp)
+                )
+            }
+        }
+
         item {
             SectionTitle("Continuar escuchando")
             LazyRow(
                 contentPadding = PaddingValues(horizontal = 20.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                items(continueListening) { song ->
+                items(continueList, key = { it.id }) { song ->
                     ContinueCard(song = song, onClick = { onSongClick(song) })
                 }
             }
             Spacer(modifier = Modifier.height(28.dp))
         }
 
-        // Made for you
         item {
             SectionTitle("Hecho para ti")
             Box(
@@ -129,13 +194,15 @@ fun HomeScreen(
                     .fillMaxWidth()
                     .padding(horizontal = 20.dp)
                     .height(140.dp)
-                    .clip(RoundedCornerShape(16.dp))
+                    .clip(RoundedCornerShape(20.dp))
                     .background(
                         Brush.horizontalGradient(
                             listOf(Color(0xFF3D2B1F), Color(0xFF1A1512))
                         )
                     )
-                    .clickable { onOpenPlayer() }
+                    .clickable {
+                        songs.firstOrNull()?.let { onSongClick(it) } ?: onOpenPlayer()
+                    }
                     .padding(20.dp)
             ) {
                 Column(
@@ -150,20 +217,19 @@ fun HomeScreen(
                     )
                     Spacer(modifier = Modifier.height(6.dp))
                     Text(
-                        text = "Laufey, She & Him, liana flores y más",
+                        text = songs.take(3).joinToString { it.artist }.ifBlank { "Tu mezcla del día" },
                         color = PokkeOnSurfaceVariant,
-                        fontSize = 14.sp
+                        fontSize = 14.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
             }
             Spacer(modifier = Modifier.height(28.dp))
         }
 
-        // Recent
-        item {
-            SectionTitle("Recientes")
-        }
-        items(recentSongs) { song ->
+        item { SectionTitle("Recientes") }
+        items(recentList, key = { "r-${it.id}" }) { song ->
             RecentSongRow(song = song, onClick = { onSongClick(song) })
         }
     }
@@ -182,6 +248,7 @@ private fun SectionTitle(title: String) {
 
 @Composable
 private fun ContinueCard(song: Song, onClick: () -> Unit) {
+    val context = LocalContext.current
     Column(
         modifier = Modifier
             .width(140.dp)
@@ -190,12 +257,15 @@ private fun ContinueCard(song: Song, onClick: () -> Unit) {
         Box(
             modifier = Modifier
                 .size(140.dp)
-                .clip(RoundedCornerShape(12.dp))
+                .clip(RoundedCornerShape(16.dp))
                 .background(Color(0xFF2A2A2A))
         ) {
             if (!song.coverUrl.isNullOrEmpty()) {
                 AsyncImage(
-                    model = song.coverUrl,
+                    model = ImageRequest.Builder(context)
+                        .data(song.coverUrl)
+                        .crossfade(true)
+                        .build(),
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize()
@@ -223,6 +293,7 @@ private fun ContinueCard(song: Song, onClick: () -> Unit) {
 
 @Composable
 private fun RecentSongRow(song: Song, onClick: () -> Unit) {
+    val context = LocalContext.current
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -233,9 +304,21 @@ private fun RecentSongRow(song: Song, onClick: () -> Unit) {
         Box(
             modifier = Modifier
                 .size(52.dp)
-                .clip(RoundedCornerShape(8.dp))
+                .clip(RoundedCornerShape(10.dp))
                 .background(Color(0xFF2A2A2A))
-        )
+        ) {
+            if (!song.coverUrl.isNullOrEmpty()) {
+                AsyncImage(
+                    model = ImageRequest.Builder(context)
+                        .data(song.coverUrl)
+                        .crossfade(true)
+                        .build(),
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
+        }
         Spacer(modifier = Modifier.width(14.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(
@@ -254,12 +337,8 @@ private fun RecentSongRow(song: Song, onClick: () -> Unit) {
                 overflow = TextOverflow.Ellipsis
             )
         }
-        IconButton(onClick = { /* more */ }) {
-            Icon(
-                Icons.Default.MoreVert,
-                contentDescription = "More",
-                tint = PokkeOnSurfaceVariant
-            )
+        IconButton(onClick = { }) {
+            Icon(Icons.Default.MoreVert, contentDescription = "More", tint = PokkeOnSurfaceVariant)
         }
     }
 }
