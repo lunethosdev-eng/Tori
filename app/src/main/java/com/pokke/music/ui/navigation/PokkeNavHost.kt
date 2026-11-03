@@ -1,34 +1,35 @@
 package com.pokke.music.ui.navigation
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.LibraryMusic
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.LibraryMusic
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -37,7 +38,9 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.pokke.music.data.preferences.UserPreferences
 import com.pokke.music.player.PlayerController
+import com.pokke.music.ui.auth.LoginScreen
 import com.pokke.music.ui.home.HomeScreen
 import com.pokke.music.ui.library.LibraryScreen
 import com.pokke.music.ui.player.FullPlayerScreen
@@ -47,9 +50,10 @@ import com.pokke.music.ui.search.SearchScreen
 import com.pokke.music.ui.settings.SettingsScreen
 
 sealed class Screen(val route: String) {
+    data object Auth : Screen("auth")
     data object Home : Screen("home")
-    data object Search : Screen("search")
     data object Library : Screen("library")
+    data object Search : Screen("search")
     data object Player : Screen("player")
     data object Queue : Screen("queue")
     data object Lyrics : Screen("lyrics")
@@ -63,27 +67,38 @@ data class BottomNavItem(
     val unselectedIcon: ImageVector
 )
 
+// Search va de último
 private val bottomNavItems = listOf(
     BottomNavItem(Screen.Home, "Home", Icons.Filled.Home, Icons.Outlined.Home),
-    BottomNavItem(Screen.Search, "Search", Icons.Filled.Search, Icons.Outlined.Search),
-    BottomNavItem(Screen.Library, "Library", Icons.Filled.LibraryMusic, Icons.Outlined.LibraryMusic)
+    BottomNavItem(Screen.Library, "Library", Icons.Filled.LibraryMusic, Icons.Outlined.LibraryMusic),
+    BottomNavItem(Screen.Search, "Search", Icons.Filled.Search, Icons.Outlined.Search)
 )
 
 @Composable
 fun PokkeNavHost() {
     val navController = rememberNavController()
     val context = LocalContext.current
+    val prefs = remember { UserPreferences(context) }
+    
+    val liquidGlassEnabled by prefs.liquidGlassEnabled.collectAsState(initial = false)
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
+
+    var isScrolled by remember { mutableStateOf(false) }
 
     val showBottomBar = currentRoute in listOf(
         Screen.Home.route, Screen.Search.route, Screen.Library.route
     )
 
-    fun openSong(song: com.pokke.music.data.model.Song) {
-        PlayerController.init(context)
-        PlayerController.playSong(song)
-        navController.navigate(Screen.Player.route)
+    val searchSeparation = remember { Animatable(0f) }
+    LaunchedEffect(isScrolled) {
+        searchSeparation.animateTo(
+            targetValue = if (isScrolled) 1f else 0f,
+            animationSpec = spring(
+                dampingRatio = if (liquidGlassEnabled) Spring.DampingRatioLowBouncy else Spring.DampingRatioNoBouncy,
+                stiffness = Spring.StiffnessLow
+            )
+        )
     }
 
     Scaffold(
@@ -94,44 +109,103 @@ fun PokkeNavHost() {
                     modifier = Modifier
                         .fillMaxWidth()
                         .navigationBarsPadding()
-                        .padding(horizontal = 24.dp, vertical = 12.dp),
+                        .padding(horizontal = 20.dp, vertical = 12.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Row(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(32.dp))
-                            .background(Color(0xFF1C1C1C))
-                            .padding(horizontal = 8.dp, vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp * searchSeparation.value)
                     ) {
-                        bottomNavItems.forEach { item ->
-                            val selected = currentRoute == item.screen.route
-                            IconButton(
-                                onClick = {
-                                    navController.navigate(item.screen.route) {
-                                        popUpTo(navController.graph.findStartDestination().id) {
-                                            saveState = true
-                                        }
+                        // Nav Principal (Home + Library + Profile dinámico)
+                        Row(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(32.dp))
+                                .background(
+                                    if (liquidGlassEnabled) Color.White.copy(alpha = 0.12f)
+                                    else Color(0xFF1C1C1C)
+                                )
+                                .then(
+                                    if (liquidGlassEnabled) Modifier.blur(16.dp)
+                                    else Modifier
+                                )
+                                .padding(horizontal = 12.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            bottomNavItems.take(2).forEach { item ->
+                                val selected = currentRoute == item.screen.route
+                                Box(
+                                    modifier = Modifier
+                                        .size(48.dp)
+                                        .clip(CircleShape)
+                                        .background(if (selected) Color(0xFF2E2E2E) else Color.Transparent)
+                                        .clickable {
+                                            navController.navigate(item.screen.route) {
+                                                popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                                                launchSingleTop = true
+                                                restoreState = true
+                                            }
+                                        },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = if (selected) item.selectedIcon else item.unselectedIcon,
+                                        contentDescription = item.label,
+                                        tint = if (selected) Color.White else Color(0xFF888888),
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                }
+                            }
+
+                            // Botón de Perfil que baja al Nav al hacer scroll
+                            if (isScrolled) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(48.dp)
+                                        .clip(CircleShape)
+                                        .background(Color(0xFF2A2A2A))
+                                        .clickable { navController.navigate(Screen.Auth.route) },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Person,
+                                        contentDescription = "Profile",
+                                        tint = Color.White,
+                                        modifier = Modifier.size(22.dp)
+                                    )
+                                }
+                            }
+                        }
+
+                        // Search Separado con Animación tipo Gota (Liquid)
+                        val searchSelected = currentRoute == Screen.Search.route
+                        Box(
+                            modifier = Modifier
+                                .graphicsLayer {
+                                    translationX = searchSeparation.value * 8.dp.toPx()
+                                    scaleX = 1f + (searchSeparation.value * 0.05f)
+                                }
+                                .size(48.dp)
+                                .clip(CircleShape)
+                                .background(
+                                    if (searchSelected) Color(0xFF2E2E2E) 
+                                    else if (liquidGlassEnabled) Color.White.copy(alpha = 0.12f)
+                                    else Color(0xFF1C1C1C)
+                                )
+                                .clickable {
+                                    navController.navigate(Screen.Search.route) {
+                                        popUpTo(navController.graph.findStartDestination().id) { saveState = true }
                                         launchSingleTop = true
                                         restoreState = true
                                     }
                                 },
-                                modifier = Modifier
-                                    .size(56.dp)
-                                    .then(
-                                        if (selected) Modifier
-                                            .clip(RoundedCornerShape(28.dp))
-                                            .background(Color(0xFF2E2E2E))
-                                        else Modifier
-                                    )
-                            ) {
-                                Icon(
-                                    imageVector = if (selected) item.selectedIcon else item.unselectedIcon,
-                                    contentDescription = item.label,
-                                    tint = if (selected) Color.White else Color(0xFF888888),
-                                    modifier = Modifier.size(24.dp)
-                                )
-                            }
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = if (searchSelected) Icons.Filled.Search else Icons.Outlined.Search,
+                                contentDescription = "Search",
+                                tint = if (searchSelected) Color.White else Color(0xFF888888),
+                                modifier = Modifier.size(24.dp)
+                            )
                         }
                     }
                 }
@@ -145,30 +219,46 @@ fun PokkeNavHost() {
             enterTransition = { fadeIn(animationSpec = tween(250)) },
             exitTransition = { fadeOut(animationSpec = tween(250)) }
         ) {
+            composable(Screen.Auth.route) {
+                LoginScreen(
+                    onContinueAsGuest = { navController.popBackStack() },
+                    onLoginSuccess = { navController.popBackStack() }
+                )
+            }
             composable(Screen.Home.route) {
                 HomeScreen(
-                    onSongClick = { openSong(it) },
+                    onSongClick = { song ->
+                        PlayerController.init(context)
+                        PlayerController.playSong(song)
+                        navController.navigate(Screen.Player.route)
+                    },
                     onOpenPlayer = { navController.navigate(Screen.Player.route) },
-                    onOpenSettings = { navController.navigate(Screen.Settings.route) }
+                    onOpenSettings = { navController.navigate(Screen.Settings.route) },
+                    onOpenProfile = { navController.navigate(Screen.Auth.route) },
+                    onScrollStateChanged = { scrolled -> isScrolled = scrolled }
                 )
             }
             composable(Screen.Search.route) {
-                SearchScreen(onSongClick = { openSong(it) })
+                SearchScreen(onSongClick = { song ->
+                    PlayerController.init(context)
+                    PlayerController.playSong(song)
+                    navController.navigate(Screen.Player.route)
+                })
             }
             composable(Screen.Library.route) {
-                LibraryScreen(onSongClick = { openSong(it) })
+                LibraryScreen(onSongClick = { song ->
+                    PlayerController.init(context)
+                    PlayerController.playSong(song)
+                    navController.navigate(Screen.Player.route)
+                })
             }
             composable(Screen.Settings.route) {
                 SettingsScreen(onBack = { navController.popBackStack() })
             }
             composable(
                 route = Screen.Player.route,
-                enterTransition = {
-                    slideInVertically(initialOffsetY = { it }, animationSpec = tween(400)) + fadeIn(tween(400))
-                },
-                exitTransition = {
-                    slideOutVertically(targetOffsetY = { it }, animationSpec = tween(350)) + fadeOut(tween(350))
-                }
+                enterTransition = { slideInVertically(initialOffsetY = { it }, animationSpec = tween(400)) + fadeIn(tween(400)) },
+                exitTransition = { slideOutVertically(targetOffsetY = { it }, animationSpec = tween(350)) + fadeOut(tween(350)) }
             ) {
                 FullPlayerScreen(
                     onBack = { navController.popBackStack() },
