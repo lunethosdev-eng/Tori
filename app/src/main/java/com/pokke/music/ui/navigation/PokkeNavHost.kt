@@ -67,7 +67,7 @@ data class BottomNavItem(
     val unselectedIcon: ImageVector
 )
 
-// Search va de último
+// Orden: Home, Library, Search (Search al final dentro del mismo nav por defecto)
 private val bottomNavItems = listOf(
     BottomNavItem(Screen.Home, "Home", Icons.Filled.Home, Icons.Outlined.Home),
     BottomNavItem(Screen.Library, "Library", Icons.Filled.LibraryMusic, Icons.Outlined.LibraryMusic),
@@ -90,13 +90,14 @@ fun PokkeNavHost() {
         Screen.Home.route, Screen.Search.route, Screen.Library.route
     )
 
+    // Animación de separación de tipo gota líquida (Liquid Glass) al hacer scroll
     val searchSeparation = remember { Animatable(0f) }
     LaunchedEffect(isScrolled) {
         searchSeparation.animateTo(
             targetValue = if (isScrolled) 1f else 0f,
             animationSpec = spring(
-                dampingRatio = if (liquidGlassEnabled) Spring.DampingRatioLowBouncy else Spring.DampingRatioNoBouncy,
-                stiffness = Spring.StiffnessLow
+                dampingRatio = if (liquidGlassEnabled) 0.55f else Spring.DampingRatioNoBouncy,
+                stiffness = Spring.StiffnessMediumLow
             )
         )
     }
@@ -114,55 +115,45 @@ fun PokkeNavHost() {
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp * searchSeparation.value)
+                        horizontalArrangement = Arrangement.spacedBy(10.dp * searchSeparation.value)
                     ) {
-                        // Nav Principal (Home + Library + Profile dinámico)
+                        // Contenedor Nav Principal (Home, Library y opcionalmente Perfil y Search si no hay scroll)
                         Row(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(32.dp))
                                 .background(
-                                    if (liquidGlassEnabled) Color.White.copy(alpha = 0.12f)
-                                    else Color(0xFF1C1C1C)
+                                    if (liquidGlassEnabled) Color.White.copy(alpha = 0.10f)
+                                    else Color(0xFF141414)
                                 )
-                                .then(
-                                    if (liquidGlassEnabled) Modifier.blur(16.dp)
-                                    else Modifier
-                                )
-                                .padding(horizontal = 12.dp, vertical = 6.dp),
+                                .padding(horizontal = 10.dp, vertical = 6.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
+                            // Elementos fijos (Home, Library)
                             bottomNavItems.take(2).forEach { item ->
                                 val selected = currentRoute == item.screen.route
-                                Box(
-                                    modifier = Modifier
-                                        .size(48.dp)
-                                        .clip(CircleShape)
-                                        .background(if (selected) Color(0xFF2E2E2E) else Color.Transparent)
-                                        .clickable {
-                                            navController.navigate(item.screen.route) {
-                                                popUpTo(navController.graph.findStartDestination().id) { saveState = true }
-                                                launchSingleTop = true
-                                                restoreState = true
-                                            }
-                                        },
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(
-                                        imageVector = if (selected) item.selectedIcon else item.unselectedIcon,
-                                        contentDescription = item.label,
-                                        tint = if (selected) Color.White else Color(0xFF888888),
-                                        modifier = Modifier.size(24.dp)
-                                    )
-                                }
+                                NavIconButton(
+                                    selected = selected,
+                                    selectedIcon = item.selectedIcon,
+                                    unselectedIcon = item.unselectedIcon,
+                                    label = item.label,
+                                    onClick = {
+                                        navController.navigate(item.screen.route) {
+                                            popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                                            launchSingleTop = true
+                                            restoreState = true
+                                        }
+                                    }
+                                )
                             }
 
-                            // Botón de Perfil que baja al Nav al hacer scroll
+                            // Si hay scroll, el perfil aparece integrado en el nav
                             if (isScrolled) {
+                                Spacer(modifier = Modifier.width(4.dp))
                                 Box(
                                     modifier = Modifier
-                                        .size(48.dp)
+                                        .size(46.dp)
                                         .clip(CircleShape)
-                                        .background(Color(0xFF2A2A2A))
+                                        .background(Color(0xFF252525))
                                         .clickable { navController.navigate(Screen.Auth.route) },
                                     contentAlignment = Alignment.Center
                                 ) {
@@ -170,42 +161,64 @@ fun PokkeNavHost() {
                                         imageVector = Icons.Default.Person,
                                         contentDescription = "Profile",
                                         tint = Color.White,
-                                        modifier = Modifier.size(22.dp)
+                                        modifier = Modifier.size(20.dp)
                                     )
                                 }
                             }
+
+                            // Si NO hay scroll, Search vive dentro de este mismo contenedor (al final)
+                            if (!isScrolled) {
+                                Spacer(modifier = Modifier.width(4.dp))
+                                val searchItem = bottomNavItems[2]
+                                val selected = currentRoute == searchItem.screen.route
+                                NavIconButton(
+                                    selected = selected,
+                                    selectedIcon = searchItem.selectedIcon,
+                                    unselectedIcon = searchItem.unselectedIcon,
+                                    label = searchItem.label,
+                                    onClick = {
+                                        navController.navigate(searchItem.screen.route) {
+                                            popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                                            launchSingleTop = true
+                                            restoreState = true
+                                        }
+                                    }
+                                )
+                            }
                         }
 
-                        // Search Separado con Animación tipo Gota (Liquid)
-                        val searchSelected = currentRoute == Screen.Search.route
-                        Box(
-                            modifier = Modifier
-                                .graphicsLayer {
-                                    translationX = searchSeparation.value * 8.dp.toPx()
-                                    scaleX = 1f + (searchSeparation.value * 0.05f)
-                                }
-                                .size(48.dp)
-                                .clip(CircleShape)
-                                .background(
-                                    if (searchSelected) Color(0xFF2E2E2E) 
-                                    else if (liquidGlassEnabled) Color.White.copy(alpha = 0.12f)
-                                    else Color(0xFF1C1C1C)
-                                )
-                                .clickable {
-                                    navController.navigate(Screen.Search.route) {
-                                        popUpTo(navController.graph.findStartDestination().id) { saveState = true }
-                                        launchSingleTop = true
-                                        restoreState = true
+                        // Search Separado en burbuja independiente cuando se hace scroll (Efecto Gota Líquida)
+                        if (isScrolled) {
+                            val searchSelected = currentRoute == Screen.Search.route
+                            Box(
+                                modifier = Modifier
+                                    .graphicsLayer {
+                                        scaleX = 0.8f + (0.2f * searchSeparation.value)
+                                        scaleY = scaleX
                                     }
-                                },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = if (searchSelected) Icons.Filled.Search else Icons.Outlined.Search,
-                                contentDescription = "Search",
-                                tint = if (searchSelected) Color.White else Color(0xFF888888),
-                                modifier = Modifier.size(24.dp)
-                            )
+                                    .size(54.dp)
+                                    .clip(CircleShape)
+                                    .background(
+                                        if (searchSelected) Color(0xFF2E2E2E)
+                                        else if (liquidGlassEnabled) Color.White.copy(alpha = 0.12f)
+                                        else Color(0xFF1C1C1C)
+                                    )
+                                    .clickable {
+                                        navController.navigate(Screen.Search.route) {
+                                            popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                                            launchSingleTop = true
+                                            restoreState = true
+                                        }
+                                    },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = if (searchSelected) Icons.Filled.Search else Icons.Outlined.Search,
+                                    contentDescription = "Search",
+                                    tint = if (searchSelected) Color.White else Color(0xFF888888),
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
                         }
                     }
                 }
@@ -220,10 +233,7 @@ fun PokkeNavHost() {
             exitTransition = { fadeOut(animationSpec = tween(250)) }
         ) {
             composable(Screen.Auth.route) {
-                LoginScreen(
-                    onContinueAsGuest = { navController.popBackStack() },
-                    onLoginSuccess = { navController.popBackStack() }
-                )
+                LoginScreen(onContinueAsGuest = { navController.popBackStack() }, onLoginSuccess = { navController.popBackStack() })
             }
             composable(Screen.Home.route) {
                 HomeScreen(
@@ -266,12 +276,33 @@ fun PokkeNavHost() {
                     onOpenLyrics = { navController.navigate(Screen.Lyrics.route) }
                 )
             }
-            composable(Screen.Queue.route) {
-                QueueScreen(onBack = { navController.popBackStack() })
-            }
-            composable(Screen.Lyrics.route) {
-                LyricsScreen(onBack = { navController.popBackStack() })
-            }
+            composable(Screen.Queue.route) { QueueScreen(onBack = { navController.popBackStack() }) }
+            composable(Screen.Lyrics.route) { LyricsScreen(onBack = { navController.popBackStack() }) }
         }
+    }
+}
+
+@Composable
+private fun NavIconButton(
+    selected: Boolean,
+    selectedIcon: ImageVector,
+    unselectedIcon: ImageVector,
+    label: String,
+    onClick: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .size(48.dp)
+            .clip(CircleShape)
+            .background(if (selected) Color(0xFF2E2E2E) else Color.Transparent)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(
+            imageVector = if (selected) selectedIcon else unselectedIcon,
+            contentDescription = label,
+            tint = if (selected) Color.White else Color(0xFF888888),
+            modifier = Modifier.size(24.dp)
+        )
     }
 }
