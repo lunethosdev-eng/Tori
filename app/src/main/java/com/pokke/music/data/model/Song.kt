@@ -65,5 +65,9 @@ data class UserProfile(
     val cardStyle: String? = "glass",
     val badges: String? = null,
     val linkLabel: String? = null,
-    val linkUrl: String? = null
+    val linkUrl: String? = null,
+    /** When true, other users can see what you're currently listening to on your profile. */
+    val showListening: Boolean = true,
+    /** Extra links as "label|url,label|url". Primary link remains linkLabel/linkUrl. */
+    val extraLinks: String? = null
 )
