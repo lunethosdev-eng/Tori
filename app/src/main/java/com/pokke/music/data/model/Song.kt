@@ -13,19 +13,29 @@ data class Song(
     val lyricsUrl: String? = null,
     val genre: String? = null,
     val youtubeId: String? = null,
-    // Optional parsed lyrics for UI demos
     val lyrics: List<LyricLine> = emptyList()
 ) {
-    val hasAnimatedCover: Boolean
-        get() = !animatedCoverUrl.isNullOrBlank()
-
-    val durationMs: Long
-        get() = durationSeconds * 1000L
+    val hasAnimatedCover: Boolean get() = !animatedCoverUrl.isNullOrBlank()
+    val durationMs: Long get() = durationSeconds * 1000L
+    val displayCoverUrl: String?
+        get() = coverUrl?.takeIf(String::isNotBlank)
+            ?: youtubeId?.takeIf(String::isNotBlank)?.let { "https://i.ytimg.com/vi/$it/hqdefault.jpg" }
 }
 
-data class LyricLine(
-    val timeMs: Long,
-    val text: String
+data class LyricLine(val timeMs: Long, val text: String)
+
+data class Artist(
+    val id: String,
+    val name: String,
+    val imageUrl: String? = null,
+    val bio: String? = null
+)
+
+data class Album(
+    val name: String,
+    val artist: String,
+    val coverUrl: String? = null,
+    val songCount: Int = 0
 )
 
 data class Playlist(
