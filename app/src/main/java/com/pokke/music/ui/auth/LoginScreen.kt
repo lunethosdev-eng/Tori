@@ -36,7 +36,7 @@ fun LoginScreen(
     val session by repository.session.collectAsState()
 
     if (session != null) {
-        ProfileScreen(repository = repository, onSignedOut = onContinueAsGuest)
+        ProfileScreen(repository = repository, onBack = {}, onSignedOut = onContinueAsGuest)
         return
     }
 
