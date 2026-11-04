@@ -97,7 +97,7 @@ class AuthRepository(context: Context) {
         }
     }
 
-    suspend fun updateProfile(displayName: String, username: String, bio: String, avatarUrl: String? = null, bannerUrl: String? = null, theme: String? = null): Result<UserProfile> = withContext(Dispatchers.IO) {
+    suspend fun updateProfile(displayName: String, username: String, bio: String, avatarUrl: String? = null, bannerUrl: String? = null, theme: String? = null, frame: String? = null, badge: String? = null, pronouns: String? = null, statusText: String? = null, accentColor: String? = null, cardStyle: String? = null, badges: String? = null, isPublic: Boolean? = null, linkLabel: String? = null, linkUrl: String? = null): Result<UserProfile> = withContext(Dispatchers.IO) {
         runCatching {
             val s = requireSession()
             require(username.matches(Regex("[a-zA-Z0-9_.]{3,24}"))) { "El usuario debe tener 3–24 caracteres: letras, números, _ o ." }
@@ -109,6 +109,16 @@ class AuthRepository(context: Context) {
                 if (avatarUrl != null) { if (avatarUrl.isBlank()) put("avatar_url", JSONObject.NULL) else put("avatar_url", avatarUrl.trim()) }
                 if (bannerUrl != null) { if (bannerUrl.isBlank()) put("banner_url", JSONObject.NULL) else put("banner_url", bannerUrl.trim()) }
                 if (theme != null) put("theme", theme)
+                if (frame != null) put("frame", frame)
+                if (badge != null) put("badge", badge)
+                if (pronouns != null) put("pronouns", pronouns)
+                if (statusText != null) put("status_text", statusText)
+                if (accentColor != null) put("accent_color", accentColor)
+                if (cardStyle != null) put("card_style", cardStyle)
+                if (badges != null) put("badges", badges)
+                if (isPublic != null) put("is_public", isPublic)
+                if (linkLabel != null) put("link_label", linkLabel)
+                if (linkUrl != null) put("link_url", linkUrl)
             }
             val rows = JSONArray(request(KokoroConfig.PROFILES, "POST", s, params = mapOf("on_conflict" to "id"), body = body.toString(), prefer = "resolution=merge-duplicates,return=representation"))
             if (rows.length() == 0) throw IOException("Kokoro no devolvió el perfil actualizado")
@@ -281,7 +291,10 @@ class AuthRepository(context: Context) {
         id = o.getString("id"), displayName = o.optString("display_name").nullable(), username = o.optString("username").nullable(),
         avatarUrl = o.optString("avatar_url").nullable(), bannerUrl = o.optString("banner_url").nullable(), bio = o.optString("bio").nullable(),
         theme = o.optString("theme", "default"), frame = o.optString("frame", "none"), isPublic = o.optBoolean("is_public", true),
-        isArtist = o.optBoolean("is_artist", false), badge = o.optString("badge", "none")
+        isArtist = o.optBoolean("is_artist", false), badge = o.optString("badge", "none"),
+        pronouns = o.optString("pronouns").nullable(), statusText = o.optString("status_text").nullable(),
+        accentColor = o.optString("accent_color", "violet"), cardStyle = o.optString("card_style", "glass"),
+        badges = o.optString("badges").nullable(), linkLabel = o.optString("link_label").nullable(), linkUrl = o.optString("link_url").nullable()
     )
 
     private fun authRequest(path: String, body: JSONObject): JSONObject = JSONObject(http(path, "POST", body = body.toString(), authToken = null))
