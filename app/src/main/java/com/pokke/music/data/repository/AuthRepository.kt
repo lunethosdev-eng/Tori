@@ -97,7 +97,26 @@ class AuthRepository(context: Context) {
         }
     }
 
-    suspend fun updateProfile(displayName: String, username: String, bio: String, avatarUrl: String? = null, bannerUrl: String? = null, theme: String? = null, frame: String? = null, badge: String? = null, pronouns: String? = null, statusText: String? = null, accentColor: String? = null, cardStyle: String? = null, badges: String? = null, isPublic: Boolean? = null, linkLabel: String? = null, linkUrl: String? = null): Result<UserProfile> = withContext(Dispatchers.IO) {
+    suspend fun updateProfile(
+        displayName: String,
+        username: String,
+        bio: String,
+        avatarUrl: String? = null,
+        bannerUrl: String? = null,
+        theme: String? = null,
+        frame: String? = null,
+        badge: String? = null,
+        pronouns: String? = null,
+        statusText: String? = null,
+        accentColor: String? = null,
+        cardStyle: String? = null,
+        badges: String? = null,
+        isPublic: Boolean? = null,
+        linkLabel: String? = null,
+        linkUrl: String? = null,
+        showListening: Boolean? = null,
+        extraLinks: String? = null
+    ): Result<UserProfile> = withContext(Dispatchers.IO) {
         runCatching {
             val s = requireSession()
             require(username.matches(Regex("[a-zA-Z0-9_.]{3,24}"))) { "El usuario debe tener 3–24 caracteres: letras, números, _ o ." }
@@ -119,10 +138,58 @@ class AuthRepository(context: Context) {
                 if (isPublic != null) put("is_public", isPublic)
                 if (linkLabel != null) put("link_label", linkLabel)
                 if (linkUrl != null) put("link_url", linkUrl)
+                if (showListening != null) put("show_listening", showListening)
+                if (extraLinks != null) put("extra_links", extraLinks)
             }
             val rows = JSONArray(request(KokoroConfig.PROFILES, "POST", s, params = mapOf("on_conflict" to "id"), body = body.toString(), prefer = "resolution=merge-duplicates,return=representation"))
             if (rows.length() == 0) throw IOException("Kokoro no devolvió el perfil actualizado")
             parseProfile(rows.getJSONObject(0))
+        }
+    }
+
+    /** Public lookup by username (only returns is_public = true profiles unless it's your own). */
+    suspend fun getProfileByUsername(username: String): Result<UserProfile?> = withContext(Dispatchers.IO) {
+        runCatching {
+            val clean = username.trim().lowercase().removePrefix("@")
+            require(clean.isNotBlank()) { "Escribe un nombre de usuario" }
+            val s = _session.value
+            val params = mutableMapOf(
+                "username" to "eq.$clean",
+                "select" to "*",
+                "limit" to "1"
+            )
+            val body = if (s != null) {
+                request(KokoroConfig.PROFILES, "GET", s, params = params)
+            } else {
+                // Anonymous read (requires RLS allowing public profiles)
+                http(KokoroConfig.PROFILES, "GET", params)
+            }
+            val rows = JSONArray(body)
+            if (rows.length() == 0) null else {
+                val p = parseProfile(rows.getJSONObject(0))
+                if (!p.isPublic && p.id != s?.userId) null else p
+            }
+        }
+    }
+
+    /** Search public profiles by username or display name. */
+    suspend fun searchUsers(query: String, limit: Int = 30): Result<List<UserProfile>> = withContext(Dispatchers.IO) {
+        runCatching {
+            require(query.isNotBlank()) { "Escribe algo para buscar" }
+            val term = query.trim().lowercase().removePrefix("@")
+            val pattern = "*$term*"
+            val s = _session.value
+            val params = mapOf(
+                "select" to "id,display_name,username,avatar_url,banner_url,bio,theme,frame,is_public,badge,pronouns,status_text,accent_color,card_style,badges,link_label,link_url,show_listening",
+                "or" to "(username.ilike.$pattern,display_name.ilike.$pattern)",
+                "is_public" to "eq.true",
+                "order" to "username.asc",
+                "limit" to limit.coerceIn(1, 50).toString()
+            )
+            val body = if (s != null) request(KokoroConfig.PROFILES, "GET", s, params = params)
+            else http(KokoroConfig.PROFILES, "GET", params)
+            val rows = JSONArray(body)
+            (0 until rows.length()).map { parseProfile(rows.getJSONObject(it)) }
         }
     }
 
@@ -288,13 +355,26 @@ class AuthRepository(context: Context) {
     }
 
     private fun parseProfile(o: JSONObject) = UserProfile(
-        id = o.getString("id"), displayName = o.optString("display_name").nullable(), username = o.optString("username").nullable(),
-        avatarUrl = o.optString("avatar_url").nullable(), bannerUrl = o.optString("banner_url").nullable(), bio = o.optString("bio").nullable(),
-        theme = o.optString("theme", "default"), frame = o.optString("frame", "none"), isPublic = o.optBoolean("is_public", true),
-        isArtist = o.optBoolean("is_artist", false), badge = o.optString("badge", "none"),
-        pronouns = o.optString("pronouns").nullable(), statusText = o.optString("status_text").nullable(),
-        accentColor = o.optString("accent_color", "violet"), cardStyle = o.optString("card_style", "glass"),
-        badges = o.optString("badges").nullable(), linkLabel = o.optString("link_label").nullable(), linkUrl = o.optString("link_url").nullable()
+        id = o.getString("id"),
+        displayName = o.optString("display_name").nullable(),
+        username = o.optString("username").nullable(),
+        avatarUrl = o.optString("avatar_url").nullable(),
+        bannerUrl = o.optString("banner_url").nullable(),
+        bio = o.optString("bio").nullable(),
+        theme = o.optString("theme", "default"),
+        frame = o.optString("frame", "none"),
+        isPublic = o.optBoolean("is_public", true),
+        isArtist = o.optBoolean("is_artist", false),
+        badge = o.optString("badge", "none"),
+        pronouns = o.optString("pronouns").nullable(),
+        statusText = o.optString("status_text").nullable(),
+        accentColor = o.optString("accent_color", "violet"),
+        cardStyle = o.optString("card_style", "glass"),
+        badges = o.optString("badges").nullable(),
+        linkLabel = o.optString("link_label").nullable(),
+        linkUrl = o.optString("link_url").nullable(),
+        showListening = if (o.has("show_listening")) o.optBoolean("show_listening", true) else true,
+        extraLinks = o.optString("extra_links").nullable()
     )
 
     private fun authRequest(path: String, body: JSONObject): JSONObject = JSONObject(http(path, "POST", body = body.toString(), authToken = null))
