@@ -57,7 +57,7 @@ fun FullPlayerScreen(
     val durationMs by PlayerController.durationMs.collectAsState()
     val playbackError by PlayerController.playbackError.collectAsState()
 
-    val cover = current?.coverUrl
+    val cover = current?.displayCoverUrl
 
     var volume by remember { mutableFloatStateOf(0.8f) }
     var showAudioOutput by remember { mutableStateOf(false) }
@@ -164,7 +164,7 @@ fun FullPlayerScreen(
             Spacer(modifier = Modifier.height(16.dp))
 
             Text(
-                text = "Listening to you harp on 'bout some new s...",
+                text = current?.lyricsText?.lineSequence()?.firstOrNull { it.isNotBlank() && !it.startsWith("[") && !it.startsWith("Letras de") && !it.startsWith("Procesado") } ?: "Ver letras de la canción",
                 color = Color.White.copy(alpha = 0.8f),
                 fontSize = 14.sp,
                 maxLines = 1,
