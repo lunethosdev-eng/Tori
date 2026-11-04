@@ -97,7 +97,7 @@ class AuthRepository(context: Context) {
         }
     }
 
-    suspend fun updateProfile(displayName: String, username: String, bio: String): Result<UserProfile> = withContext(Dispatchers.IO) {
+    suspend fun updateProfile(displayName: String, username: String, bio: String, avatarUrl: String? = null, bannerUrl: String? = null, theme: String? = null): Result<UserProfile> = withContext(Dispatchers.IO) {
         runCatching {
             val s = requireSession()
             require(username.matches(Regex("[a-zA-Z0-9_.]{3,24}"))) { "El usuario debe tener 3–24 caracteres: letras, números, _ o ." }
@@ -106,6 +106,9 @@ class AuthRepository(context: Context) {
                 put("display_name", displayName.trim())
                 put("username", username.trim().lowercase())
                 put("bio", bio.trim())
+                if (avatarUrl != null) { if (avatarUrl.isBlank()) put("avatar_url", JSONObject.NULL) else put("avatar_url", avatarUrl.trim()) }
+                if (bannerUrl != null) { if (bannerUrl.isBlank()) put("banner_url", JSONObject.NULL) else put("banner_url", bannerUrl.trim()) }
+                if (theme != null) put("theme", theme)
             }
             val rows = JSONArray(request(KokoroConfig.PROFILES, "POST", s, params = mapOf("on_conflict" to "id"), body = body.toString(), prefer = "resolution=merge-duplicates,return=representation"))
             if (rows.length() == 0) throw IOException("Kokoro no devolvió el perfil actualizado")
