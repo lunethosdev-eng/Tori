@@ -12,7 +12,8 @@ import com.pokke.music.data.preferences.UserPreferences
 
 @Composable
 fun PokkeTheme(content: @Composable () -> Unit) {
-    val prefs = androidx.compose.runtime.remember { UserPreferences(LocalContext.current) }
+    val context = LocalContext.current
+    val prefs = androidx.compose.runtime.remember(context) { UserPreferences(context) }
     val selectedTheme by prefs.appTheme.collectAsState("dark")
     val accent by prefs.accentColor.collectAsState("white")
     val primary = when (accent) {
