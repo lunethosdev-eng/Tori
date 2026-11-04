@@ -17,6 +17,9 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.filled.VolumeUp
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.outlined.FavoriteBorder
+import androidx.compose.material.icons.filled.QueueMusic
 import androidx.compose.material.icons.outlined.QueueMusic
 import androidx.compose.material.icons.outlined.Speaker
 import androidx.compose.material.icons.outlined.Subtitles
@@ -39,6 +42,8 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.pokke.music.player.PlayerController
+import com.pokke.music.data.repository.AuthRepository
+import com.pokke.music.data.model.Playlist
 import com.pokke.music.ui.sheets.AudioOutputSheet
 import com.pokke.music.ui.sheets.OverflowMenuSheet
 import com.pokke.music.ui.sheets.ShareLyricsSheet
@@ -48,7 +53,9 @@ import com.pokke.music.ui.sheets.ShareLyricsSheet
 fun FullPlayerScreen(
     onBack: () -> Unit,
     onOpenQueue: () -> Unit,
-    onOpenLyrics: () -> Unit
+    onOpenLyrics: () -> Unit,
+    authRepository: AuthRepository,
+    onRequireLogin: () -> Unit
 ) {
     val context = LocalContext.current
     val current by PlayerController.currentSong.collectAsState()
@@ -63,6 +70,16 @@ fun FullPlayerScreen(
     var showAudioOutput by remember { mutableStateOf(false) }
     var showOverflow by remember { mutableStateOf(false) }
     var showShareLyrics by remember { mutableStateOf(false) }
+    var showPlaylistPicker by remember { mutableStateOf(false) }
+    var playlists by remember { mutableStateOf<List<Playlist>>(emptyList()) }
+    var isFavorite by remember { mutableStateOf(false) }
+    var favoriteMessage by remember { mutableStateOf<String?>(null) }
+    val authSession by authRepository.session.collectAsState()
+    val scope = rememberCoroutineScope()
+
+    LaunchedEffect(current?.id, authSession?.userId) {
+        isFavorite = if (current != null && authSession != null) authRepository.isFavorite(current!!.id).getOrDefault(false) else false
+    }
 
     val progress = if (durationMs > 0) (positionMs.toFloat() / durationMs.toFloat()).coerceIn(0f, 1f) else 0f
 
@@ -134,30 +151,35 @@ fun FullPlayerScreen(
 
             Spacer(modifier = Modifier.height(28.dp))
 
-            Column(modifier = Modifier.fillMaxWidth()) {
-                Text(
-                    text = current?.title ?: "From The Start",
-                    color = Color.White,
-                    fontSize = 22.sp,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = current?.artist ?: "Laufey",
-                    color = Color.White.copy(alpha = 0.7f),
-                    fontSize = 15.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                if (playbackError != null) {
+            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = playbackError.orEmpty(),
-                        color = Color(0xFFFF8A80),
-                        fontSize = 12.sp,
-                        modifier = Modifier.padding(top = 6.dp)
+                        text = current?.title ?: "From The Start",
+                        color = Color.White,
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = current?.artist ?: "Laufey",
+                        color = Color.White.copy(alpha = 0.7f),
+                        fontSize = 15.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    if (playbackError != null) Text(playbackError.orEmpty(), color = Color(0xFFFF8A80), fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp))
+                }
+                IconButton(onClick = {
+                    val song = current ?: return@IconButton
+                    if (authSession == null) { favoriteMessage = "Inicia sesión para sincronizar favoritos" }
+                    else {
+                        val next = !isFavorite; isFavorite = next
+                        scope.launch { authRepository.setFavorite(song, next).onFailure { isFavorite = !next; favoriteMessage = it.localizedMessage } }
+                    }
+                }) {
+                    Icon(if (isFavorite) Icons.Default.Favorite else Icons.Outlined.FavoriteBorder, "Favorito", tint = if (isFavorite) Color(0xFFFF6B81) else Color.White.copy(.8f), modifier = Modifier.size(25.dp))
                 }
             }
 
@@ -265,6 +287,12 @@ fun FullPlayerScreen(
                 IconButton(onClick = onOpenQueue) {
                     Icon(Icons.Outlined.QueueMusic, contentDescription = "Queue", tint = Color.White.copy(alpha = 0.85f), modifier = Modifier.size(26.dp))
                 }
+                IconButton(onClick = {
+                    if (authSession == null) favoriteMessage = "Inicia sesión para crear y sincronizar playlists"
+                    else scope.launch { authRepository.getPlaylists().onSuccess { playlists = it; showPlaylistPicker = true }.onFailure { favoriteMessage = it.localizedMessage } }
+                }) {
+                    Icon(Icons.Default.QueueMusic, contentDescription = "Añadir a playlist", tint = Color.White.copy(alpha = 0.85f), modifier = Modifier.size(26.dp))
+                }
             }
 
             Text(
@@ -304,6 +332,27 @@ fun FullPlayerScreen(
         ModalBottomSheet(onDismissRequest = { showShareLyrics = false }, containerColor = Color(0xFF1C1C1C)) {
             ShareLyricsSheet(onDismiss = { showShareLyrics = false })
         }
+    }
+    if (showPlaylistPicker) {
+        AlertDialog(
+            onDismissRequest = { showPlaylistPicker = false },
+            title = { Text("Añadir a playlist") },
+            text = {
+                if (playlists.isEmpty()) Text("Todavía no tienes playlists. Crea una desde Tu biblioteca.")
+                else Column { playlists.forEach { playlist ->
+                    TextButton(onClick = {
+                        val song = current
+                        if (song != null) scope.launch {
+                            authRepository.addSongToPlaylist(playlist.id, song).onSuccess { showPlaylistPicker = false; favoriteMessage = "Añadida a ${playlist.name}" }.onFailure { favoriteMessage = it.localizedMessage }
+                        }
+                    }, modifier = Modifier.fillMaxWidth()) { Text("${playlist.name} · ${playlist.songCount} canciones") }
+                } }
+            },
+            confirmButton = { TextButton(onClick = { showPlaylistPicker = false }) { Text("Cerrar") } }
+        )
+    }
+    if (favoriteMessage != null) {
+        AlertDialog(onDismissRequest = { favoriteMessage = null }, text = { Text(favoriteMessage.orEmpty()) }, confirmButton = { TextButton(onClick = { favoriteMessage = null; if (authSession == null) onRequireLogin() }) { Text("Entendido") } })
     }
 }
 
