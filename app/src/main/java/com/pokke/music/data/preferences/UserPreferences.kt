@@ -23,6 +23,8 @@ class UserPreferences(private val context: Context) {
         private val CROSSFADE = floatPreferencesKey("crossfade_seconds")
         private val ACCENT = stringPreferencesKey("accent_color")
         private val THEME = stringPreferencesKey("app_theme")
+        private val SHOW_LISTENING = booleanPreferencesKey("show_listening_on_profile")
+        private val SHOW_LINK_EMBEDS = booleanPreferencesKey("show_link_embeds")
     }
     val liquidGlassEnabled: Flow<Boolean> = context.dataStore.data.map { it[LIQUID_GLASS] ?: true }
     val autoAnimatedCovers: Flow<Boolean> = context.dataStore.data.map { it[AUTO_ANIMATED_COVERS] ?: true }
@@ -32,6 +34,10 @@ class UserPreferences(private val context: Context) {
     val crossfadeSeconds: Flow<Float> = context.dataStore.data.map { it[CROSSFADE] ?: 0f }
     val accentColor: Flow<String> = context.dataStore.data.map { it[ACCENT] ?: "white" }
     val appTheme: Flow<String> = context.dataStore.data.map { it[THEME] ?: "dark" }
+    /** Default ON: others can see what you are listening to on your public profile. */
+    val showListeningOnProfile: Flow<Boolean> = context.dataStore.data.map { it[SHOW_LISTENING] ?: true }
+    /** Default ON: link cards expand / show rich preview when possible. */
+    val showLinkEmbeds: Flow<Boolean> = context.dataStore.data.map { it[SHOW_LINK_EMBEDS] ?: true }
 
     suspend fun setLiquidGlass(v: Boolean) = context.dataStore.edit { it[LIQUID_GLASS] = v }
     suspend fun setAutoAnimatedCovers(v: Boolean) = context.dataStore.edit { it[AUTO_ANIMATED_COVERS] = v }
@@ -41,4 +47,6 @@ class UserPreferences(private val context: Context) {
     suspend fun setCrossfadeSeconds(v: Float) = context.dataStore.edit { it[CROSSFADE] = v.coerceIn(0f, 12f) }
     suspend fun setAccentColor(v: String) = context.dataStore.edit { it[ACCENT] = v }
     suspend fun setAppTheme(v: String) = context.dataStore.edit { it[THEME] = v }
+    suspend fun setShowListeningOnProfile(v: Boolean) = context.dataStore.edit { it[SHOW_LISTENING] = v }
+    suspend fun setShowLinkEmbeds(v: Boolean) = context.dataStore.edit { it[SHOW_LINK_EMBEDS] = v }
 }
