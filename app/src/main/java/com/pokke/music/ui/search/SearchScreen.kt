@@ -42,7 +42,9 @@ import kotlinx.coroutines.launch
 import com.pokke.music.ui.theme.PokkeBlack
 import kotlinx.coroutines.delay
 
-private enum class SearchKind(val label: String) { SONGS("Canciones"), ARTISTS("Artistas"), ALBUMS("Álbumes") }
+private enum class SearchKind(val label: String) {
+    SONGS("Canciones"), ARTISTS("Artistas"), ALBUMS("Álbumes"), USERS("Usuarios")
+}
 private data class SearchDetail(val title: String, val artist: String? = null, val isArtist: Boolean)
 
 @Composable
@@ -50,7 +52,8 @@ fun SearchScreen(
     authRepository: AuthRepository,
     isVisible: Boolean = true,
     onSongClick: (Song) -> Unit = {},
-    onPlayQueue: (List<Song>, Int) -> Unit = { songs, index -> songs.getOrNull(index)?.let(onSongClick) }
+    onPlayQueue: (List<Song>, Int) -> Unit = { songs, index -> songs.getOrNull(index)?.let(onSongClick) },
+    onUserClick: (String) -> Unit = {}
 ) {
     val repo = remember { MusicRepository() }
     val session by authRepository.session.collectAsState()
@@ -61,6 +64,7 @@ fun SearchScreen(
     var songs by remember { mutableStateOf<List<Song>>(emptyList()) }
     var artists by remember { mutableStateOf<List<Artist>>(emptyList()) }
     var albums by remember { mutableStateOf<List<Album>>(emptyList()) }
+    var users by remember { mutableStateOf<List<com.pokke.music.data.model.UserProfile>>(emptyList()) }
     var detail by remember { mutableStateOf<SearchDetail?>(null) }
     var detailSongs by remember { mutableStateOf<List<Song>>(emptyList()) }
     var loading by remember { mutableStateOf(false) }
@@ -86,7 +90,7 @@ fun SearchScreen(
     LaunchedEffect(query, kind) {
         detail = null
         if (query.isBlank()) {
-            songs = emptyList(); artists = emptyList(); albums = emptyList()
+            songs = emptyList(); artists = emptyList(); albums = emptyList(); users = emptyList()
             loading = false; error = null
             return@LaunchedEffect
         }
@@ -103,6 +107,9 @@ fun SearchScreen(
             SearchKind.ALBUMS -> repo.searchAlbums(query)
                 .onSuccess { albums = it }
                 .onFailure { error = it.localizedMessage ?: "No se pudieron buscar álbumes"; albums = emptyList() }
+            SearchKind.USERS -> authRepository.searchUsers(query)
+                .onSuccess { users = it }
+                .onFailure { error = it.localizedMessage ?: "No se pudieron buscar usuarios"; users = emptyList() }
         }
         loading = false
     }
@@ -163,7 +170,7 @@ fun SearchScreen(
                     }
                 }
             }
-            query.isBlank() -> EmptyMessage("Busca canciones, artistas o álbumes de Ukiyo")
+            query.isBlank() -> EmptyMessage("Busca canciones, artistas, álbumes o usuarios")
             kind == SearchKind.SONGS -> {
                 if (songs.isEmpty()) EmptyMessage("No se encontraron canciones")
                 else LazyColumn(contentPadding = PaddingValues(bottom = 112.dp)) {
@@ -175,6 +182,14 @@ fun SearchScreen(
                 else LazyColumn(contentPadding = PaddingValues(bottom = 112.dp)) {
                     itemsIndexed(artists, key = { _, artist -> artist.id.ifBlank { artist.name } }) { _, artist ->
                         ArtistRow(artist) { detail = SearchDetail(artist.name, isArtist = true) }
+                    }
+                }
+            }
+            kind == SearchKind.USERS -> {
+                if (users.isEmpty()) EmptyMessage("No se encontraron usuarios públicos")
+                else LazyColumn(contentPadding = PaddingValues(bottom = 112.dp)) {
+                    itemsIndexed(users, key = { _, u -> u.id }) { _, user ->
+                        UserRow(user) { user.username?.let(onUserClick) }
                     }
                 }
             }
@@ -259,6 +274,44 @@ private fun AlbumRow(album: Album, onClick: () -> Unit) {
             Text(album.artist, color = Color.White.copy(alpha = .55f), fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         Text("${album.songCount} pistas", color = Color.White.copy(alpha = .4f), fontSize = 11.sp)
+    }
+}
+
+@Composable
+private fun UserRow(user: com.pokke.music.data.model.UserProfile, onClick: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 20.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        CoverImage(user.avatarUrl, 52, circle = true)
+        Spacer(Modifier.width(14.dp))
+        Column(Modifier.weight(1f)) {
+            Text(
+                user.displayName?.ifBlank { null } ?: user.username ?: "Usuario",
+                color = Color.White,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Medium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                "@${user.username.orEmpty()}",
+                color = Color.White.copy(alpha = .55f),
+                fontSize = 13.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+        if (!user.statusText.isNullOrBlank()) {
+            Text(
+                user.statusText!!,
+                color = Color.White.copy(alpha = .4f),
+                fontSize = 11.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.widthIn(max = 100.dp)
+            )
+        }
     }
 }
 
