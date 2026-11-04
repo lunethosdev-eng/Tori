@@ -22,7 +22,8 @@ import kotlinx.coroutines.launch
 
 @Composable
 fun SettingsScreen(onBack: () -> Unit) {
-    val prefs = remember { UserPreferences(LocalContext.current) }
+    val context = LocalContext.current
+    val prefs = remember(context) { UserPreferences(context) }
     val scope = rememberCoroutineScope()
     val glass by prefs.liquidGlassEnabled.collectAsState(true)
     val blur by prefs.blurPlayerBackground.collectAsState(true)
