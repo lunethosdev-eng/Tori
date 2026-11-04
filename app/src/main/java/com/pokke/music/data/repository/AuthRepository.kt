@@ -152,6 +152,7 @@ class AuthRepository(context: Context) {
             } else {
                 request(KokoroConfig.FAVORITES, "DELETE", s, params = mapOf("user_id" to "eq.${s.userId}", "song_id" to "eq.${song.id}"))
             }
+            Unit
         }
     }
 
@@ -212,11 +213,20 @@ class AuthRepository(context: Context) {
         }
     }
 
+    suspend fun removeSongFromPlaylist(playlistId: String, songId: String): Result<Unit> = withContext(Dispatchers.IO) {
+        runCatching {
+            val s = requireSession()
+            request(KokoroConfig.PLAYLIST_SONGS, "DELETE", s, params = mapOf("playlist_id" to "eq.$playlistId", "song_id" to "eq.$songId"))
+            Unit
+        }
+    }
+
     suspend fun deletePlaylist(playlistId: String): Result<Unit> = withContext(Dispatchers.IO) {
         runCatching {
             val s = requireSession()
             request(KokoroConfig.PLAYLIST_SONGS, "DELETE", s, params = mapOf("playlist_id" to "eq.$playlistId"))
             request(KokoroConfig.PLAYLISTS, "DELETE", s, params = mapOf("id" to "eq.$playlistId"))
+            Unit
         }
     }
 
