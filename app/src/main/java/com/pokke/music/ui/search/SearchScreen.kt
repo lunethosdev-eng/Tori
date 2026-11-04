@@ -11,6 +11,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
@@ -35,6 +37,8 @@ import com.pokke.music.data.model.Album
 import com.pokke.music.data.model.Artist
 import com.pokke.music.data.model.Song
 import com.pokke.music.data.repository.MusicRepository
+import com.pokke.music.data.repository.AuthRepository
+import kotlinx.coroutines.launch
 import com.pokke.music.ui.theme.PokkeBlack
 import kotlinx.coroutines.delay
 
@@ -43,10 +47,15 @@ private data class SearchDetail(val title: String, val artist: String? = null, v
 
 @Composable
 fun SearchScreen(
+    authRepository: AuthRepository,
+    isVisible: Boolean = true,
     onSongClick: (Song) -> Unit = {},
     onPlayQueue: (List<Song>, Int) -> Unit = { songs, index -> songs.getOrNull(index)?.let(onSongClick) }
 ) {
     val repo = remember { MusicRepository() }
+    val session by authRepository.session.collectAsState()
+    val scope = rememberCoroutineScope()
+    var favoriteIds by remember { mutableStateOf<Set<String>>(emptySet()) }
     var query by remember { mutableStateOf("") }
     var kind by remember { mutableStateOf(SearchKind.SONGS) }
     var songs by remember { mutableStateOf<List<Song>>(emptyList()) }
@@ -56,6 +65,23 @@ fun SearchScreen(
     var detailSongs by remember { mutableStateOf<List<Song>>(emptyList()) }
     var loading by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(session?.userId, isVisible) {
+        if (session != null && isVisible) authRepository.getFavorites().onSuccess { favoriteIds = it.map { song -> song.id }.toSet() }
+        else if (session == null) favoriteIds = emptySet()
+    }
+
+    fun toggleFavorite(song: Song) {
+        if (session == null) { error = "Inicia sesión para sincronizar tus favoritos"; return }
+        val wasFavorite = favoriteIds.contains(song.id)
+        favoriteIds = if (wasFavorite) favoriteIds - song.id else favoriteIds + song.id
+        scope.launch {
+            authRepository.setFavorite(song, !wasFavorite).onFailure {
+                favoriteIds = if (wasFavorite) favoriteIds + song.id else favoriteIds - song.id
+                error = it.localizedMessage ?: "No se pudo sincronizar el favorito"
+            }
+        }
+    }
 
     LaunchedEffect(query, kind) {
         detail = null
@@ -133,7 +159,7 @@ fun SearchScreen(
                 if (detailSongs.isEmpty()) EmptyMessage("Este artista o álbum todavía no tiene canciones disponibles")
                 else LazyColumn(contentPadding = PaddingValues(bottom = 112.dp)) {
                     itemsIndexed(detailSongs, key = { _, song -> song.id }) { index, song ->
-                        SongRow(song) { onPlayQueue(detailSongs, index) }
+                        SongRow(song, favoriteIds.contains(song.id), { toggleFavorite(song) }) { onPlayQueue(detailSongs, index) }
                     }
                 }
             }
@@ -141,7 +167,7 @@ fun SearchScreen(
             kind == SearchKind.SONGS -> {
                 if (songs.isEmpty()) EmptyMessage("No se encontraron canciones")
                 else LazyColumn(contentPadding = PaddingValues(bottom = 112.dp)) {
-                    itemsIndexed(songs, key = { _, song -> song.id }) { index, song -> SongRow(song) { onPlayQueue(songs, index) } }
+                    itemsIndexed(songs, key = { _, song -> song.id }) { index, song -> SongRow(song, favoriteIds.contains(song.id), { toggleFavorite(song) }) { onPlayQueue(songs, index) } }
                 }
             }
             kind == SearchKind.ARTISTS -> {
@@ -190,7 +216,7 @@ private fun SearchField(query: String, onQueryChange: (String) -> Unit) {
 }
 
 @Composable
-private fun SongRow(song: Song, onClick: () -> Unit) {
+private fun SongRow(song: Song, isFavorite: Boolean, onFavoriteClick: () -> Unit, onClick: () -> Unit) {
     Row(
         modifier = Modifier.fillMaxWidth().clickable(enabled = !song.audioUrl.isNullOrBlank(), onClick = onClick).padding(horizontal = 20.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -204,7 +230,10 @@ private fun SongRow(song: Song, onClick: () -> Unit) {
                 color = Color.White.copy(alpha = .58f), fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis
             )
         }
-        song.durationSeconds.takeIf { it > 0 }?.let { Text(formatDuration(it), color = Color.White.copy(alpha = .4f), fontSize = 11.sp) }
+        if (song.durationSeconds > 0) Text(formatDuration(song.durationSeconds), color = Color.White.copy(alpha = .4f), fontSize = 11.sp)
+        IconButton(onClick = onFavoriteClick, modifier = Modifier.size(40.dp)) {
+            Icon(if (isFavorite) Icons.Default.Favorite else Icons.Outlined.FavoriteBorder, contentDescription = "Favorito", tint = if (isFavorite) Color(0xFFFF6B81) else Color.White.copy(.55f), modifier = Modifier.size(20.dp))
+        }
     }
 }
 
