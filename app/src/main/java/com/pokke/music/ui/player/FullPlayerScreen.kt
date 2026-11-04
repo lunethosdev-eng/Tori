@@ -19,12 +19,17 @@ import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.outlined.FavoriteBorder
-import androidx.compose.material.icons.filled.QueueMusic
 import androidx.compose.material.icons.outlined.QueueMusic
 import androidx.compose.material.icons.outlined.Speaker
 import androidx.compose.material.icons.outlined.Subtitles
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import android.content.Intent
+import android.widget.Toast
+import com.pokke.music.data.repository.LocalLibraryStore
+import com.pokke.music.data.repository.AuthRepository
+import com.pokke.music.data.model.Playlist
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
@@ -42,11 +47,8 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.pokke.music.player.PlayerController
-import com.pokke.music.data.repository.AuthRepository
-import com.pokke.music.data.model.Playlist
 import com.pokke.music.ui.sheets.AudioOutputSheet
 import com.pokke.music.ui.sheets.OverflowMenuSheet
-import com.pokke.music.ui.sheets.ShareLyricsSheet
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -69,16 +71,20 @@ fun FullPlayerScreen(
     var volume by remember { mutableFloatStateOf(0.8f) }
     var showAudioOutput by remember { mutableStateOf(false) }
     var showOverflow by remember { mutableStateOf(false) }
-    var showShareLyrics by remember { mutableStateOf(false) }
+    var showSleepTimer by remember { mutableStateOf(false) }
+    var showSongInfo by remember { mutableStateOf(false) }
     var showPlaylistPicker by remember { mutableStateOf(false) }
+    var timerMinutes by remember { mutableIntStateOf(30) }
+    val libraryStore = remember { LocalLibraryStore(context.applicationContext) }
     var playlists by remember { mutableStateOf<List<Playlist>>(emptyList()) }
-    var isFavorite by remember { mutableStateOf(false) }
+    var isCurrentFavorite by remember { mutableStateOf(false) }
     var favoriteMessage by remember { mutableStateOf<String?>(null) }
     val authSession by authRepository.session.collectAsState()
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(current?.id, authSession?.userId) {
-        isFavorite = if (current != null && authSession != null) authRepository.isFavorite(current!!.id).getOrDefault(false) else false
+        val songId = current?.id
+        isCurrentFavorite = if (songId != null && authSession != null) authRepository.isFavorite(songId).getOrDefault(false) else false
     }
 
     val progress = if (durationMs > 0) (positionMs.toFloat() / durationMs.toFloat()).coerceIn(0f, 1f) else 0f
@@ -169,17 +175,27 @@ fun FullPlayerScreen(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
-                    if (playbackError != null) Text(playbackError.orEmpty(), color = Color(0xFFFF8A80), fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp))
+                    if (playbackError != null) {
+                        Text(playbackError.orEmpty(), color = Color(0xFFFF8A80), fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp))
+                    }
                 }
                 IconButton(onClick = {
                     val song = current ?: return@IconButton
-                    if (authSession == null) { favoriteMessage = "Inicia sesión para sincronizar favoritos" }
-                    else {
-                        val next = !isFavorite; isFavorite = next
-                        scope.launch { authRepository.setFavorite(song, next).onFailure { isFavorite = !next; favoriteMessage = it.localizedMessage } }
+                    if (authSession == null) {
+                        favoriteMessage = "Inicia sesión para sincronizar tus favoritos"
+                    } else scope.launch {
+                        val next = !isCurrentFavorite
+                        authRepository.setFavorite(song, next)
+                            .onSuccess { isCurrentFavorite = next }
+                            .onFailure { favoriteMessage = it.localizedMessage ?: "No se pudo actualizar Kokoro" }
                     }
                 }) {
-                    Icon(if (isFavorite) Icons.Default.Favorite else Icons.Outlined.FavoriteBorder, "Favorito", tint = if (isFavorite) Color(0xFFFF6B81) else Color.White.copy(.8f), modifier = Modifier.size(25.dp))
+                    Icon(
+                        imageVector = if (isCurrentFavorite) Icons.Default.Favorite else Icons.Outlined.FavoriteBorder,
+                        contentDescription = "Favorito",
+                        tint = if (isCurrentFavorite) Color(0xFFFF6B81) else Color.White.copy(.8f),
+                        modifier = Modifier.size(25.dp)
+                    )
                 }
             }
 
@@ -287,16 +303,10 @@ fun FullPlayerScreen(
                 IconButton(onClick = onOpenQueue) {
                     Icon(Icons.Outlined.QueueMusic, contentDescription = "Queue", tint = Color.White.copy(alpha = 0.85f), modifier = Modifier.size(26.dp))
                 }
-                IconButton(onClick = {
-                    if (authSession == null) favoriteMessage = "Inicia sesión para crear y sincronizar playlists"
-                    else scope.launch { authRepository.getPlaylists().onSuccess { playlists = it; showPlaylistPicker = true }.onFailure { favoriteMessage = it.localizedMessage } }
-                }) {
-                    Icon(Icons.Default.QueueMusic, contentDescription = "Añadir a playlist", tint = Color.White.copy(alpha = 0.85f), modifier = Modifier.size(26.dp))
-                }
             }
 
             Text(
-                text = "CMF Buds 2a",
+                text = "Salida de audio de Android",
                 color = Color.White.copy(alpha = 0.5f),
                 fontSize = 12.sp,
                 modifier = Modifier.align(Alignment.CenterHorizontally).padding(bottom = 16.dp)
@@ -313,46 +323,103 @@ fun FullPlayerScreen(
         ModalBottomSheet(onDismissRequest = { showOverflow = false }, containerColor = Color(0xFF1C1C1C)) {
             OverflowMenuSheet(
                 onDismiss = { showOverflow = false },
-                onShareLyrics = {
+                onShareSong = {
                     showOverflow = false
-                    showShareLyrics = true
+                    current?.let { song ->
+                        val text = "${song.title} — ${song.artist}" + (song.audioUrl?.takeIf { it.startsWith("https://") }?.let { "\n$it" } ?: "")
+                        context.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, text), "Compartir canción"))
+                    }
                 },
-                onPlayNext = {
-                    current?.let { PlayerController.addToQueue(it, playNext = true) }
+                onFavorite = {
                     showOverflow = false
+                    current?.let { song ->
+                        if (authSession == null) {
+                            Toast.makeText(context, "Inicia sesión para sincronizar tus favoritos", Toast.LENGTH_LONG).show()
+                            onRequireLogin()
+                        } else scope.launch {
+                            val next = !isCurrentFavorite
+                            authRepository.setFavorite(song, next)
+                                .onSuccess {
+                                    isCurrentFavorite = next
+                                    Toast.makeText(context, if (next) "Guardada en favoritos de Kokoro" else "Quitada de favoritos de Kokoro", Toast.LENGTH_SHORT).show()
+                                }
+                                .onFailure { Toast.makeText(context, it.localizedMessage ?: "No se pudo actualizar Kokoro", Toast.LENGTH_LONG).show() }
+                        }
+                    }
                 },
-                onAddToQueue = {
-                    current?.let { PlayerController.addToQueue(it) }
+                onDownload = {
                     showOverflow = false
-                }
+                    current?.let { song -> scope.launch {
+                        runCatching { libraryStore.download(song) }
+                            .onSuccess { Toast.makeText(context, "Descarga iniciada", Toast.LENGTH_SHORT).show() }
+                            .onFailure { Toast.makeText(context, it.message ?: "No se pudo descargar", Toast.LENGTH_LONG).show() }
+                    } }
+                },
+                onPlayNext = { current?.let { PlayerController.addToQueue(it, playNext = true) }; showOverflow = false },
+                onAddToQueue = { current?.let { PlayerController.addToQueue(it) }; showOverflow = false },
+                onAddToPlaylist = {
+                    showOverflow = false
+                    if (authSession == null) {
+                        favoriteMessage = "Inicia sesión para crear y sincronizar playlists"
+                    } else scope.launch {
+                        authRepository.getPlaylists().onSuccess { playlists = it; showPlaylistPicker = true }
+                            .onFailure { favoriteMessage = it.localizedMessage ?: "No se pudieron cargar las playlists" }
+                    }
+                },
+                onSleepTimer = { showOverflow = false; showSleepTimer = true },
+                onRemoveFromQueue = { PlayerController.removeQueueItem(PlayerController.currentIndex.value); showOverflow = false },
+                onSongInfo = { showOverflow = false; showSongInfo = true }
             )
-        }
-    }
-    if (showShareLyrics) {
-        ModalBottomSheet(onDismissRequest = { showShareLyrics = false }, containerColor = Color(0xFF1C1C1C)) {
-            ShareLyricsSheet(onDismiss = { showShareLyrics = false })
         }
     }
     if (showPlaylistPicker) {
         AlertDialog(
             onDismissRequest = { showPlaylistPicker = false },
-            title = { Text("Añadir a playlist") },
+            title = { Text("Agregar a playlist") },
             text = {
-                if (playlists.isEmpty()) Text("Todavía no tienes playlists. Crea una desde Tu biblioteca.")
+                if (playlists.isEmpty()) Text("Primero crea una playlist desde Biblioteca.")
                 else Column { playlists.forEach { playlist ->
                     TextButton(onClick = {
-                        val song = current
-                        if (song != null) scope.launch {
-                            authRepository.addSongToPlaylist(playlist.id, song).onSuccess { showPlaylistPicker = false; favoriteMessage = "Añadida a ${playlist.name}" }.onFailure { favoriteMessage = it.localizedMessage }
-                        }
-                    }, modifier = Modifier.fillMaxWidth()) { Text("${playlist.name} · ${playlist.songCount} canciones") }
+                        current?.let { song -> scope.launch {
+                            authRepository.addSongToPlaylist(playlist.id, song)
+                                .onSuccess { Toast.makeText(context, "Agregada a ${playlist.name}", Toast.LENGTH_SHORT).show(); showPlaylistPicker = false }
+                                .onFailure { favoriteMessage = it.localizedMessage ?: "No se pudo añadir a la playlist" }
+                        } }
+                    }, modifier = Modifier.fillMaxWidth()) { Text(playlist.name) }
                 } }
             },
             confirmButton = { TextButton(onClick = { showPlaylistPicker = false }) { Text("Cerrar") } }
         )
     }
+    if (showSleepTimer) {
+        AlertDialog(
+            onDismissRequest = { showSleepTimer = false },
+            title = { Text("Temporizador de apagado") },
+            text = {
+                Column {
+                    Text("La reproducción se pausará al terminar el tiempo.")
+                    Slider(value = timerMinutes.toFloat(), onValueChange = { timerMinutes = it.toInt().coerceIn(1, 180) }, valueRange = 1f..180f)
+                    Text("$timerMinutes minutos")
+                }
+            },
+            confirmButton = { TextButton(onClick = { PlayerController.startSleepTimer(timerMinutes); showSleepTimer = false; Toast.makeText(context, "Temporizador activado", Toast.LENGTH_SHORT).show() }) { Text("Iniciar") } },
+            dismissButton = { TextButton(onClick = { PlayerController.cancelSleepTimer(); showSleepTimer = false }) { Text("Cancelar") } }
+        )
+    }
+    if (showSongInfo && current != null) {
+        AlertDialog(
+            onDismissRequest = { showSongInfo = false },
+            title = { Text("Información de la canción") },
+            text = { Text("Título: ${current?.title}\nArtista: ${current?.artist}\nÁlbum: ${current?.album ?: "Desconocido"}\nDuración: ${formatTime(durationMs)}") },
+            confirmButton = { TextButton(onClick = { showSongInfo = false }) { Text("Cerrar") } }
+        )
+    }
     if (favoriteMessage != null) {
-        AlertDialog(onDismissRequest = { favoriteMessage = null }, text = { Text(favoriteMessage.orEmpty()) }, confirmButton = { TextButton(onClick = { favoriteMessage = null; if (authSession == null) onRequireLogin() }) { Text("Entendido") } })
+        AlertDialog(
+            onDismissRequest = { favoriteMessage = null },
+            text = { Text(favoriteMessage.orEmpty()) },
+            confirmButton = { TextButton(onClick = { favoriteMessage = null; if (authSession == null) onRequireLogin() }) { Text("Entendido") } }
+        )
     }
 }
 
