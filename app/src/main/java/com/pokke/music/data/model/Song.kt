@@ -58,5 +58,12 @@ data class UserProfile(
     val frame: String? = "none",
     val isPublic: Boolean = true,
     val isArtist: Boolean = false,
-    val badge: String? = "none"
+    val badge: String? = "none",
+    val pronouns: String? = null,
+    val statusText: String? = null,
+    val accentColor: String? = "violet",
+    val cardStyle: String? = "glass",
+    val badges: String? = null,
+    val linkLabel: String? = null,
+    val linkUrl: String? = null
 )
