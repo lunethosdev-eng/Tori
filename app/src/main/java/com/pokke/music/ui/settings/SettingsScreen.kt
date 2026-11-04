@@ -1,136 +1,73 @@
 package com.pokke.music.ui.settings
 
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.outlined.Science
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalContext
 import com.pokke.music.data.preferences.UserPreferences
 import kotlinx.coroutines.launch
 
 @Composable
 fun SettingsScreen(onBack: () -> Unit) {
-    val context = LocalContext.current
-    val prefs = remember { UserPreferences(context) }
+    val prefs = remember { UserPreferences(LocalContext.current) }
     val scope = rememberCoroutineScope()
+    val glass by prefs.liquidGlassEnabled.collectAsState(true)
+    val blur by prefs.blurPlayerBackground.collectAsState(true)
+    val accent by prefs.accentColor.collectAsState("white")
+    val theme by prefs.appTheme.collectAsState("dark")
 
-    val liquidGlass by prefs.liquidGlassEnabled.collectAsState(initial = false)
-    val autoAnimated by prefs.autoAnimatedCovers.collectAsState(initial = true)
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color(0xFF0A0A0A))
-            .verticalScroll(rememberScrollState())
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            IconButton(onClick = onBack) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.White)
-            }
-            Text(text = "Settings", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
+    Column(Modifier.fillMaxSize().background(Color(0xFF09090B)).verticalScroll(rememberScrollState()).statusBarsPadding()) {
+        Row(Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = Color.White) }
+            Column { Text("Ajustes", color = Color.White, fontSize = 23.sp, fontWeight = FontWeight.Bold); Text("Personaliza tu experiencia", color = Color.White.copy(.5f), fontSize = 12.sp) }
         }
-
-        Spacer(modifier = Modifier.height(8.dp))
-        SectionHeader("Experimental")
-
-        SettingToggle(
-            title = "Liquid Glass (Eco Glass)",
-            subtitle = "Efecto líquido translúcido premium en barra de navegación y controles.",
-            checked = liquidGlass,
-            experimental = true,
-            onCheckedChange = { enabled -> scope.launch { prefs.setLiquidGlass(enabled) } }
-        )
-
-        HorizontalDivider(color = Color.White.copy(alpha = 0.08f), modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp))
-
-        SectionHeader("Reproducción")
-        SettingToggle(
-            title = "Covers animados automáticos",
-            subtitle = "Reproduce carátulas animadas en loop automático.",
-            checked = autoAnimated,
-            experimental = false,
-            onCheckedChange = { enabled -> scope.launch { prefs.setAutoAnimatedCovers(enabled) } }
-        )
-
-        Spacer(modifier = Modifier.height(40.dp))
-    }
-}
-
-@Composable
-private fun SectionHeader(title: String) {
-    Text(
-        text = title.uppercase(),
-        color = Color.White.copy(alpha = 0.45f),
-        fontSize = 12.sp,
-        fontWeight = FontWeight.Medium,
-        modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)
-    )
-}
-
-@Composable
-private fun SettingToggle(
-    title: String,
-    subtitle: String,
-    checked: Boolean,
-    experimental: Boolean,
-    onCheckedChange: (Boolean) -> Unit
-) {
-    val trackColor by animateColorAsState(
-        targetValue = if (checked) Color(0xFF34C759) else Color(0xFF3A3A3C),
-        animationSpec = spring(stiffness = 300f),
-        label = "trackColor"
-    )
-
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onCheckedChange(!checked) }
-            .padding(horizontal = 20.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(title, color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Medium)
-                if (experimental) {
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Icon(Icons.Outlined.Science, contentDescription = "Experimental", tint = Color(0xFFFFB74D), modifier = Modifier.size(16.dp))
+        Section("APARIENCIA")
+        Toggle("Liquid Glass", "Superficies translúcidas y reflejos animados en controles compatibles.", glass) { scope.launch { prefs.setLiquidGlass(it) } }
+        Toggle("Fondo desenfocado en el reproductor", "Usa la portada como fondo ambiental.", blur) { scope.launch { prefs.setBlurPlayerBackground(it) } }
+        Text("Tema", color = Color.White.copy(.75f), fontSize = 14.sp, modifier = Modifier.padding(start = 22.dp, top = 12.dp, bottom = 8.dp))
+        Row(Modifier.fillMaxWidth().padding(horizontal = 18.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            listOf("dark" to "Oscuro", "amoled" to "AMOLED").forEach { (id, label) ->
+                ChoiceChip(label, theme == id) { scope.launch { prefs.setAppTheme(id) } }
+            }
+        }
+        Text("Color de acento", color = Color.White.copy(.75f), fontSize = 14.sp, modifier = Modifier.padding(start = 22.dp, top = 14.dp, bottom = 8.dp))
+        Row(Modifier.fillMaxWidth().padding(horizontal = 18.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            listOf("white" to Color.White, "violet" to Color(0xFFB69CFF), "blue" to Color(0xFF83B9FF), "pink" to Color(0xFFFFA6D2), "green" to Color(0xFF9DDBB2)).forEach { (id, color) ->
+                Box(Modifier.weight(1f).height(42.dp).background(color, RoundedCornerShape(12.dp)).clickable { scope.launch { prefs.setAccentColor(id) } }, contentAlignment = Alignment.Center) {
+                    if (accent == id) Text("✓", color = Color.Black, fontWeight = FontWeight.Bold)
                 }
             }
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(text = subtitle, color = Color.White.copy(alpha = 0.55f), fontSize = 13.sp, lineHeight = 18.sp)
         }
-        Spacer(modifier = Modifier.width(12.dp))
-        Switch(
-            checked = checked,
-            onCheckedChange = onCheckedChange,
-            colors = SwitchDefaults.colors(
-                checkedThumbColor = Color.White,
-                checkedTrackColor = trackColor,
-                uncheckedThumbColor = Color(0xFFEBEBF5),
-                uncheckedTrackColor = Color(0xFF2C2C2E)
-            )
-        )
+        Section("REPRODUCCIÓN")
+        InfoRow("Motor de audio", "Android Media3 · controles de reproducción del sistema")
+        Section("LETRAS Y PERFIL")
+        InfoRow("Proveedor de letras", "LRCLIB · sincronización por líneas cuando está disponible")
+        InfoRow("Personalización del perfil", "Foto, banner, biografía y tema se guardan en Kokoro")
+        Spacer(Modifier.height(100.dp))
     }
 }
+
+@Composable private fun Section(text: String) { Text(text, color = Color.White.copy(.45f), fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.4.sp, modifier = Modifier.padding(start = 22.dp, top = 22.dp, bottom = 8.dp)) }
+@Composable private fun Toggle(title: String, subtitle: String, checked: Boolean, onChange: (Boolean) -> Unit) {
+    Row(Modifier.fillMaxWidth().clickable { onChange(!checked) }.padding(horizontal = 22.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) { Text(title, color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Medium); Text(subtitle, color = Color.White.copy(.5f), fontSize = 12.sp, lineHeight = 17.sp, modifier = Modifier.padding(top = 3.dp)) }
+        Switch(checked, onChange, colors = SwitchDefaults.colors(checkedThumbColor = Color.Black, checkedTrackColor = Color.White, uncheckedTrackColor = Color(0xFF333338)))
+    }
+}
+@Composable private fun RowScope.ChoiceChip(label: String, selected: Boolean, onClick: () -> Unit) {
+    Box(Modifier.weight(1f).background(if (selected) Color.White else Color(0xFF202024), RoundedCornerShape(12.dp)).clickable { onClick() }.padding(vertical = 12.dp), contentAlignment = Alignment.Center) { Text(label, color = if (selected) Color.Black else Color.White, fontSize = 12.sp) }
+}
+@Composable private fun InfoRow(title: String, subtitle: String) { Column(Modifier.fillMaxWidth().padding(horizontal = 22.dp, vertical = 10.dp)) { Text(title, color = Color.White, fontSize = 14.sp); Text(subtitle, color = Color.White.copy(.5f), fontSize = 12.sp) } }
