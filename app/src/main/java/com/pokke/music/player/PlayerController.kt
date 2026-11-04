@@ -3,6 +3,7 @@ package com.pokke.music.player
 import android.content.ComponentName
 import android.content.Context
 import android.net.Uri
+import java.io.File
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Player
@@ -13,6 +14,8 @@ import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
 import com.google.common.util.concurrent.MoreExecutors
 import com.pokke.music.data.model.Song
+import com.pokke.music.data.repository.LocalLibraryStore
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -28,6 +31,10 @@ object PlayerController {
     private var controller: MediaController? = null
     private var controllerFuture: ListenableFuture<MediaController>? = null
     private var pendingQueue: Pair<List<Song>, Int>? = null
+    private var libraryStore: LocalLibraryStore? = null
+    private var sleepTimerJob: Job? = null
+    private val _sleepTimerRemainingMs = MutableStateFlow<Long?>(null)
+    val sleepTimerRemainingMs: StateFlow<Long?> = _sleepTimerRemainingMs.asStateFlow()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
     private val _currentSong = MutableStateFlow<Song?>(null)
@@ -57,6 +64,7 @@ object PlayerController {
 
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
             syncCurrentItem()
+            _currentSong.value?.let { song -> scope.launch { libraryStore?.recordPlayed(song) } }
             syncPlaybackState()
         }
 
@@ -80,6 +88,7 @@ object PlayerController {
     }
 
     fun init(context: Context) {
+        if (libraryStore == null) libraryStore = LocalLibraryStore(context.applicationContext)
         if (controller != null || controllerFuture != null) return
         val token = SessionToken(context.applicationContext, ComponentName(context, PlaybackService::class.java))
         val future = MediaController.Builder(context.applicationContext, token).buildAsync()
@@ -124,7 +133,7 @@ object PlayerController {
             .build()
         return MediaItem.Builder()
             .setMediaId(song.id)
-            .setUri(song.audioUrl ?: "")
+            .setUri(song.audioUrl?.let { raw -> if (raw.startsWith("http://") || raw.startsWith("https://") || raw.startsWith("file://")) Uri.parse(raw) else Uri.fromFile(File(raw)) } ?: Uri.EMPTY)
             .setMediaMetadata(metadata)
             .build()
     }
@@ -281,6 +290,32 @@ object PlayerController {
         _durationMs.value = if (actualDuration > 0L) actualDuration
             else _currentSong.value?.durationMs?.coerceAtLeast(0L) ?: 0L
         _currentIndex.value = player.currentMediaItemIndex.coerceAtLeast(0)
+    }
+
+
+    fun startSleepTimer(minutes: Int) {
+        cancelSleepTimer()
+        if (minutes <= 0) return
+        val total = minutes * 60_000L
+        _sleepTimerRemainingMs.value = total
+        sleepTimerJob = scope.launch {
+            var remaining = total
+            while (remaining > 0L) {
+                val step = minOf(1_000L, remaining)
+                delay(step)
+                remaining -= step
+                _sleepTimerRemainingMs.value = remaining
+            }
+            controller?.pause()
+            _sleepTimerRemainingMs.value = null
+            sleepTimerJob = null
+        }
+    }
+
+    fun cancelSleepTimer() {
+        sleepTimerJob?.cancel()
+        sleepTimerJob = null
+        _sleepTimerRemainingMs.value = null
     }
 
     /** Keep the MediaSession alive when the Activity is closed. */
