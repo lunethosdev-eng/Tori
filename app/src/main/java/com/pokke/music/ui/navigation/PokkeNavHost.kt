@@ -39,6 +39,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.pokke.music.data.preferences.UserPreferences
+import com.pokke.music.data.repository.AuthRepository
 import com.pokke.music.player.PlayerController
 import com.pokke.music.ui.auth.LoginScreen
 import com.pokke.music.ui.home.HomeScreen
@@ -79,6 +80,8 @@ fun PokkeNavHost() {
     val navController = rememberNavController()
     val context = LocalContext.current
     val prefs = remember { UserPreferences(context) }
+    val authRepository = remember(context) { AuthRepository(context) }
+    LaunchedEffect(authRepository) { authRepository.restoreSession() }
     
     val liquidGlassEnabled by prefs.liquidGlassEnabled.collectAsState(initial = false)
     val navBackStackEntry by navController.currentBackStackEntryAsState()
@@ -233,7 +236,7 @@ fun PokkeNavHost() {
             exitTransition = { fadeOut(animationSpec = tween(250)) }
         ) {
             composable(Screen.Auth.route) {
-                LoginScreen(onContinueAsGuest = { navController.popBackStack() }, onLoginSuccess = { navController.popBackStack() })
+                LoginScreen(repository = authRepository, onContinueAsGuest = { navController.popBackStack() }, onLoginSuccess = { navController.popBackStack() })
             }
             composable(Screen.Home.route) {
                 HomeScreen(
@@ -250,6 +253,8 @@ fun PokkeNavHost() {
             }
             composable(Screen.Search.route) {
                 SearchScreen(
+                    authRepository = authRepository,
+                    isVisible = currentRoute == Screen.Search.route,
                     onSongClick = { song ->
                         PlayerController.init(context)
                         PlayerController.playSong(song)
@@ -263,11 +268,16 @@ fun PokkeNavHost() {
                 )
             }
             composable(Screen.Library.route) {
-                LibraryScreen(onSongClick = { song ->
-                    PlayerController.init(context)
-                    PlayerController.playSong(song)
-                    navController.navigate(Screen.Player.route)
-                })
+                LibraryScreen(
+                    repository = authRepository,
+                    isVisible = currentRoute == Screen.Library.route,
+                    onLoginRequired = { navController.navigate(Screen.Auth.route) },
+                    onSongClick = { song ->
+                        PlayerController.init(context)
+                        PlayerController.playSong(song)
+                        navController.navigate(Screen.Player.route)
+                    }
+                )
             }
             composable(Screen.Settings.route) {
                 SettingsScreen(onBack = { navController.popBackStack() })
@@ -280,7 +290,9 @@ fun PokkeNavHost() {
                 FullPlayerScreen(
                     onBack = { navController.popBackStack() },
                     onOpenQueue = { navController.navigate(Screen.Queue.route) },
-                    onOpenLyrics = { navController.navigate(Screen.Lyrics.route) }
+                    onOpenLyrics = { navController.navigate(Screen.Lyrics.route) },
+                    authRepository = authRepository,
+                    onRequireLogin = { navController.navigate(Screen.Auth.route) }
                 )
             }
             composable(Screen.Queue.route) { QueueScreen(onBack = { navController.popBackStack() }) }
