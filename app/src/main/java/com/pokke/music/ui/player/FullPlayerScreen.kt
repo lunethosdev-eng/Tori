@@ -25,10 +25,15 @@ import androidx.compose.material.icons.outlined.Subtitles
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import android.content.Intent
+import android.media.AudioManager
 import android.widget.Toast
 import com.pokke.music.data.repository.LocalLibraryStore
 import com.pokke.music.data.repository.AuthRepository
 import com.pokke.music.data.model.Playlist
+import com.pokke.music.data.remote.MusicMetadataApi
+import com.pokke.music.data.preferences.UserPreferences
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -60,6 +65,9 @@ fun FullPlayerScreen(
     onRequireLogin: () -> Unit
 ) {
     val context = LocalContext.current
+    val preferences = remember(context) { UserPreferences(context) }
+    val blurPlayerBackground by preferences.blurPlayerBackground.collectAsState(false)
+    val liquidGlassEnabled by preferences.liquidGlassEnabled.collectAsState(true)
     val current by PlayerController.currentSong.collectAsState()
     val isPlaying by PlayerController.isPlaying.collectAsState()
     val positionMs by PlayerController.positionMs.collectAsState()
@@ -68,7 +76,9 @@ fun FullPlayerScreen(
 
     val cover = current?.displayCoverUrl
 
-    var volume by remember { mutableFloatStateOf(0.8f) }
+    val audioManager = remember(context) { context.getSystemService(android.content.Context.AUDIO_SERVICE) as AudioManager }
+    val maxMusicVolume = remember(audioManager) { audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC).coerceAtLeast(1).toFloat() }
+    var volume by remember(audioManager) { mutableFloatStateOf(audioManager.getStreamVolume(AudioManager.STREAM_MUSIC).toFloat() / maxMusicVolume) }
     var showAudioOutput by remember { mutableStateOf(false) }
     var showOverflow by remember { mutableStateOf(false) }
     var showSleepTimer by remember { mutableStateOf(false) }
@@ -79,8 +89,29 @@ fun FullPlayerScreen(
     var playlists by remember { mutableStateOf<List<Playlist>>(emptyList()) }
     var isCurrentFavorite by remember { mutableStateOf(false) }
     var favoriteMessage by remember { mutableStateOf<String?>(null) }
+    var syncedLines by remember { mutableStateOf<List<com.pokke.music.data.model.LyricLine>>(emptyList()) }
+    var artistInfo by remember { mutableStateOf<MusicMetadataApi.ArtistInfo?>(null) }
+    var infoLoading by remember { mutableStateOf(false) }
     val authSession by authRepository.session.collectAsState()
     val scope = rememberCoroutineScope()
+
+    LaunchedEffect(current?.id) {
+        val song = current ?: return@LaunchedEffect
+        syncedLines = song.lyrics
+        if (syncedLines.isEmpty()) {
+            syncedLines = withContext(Dispatchers.IO) {
+                runCatching { MusicMetadataApi.lyrics(song.title, song.artist, song.album, song.durationSeconds).lines }.getOrDefault(emptyList())
+            }
+        }
+    }
+    LaunchedEffect(current?.artist, showSongInfo) {
+        val artist = current?.artist ?: return@LaunchedEffect
+        if (showSongInfo) {
+            infoLoading = true
+            artistInfo = withContext(Dispatchers.IO) { runCatching { MusicMetadataApi.artistInfo(artist) }.getOrNull() }
+            infoLoading = false
+        }
+    }
 
     LaunchedEffect(current?.id, authSession?.userId) {
         val songId = current?.id
@@ -103,14 +134,14 @@ fun FullPlayerScreen(
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
                     .fillMaxSize()
-                    .blur(60.dp)
-                    .graphicsLayer { alpha = 0.55f }
+                    .blur(if (blurPlayerBackground) 60.dp else 0.dp)
+                    .graphicsLayer { alpha = 0.82f }
             )
         }
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Brush.verticalGradient(listOf(Color(0x99000000), Color(0xEE000000))))
+                .background(Brush.verticalGradient(listOf(Color(0x22000000), Color(0x44000000), Color(0xD9000000), Color(0xF5090808))))
         )
 
         Column(
@@ -135,27 +166,7 @@ fun FullPlayerScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.weight(0.05f))
-
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 12.dp)
-                    .aspectRatio(1f)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(Color(0xFF1A1A1A))
-            ) {
-                if (!cover.isNullOrBlank()) {
-                    AsyncImage(
-                        model = ImageRequest.Builder(context).data(cover).crossfade(true).build(),
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize()
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(28.dp))
+            Spacer(modifier = Modifier.weight(0.82f))
 
             Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Column(modifier = Modifier.weight(1f)) {
@@ -201,16 +212,16 @@ fun FullPlayerScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
+            val activeLyric = syncedLines.lastOrNull { it.timeMs <= positionMs }?.text
+                ?: syncedLines.firstOrNull()?.text ?: "Toca para ver las letras sincronizadas"
             Text(
-                text = current?.lyricsText?.lineSequence()?.firstOrNull { it.isNotBlank() && !it.startsWith("[") && !it.startsWith("Letras de") && !it.startsWith("Procesado") } ?: "Ver letras de la canción",
-                color = Color.White.copy(alpha = 0.8f),
-                fontSize = 14.sp,
-                maxLines = 1,
+                text = activeLyric,
+                color = Color.White.copy(alpha = 0.88f),
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Medium,
+                maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { onOpenLyrics() }
-                    .padding(vertical = 4.dp)
+                modifier = Modifier.fillMaxWidth().clickable { onOpenLyrics() }.padding(vertical = 5.dp)
             )
 
             Spacer(modifier = Modifier.height(12.dp))
@@ -315,12 +326,12 @@ fun FullPlayerScreen(
     }
 
     if (showAudioOutput) {
-        ModalBottomSheet(onDismissRequest = { showAudioOutput = false }, containerColor = Color(0xFF1C1C1C)) {
+        ModalBottomSheet(onDismissRequest = { showAudioOutput = false }, containerColor = if (liquidGlassEnabled) Color(0xE62A292D) else Color(0xFF1C1C1C)) {
             AudioOutputSheet(onDismiss = { showAudioOutput = false })
         }
     }
     if (showOverflow) {
-        ModalBottomSheet(onDismissRequest = { showOverflow = false }, containerColor = Color(0xFF1C1C1C)) {
+        ModalBottomSheet(onDismissRequest = { showOverflow = false }, containerColor = if (liquidGlassEnabled) Color(0xE62A292D) else Color(0xFF1C1C1C)) {
             OverflowMenuSheet(
                 onDismiss = { showOverflow = false },
                 onShareSong = {
@@ -402,16 +413,38 @@ fun FullPlayerScreen(
                     Text("$timerMinutes minutos")
                 }
             },
-            confirmButton = { TextButton(onClick = { PlayerController.startSleepTimer(timerMinutes); showSleepTimer = false; Toast.makeText(context, "Temporizador activado", Toast.LENGTH_SHORT).show() }) { Text("Iniciar") } },
-            dismissButton = { TextButton(onClick = { PlayerController.cancelSleepTimer(); showSleepTimer = false }) { Text("Cancelar") } }
+            confirmButton = { TextButton(onClick = { PlayerController.startSleepTimer(timerMinutes); showSleepTimer = false; Toast.makeText(context, "Temporizador activado", Toast.LENGTH_SHORT).show() }) { Text("Iniciar", color = Color.White) } },
+            dismissButton = { TextButton(onClick = { PlayerController.cancelSleepTimer(); showSleepTimer = false }) { Text("Cancelar", color = Color.White.copy(.7f)) } },
+            containerColor = if (liquidGlassEnabled) Color(0xE62A292D) else Color(0xFF242328),
+            titleContentColor = Color.White,
+            textContentColor = Color.White
         )
     }
     if (showSongInfo && current != null) {
         AlertDialog(
             onDismissRequest = { showSongInfo = false },
-            title = { Text("Información de la canción") },
-            text = { Text("Título: ${current?.title}\nArtista: ${current?.artist}\nÁlbum: ${current?.album ?: "Desconocido"}\nDuración: ${formatTime(durationMs)}") },
-            confirmButton = { TextButton(onClick = { showSongInfo = false }) { Text("Cerrar") } }
+            title = { Text("Información de la canción", color = Color.White) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        AsyncImage(model = artistInfo?.image ?: current?.displayCoverUrl, contentDescription = "Artista", modifier = Modifier.size(76.dp).clip(RoundedCornerShape(16.dp)), contentScale = ContentScale.Crop)
+                        Spacer(Modifier.width(12.dp))
+                        Column {
+                            Text(current?.title.orEmpty(), color = Color.White, fontWeight = FontWeight.Bold)
+                            Text(artistInfo?.name ?: current?.artist.orEmpty(), color = Color.White.copy(.65f), fontSize = 13.sp)
+                            Text("${current?.album ?: "Álbum desconocido"} · ${formatTime(durationMs)}", color = Color.White.copy(.5f), fontSize = 11.sp)
+                        }
+                    }
+                    Text("Sobre el artista", color = Color.White, fontWeight = FontWeight.SemiBold)
+                    Text(if (infoLoading) "Cargando información del artista…" else artistInfo?.description ?: "No hay una biografía pública disponible para este artista.", color = Color.White.copy(.72f), fontSize = 13.sp)
+                    artistInfo?.albums?.let { Text("Álbumes publicados: $it", color = Color.White.copy(.55f), fontSize = 12.sp) }
+                    Text("Carátula y datos de artista: Deezer · Biografía: Wikipedia", color = Color.White.copy(.38f), fontSize = 10.sp)
+                }
+            },
+            confirmButton = { TextButton(onClick = { showSongInfo = false }) { Text("Cerrar", color = Color.White) } },
+            containerColor = Color(0xFF242328),
+            titleContentColor = Color.White,
+            textContentColor = Color.White
         )
     }
     if (favoriteMessage != null) {
