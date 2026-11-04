@@ -249,11 +249,18 @@ fun PokkeNavHost() {
                 )
             }
             composable(Screen.Search.route) {
-                SearchScreen(onSongClick = { song ->
-                    PlayerController.init(context)
-                    PlayerController.playSong(song)
-                    navController.navigate(Screen.Player.route)
-                })
+                SearchScreen(
+                    onSongClick = { song ->
+                        PlayerController.init(context)
+                        PlayerController.playSong(song)
+                        navController.navigate(Screen.Player.route)
+                    },
+                    onPlayQueue = { songs, index ->
+                        PlayerController.init(context)
+                        PlayerController.playQueue(songs, index)
+                        navController.navigate(Screen.Player.route)
+                    }
+                )
             }
             composable(Screen.Library.route) {
                 LibraryScreen(onSongClick = { song ->
