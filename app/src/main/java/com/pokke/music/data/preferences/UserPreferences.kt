@@ -4,6 +4,8 @@ import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
+import androidx.datastore.preferences.core.floatPreferencesKey
+import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
@@ -12,34 +14,31 @@ import kotlinx.coroutines.flow.map
 val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "pokke_prefs")
 
 class UserPreferences(private val context: Context) {
-
     companion object {
         private val LIQUID_GLASS = booleanPreferencesKey("liquid_glass_enabled")
         private val AUTO_ANIMATED_COVERS = booleanPreferencesKey("auto_animated_covers")
-        private val IS_LOGGED_IN = booleanPreferencesKey("is_logged_in")
+        private val DYNAMIC_COLORS = booleanPreferencesKey("dynamic_colors")
+        private val BLUR_PLAYER = booleanPreferencesKey("blur_player_background")
+        private val GAPLESS = booleanPreferencesKey("gapless_playback")
+        private val CROSSFADE = floatPreferencesKey("crossfade_seconds")
+        private val ACCENT = stringPreferencesKey("accent_color")
+        private val THEME = stringPreferencesKey("app_theme")
     }
+    val liquidGlassEnabled: Flow<Boolean> = context.dataStore.data.map { it[LIQUID_GLASS] ?: true }
+    val autoAnimatedCovers: Flow<Boolean> = context.dataStore.data.map { it[AUTO_ANIMATED_COVERS] ?: true }
+    val dynamicColors: Flow<Boolean> = context.dataStore.data.map { it[DYNAMIC_COLORS] ?: true }
+    val blurPlayerBackground: Flow<Boolean> = context.dataStore.data.map { it[BLUR_PLAYER] ?: false }
+    val gaplessPlayback: Flow<Boolean> = context.dataStore.data.map { it[GAPLESS] ?: true }
+    val crossfadeSeconds: Flow<Float> = context.dataStore.data.map { it[CROSSFADE] ?: 0f }
+    val accentColor: Flow<String> = context.dataStore.data.map { it[ACCENT] ?: "white" }
+    val appTheme: Flow<String> = context.dataStore.data.map { it[THEME] ?: "dark" }
 
-    val liquidGlassEnabled: Flow<Boolean> = context.dataStore.data.map { prefs ->
-        prefs[LIQUID_GLASS] ?: false          // OFF by default (experimental)
-    }
-
-    val autoAnimatedCovers: Flow<Boolean> = context.dataStore.data.map { prefs ->
-        prefs[AUTO_ANIMATED_COVERS] ?: true   // ON by default
-    }
-
-    val isLoggedIn: Flow<Boolean> = context.dataStore.data.map { prefs ->
-        prefs[IS_LOGGED_IN] ?: false
-    }
-
-    suspend fun setLiquidGlass(enabled: Boolean) {
-        context.dataStore.edit { it[LIQUID_GLASS] = enabled }
-    }
-
-    suspend fun setAutoAnimatedCovers(enabled: Boolean) {
-        context.dataStore.edit { it[AUTO_ANIMATED_COVERS] = enabled }
-    }
-
-    suspend fun setLoggedIn(loggedIn: Boolean) {
-        context.dataStore.edit { it[IS_LOGGED_IN] = loggedIn }
-    }
+    suspend fun setLiquidGlass(v: Boolean) = context.dataStore.edit { it[LIQUID_GLASS] = v }
+    suspend fun setAutoAnimatedCovers(v: Boolean) = context.dataStore.edit { it[AUTO_ANIMATED_COVERS] = v }
+    suspend fun setDynamicColors(v: Boolean) = context.dataStore.edit { it[DYNAMIC_COLORS] = v }
+    suspend fun setBlurPlayerBackground(v: Boolean) = context.dataStore.edit { it[BLUR_PLAYER] = v }
+    suspend fun setGaplessPlayback(v: Boolean) = context.dataStore.edit { it[GAPLESS] = v }
+    suspend fun setCrossfadeSeconds(v: Float) = context.dataStore.edit { it[CROSSFADE] = v.coerceIn(0f, 12f) }
+    suspend fun setAccentColor(v: String) = context.dataStore.edit { it[ACCENT] = v }
+    suspend fun setAppTheme(v: String) = context.dataStore.edit { it[THEME] = v }
 }
