@@ -12,26 +12,22 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.Text
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.pokke.music.data.model.Song
-import com.pokke.music.data.repository.MusicRepository
 import coil.compose.AsyncImage
-import coil.request.ImageRequest
-import com.pokke.music.ui.theme.PokkeBlack
+import com.pokke.music.data.model.Song
+import com.pokke.music.data.repository.AuthRepository
+import com.pokke.music.data.repository.MusicRepository
 
 @Composable
 fun HomeScreen(
@@ -39,137 +35,72 @@ fun HomeScreen(
     onOpenPlayer: () -> Unit,
     onOpenSettings: () -> Unit = {},
     onOpenProfile: () -> Unit = {},
-    onScrollStateChanged: (Boolean) -> Unit = {}
+    onScrollStateChanged: (Boolean) -> Unit = {},
+    authRepository: AuthRepository? = null
 ) {
     val listState = rememberLazyListState()
     val repo = remember { MusicRepository() }
-    val context = LocalContext.current
     var songs by remember { mutableStateOf<List<Song>>(emptyList()) }
-
-    val isScrolled by remember {
-        derivedStateOf { listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 50 }
-    }
-
-    LaunchedEffect(isScrolled) {
-        onScrollStateChanged(isScrolled)
-    }
-
-    LaunchedEffect(Unit) {
-        repo.getRecentSongs(40).onSuccess { songs = it }
-    }
+    var avatarUrl by remember { mutableStateOf<String?>(null) }
+    val isScrolled by remember { derivedStateOf { listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 48 } }
+    LaunchedEffect(isScrolled) { onScrollStateChanged(isScrolled) }
+    LaunchedEffect(Unit) { repo.getRecentSongs(40).onSuccess { songs = it } }
+    LaunchedEffect(authRepository) { authRepository?.getProfile()?.onSuccess { avatarUrl = it?.avatarUrl } }
 
     LazyColumn(
         state = listState,
-        modifier = Modifier
-            .fillMaxSize()
-            .background(PokkeBlack),
-        contentPadding = PaddingValues(bottom = 100.dp)
+        modifier = Modifier.fillMaxSize().background(Color(0xFF080808)),
+        contentPadding = PaddingValues(top = 0.dp, bottom = 116.dp)
     ) {
         item {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .statusBarsPadding()
-                    .padding(horizontal = 16.dp, vertical = 12.dp)
+            Row(
+                Modifier.fillMaxWidth().statusBarsPadding().padding(start = 22.dp, end = 18.dp, top = 12.dp, bottom = 26.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(28.dp))
-                        .background(Color(0xFF1A1A1A))
-                        .padding(horizontal = 18.dp, vertical = 12.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "Pokke",
-                        color = Color.White,
-                        fontSize = 24.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                    
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        IconButton(
-                            onClick = onOpenSettings,
-                            modifier = Modifier
-                                .size(40.dp)
-                                .clip(CircleShape)
-                                .background(Color(0xFF2A2A2A))
-                        ) {
-                            Icon(
-                                Icons.Default.Settings,
-                                contentDescription = "Settings",
-                                tint = Color.White,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
-
-                        // Se oculta en el header cuando hay scroll (pasa a la nav bar)
-                        AnimatedVisibility(
-                            visible = !isScrolled,
-                            enter = fadeIn(),
-                            exit = fadeOut()
-                        ) {
-                            Row {
-                                Spacer(modifier = Modifier.width(8.dp))
-                                IconButton(
-                                    onClick = onOpenProfile,
-                                    modifier = Modifier
-                                        .size(40.dp)
-                                        .clip(CircleShape)
-                                        .background(Color(0xFF2A2A2A))
-                                ) {
-                                    Icon(
-                                        Icons.Default.Person,
-                                        contentDescription = "Profile",
-                                        tint = Color.White,
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                }
-                            }
-                        }
-                    }
+                Column(Modifier.weight(1f)) {
+                    Text("POKKE", color = Color.White.copy(.55f), fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 3.sp)
+                    Text("Tu espacio musical", color = Color.White, fontSize = 27.sp, fontWeight = FontWeight.Bold)
+                }
+                IconButton(onClick = onOpenSettings, modifier = Modifier.size(46.dp).clip(CircleShape).background(Color(0xFF1B1B1D))) {
+                    Icon(Icons.Default.Settings, null, tint = Color.White)
+                }
+                Spacer(Modifier.width(10.dp))
+                Box(Modifier.size(46.dp).clip(CircleShape).background(Color(0xFF29292C)).clickable { onOpenProfile() }, contentAlignment = Alignment.Center) {
+                    if (!avatarUrl.isNullOrBlank()) AsyncImage(model = avatarUrl, contentDescription = "Foto de perfil", modifier = Modifier.fillMaxSize().clip(CircleShape))
+                    else Text("P", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 19.sp)
                 }
             }
         }
-
         item {
-            Text(
-                text = "Buenas tardes",
-                color = Color.White,
-                fontSize = 24.sp,
-                fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)
-            )
+            Column(Modifier.fillMaxWidth().padding(horizontal = 22.dp).padding(bottom = 22.dp)) {
+                Text("Buenas tardes", color = Color.White, fontSize = 30.sp, fontWeight = FontWeight.Bold)
+                Text("Vuelve a lo que te gusta escuchar.", color = Color.White.copy(.55f), fontSize = 14.sp, modifier = Modifier.padding(top = 5.dp))
+            }
         }
-
-        items(songs, key = { it.id }) { song ->
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { onSongClick(song) }
-                    .padding(horizontal = 20.dp, vertical = 10.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(52.dp)
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(Color(0xFF2A2A2A))
-                ) {
-                    song.displayCoverUrl?.let { cover ->
-                        AsyncImage(
-                            model = ImageRequest.Builder(context).data(cover).crossfade(true).build(),
-                            contentDescription = "Portada de ${song.title}",
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier.fillMaxSize()
-                        )
+        if (songs.isNotEmpty()) {
+            item {
+                val featured = songs.first()
+                Box(Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 25.dp).height(176.dp).clip(RoundedCornerShape(24.dp)).clickable { onSongClick(featured) }) {
+                    if (!featured.displayCoverUrl.isNullOrBlank()) AsyncImage(featured.displayCoverUrl, null, modifier = Modifier.fillMaxSize(), contentScale = androidx.compose.ui.layout.ContentScale.Crop)
+                    Box(Modifier.fillMaxSize().background(Brush.horizontalGradient(listOf(Color(0xE6000000), Color(0x33000000)))))
+                    Column(Modifier.align(Alignment.BottomStart).padding(20.dp)) {
+                        Text("PARA TI", color = Color.White.copy(.7f), fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
+                        Text(featured.title, color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(featured.artist, color = Color.White.copy(.8f), fontSize = 14.sp)
                     }
                 }
-                Spacer(modifier = Modifier.width(14.dp))
-                Column {
-                    Text(song.title, color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Medium)
-                    Text(song.artist, color = Color.White.copy(alpha = 0.6f), fontSize = 13.sp)
+            }
+            item { Text("Escuchado recientemente", color = Color.White, fontSize = 19.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 22.dp, vertical = 8.dp)) }
+        }
+        items(songs.drop(if (songs.isNotEmpty()) 1 else 0), key = { it.id }) { song ->
+            Row(Modifier.fillMaxWidth().clickable { onSongClick(song) }.padding(horizontal = 22.dp, vertical = 9.dp), verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.size(58.dp).clip(RoundedCornerShape(13.dp)).background(Color(0xFF202024))) {
+                    if (!song.displayCoverUrl.isNullOrBlank()) AsyncImage(song.displayCoverUrl, null, modifier = Modifier.fillMaxSize(), contentScale = androidx.compose.ui.layout.ContentScale.Crop)
+                }
+                Spacer(Modifier.width(15.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(song.title, color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(song.artist, color = Color.White.copy(.55f), fontSize = 14.sp, modifier = Modifier.padding(top = 4.dp), maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
             }
         }
