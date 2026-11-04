@@ -55,6 +55,7 @@ fun FullPlayerScreen(
     val isPlaying by PlayerController.isPlaying.collectAsState()
     val positionMs by PlayerController.positionMs.collectAsState()
     val durationMs by PlayerController.durationMs.collectAsState()
+    val playbackError by PlayerController.playbackError.collectAsState()
 
     val cover = current?.coverUrl
 
@@ -150,6 +151,14 @@ fun FullPlayerScreen(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
+                if (playbackError != null) {
+                    Text(
+                        text = playbackError.orEmpty(),
+                        color = Color(0xFFFF8A80),
+                        fontSize = 12.sp,
+                        modifier = Modifier.padding(top = 6.dp)
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -184,7 +193,7 @@ fun FullPlayerScreen(
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Text(formatTime(positionMs), color = Color.White.copy(alpha = 0.6f), fontSize = 12.sp)
-                    Text("-${formatTime(durationMs - positionMs)}", color = Color.White.copy(alpha = 0.6f), fontSize = 12.sp)
+                    Text("-${formatTime((durationMs - positionMs).coerceAtLeast(0L))}", color = Color.White.copy(alpha = 0.6f), fontSize = 12.sp)
                 }
             }
 
@@ -195,7 +204,7 @@ fun FullPlayerScreen(
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(onClick = {}, modifier = Modifier.size(56.dp)) {
+                IconButton(onClick = { PlayerController.playPrevious() }, modifier = Modifier.size(56.dp)) {
                     Icon(Icons.Default.SkipPrevious, contentDescription = null, tint = Color.White, modifier = Modifier.size(40.dp))
                 }
                 Box(
@@ -216,7 +225,7 @@ fun FullPlayerScreen(
                         modifier = Modifier.size(40.dp)
                     )
                 }
-                IconButton(onClick = {}, modifier = Modifier.size(56.dp)) {
+                IconButton(onClick = { PlayerController.playNext() }, modifier = Modifier.size(56.dp)) {
                     Icon(Icons.Default.SkipNext, contentDescription = null, tint = Color.White, modifier = Modifier.size(40.dp))
                 }
             }
@@ -230,7 +239,7 @@ fun FullPlayerScreen(
                 Icon(Icons.Default.VolumeUp, contentDescription = null, tint = Color.White.copy(alpha = 0.6f), modifier = Modifier.size(20.dp))
                 Slider(
                     value = volume,
-                    onValueChange = { volume = it },
+                    onValueChange = { volume = it; PlayerController.setVolume(it) },
                     modifier = Modifier.weight(1f).padding(horizontal = 12.dp),
                     colors = SliderDefaults.colors(
                         thumbColor = Color.White,
@@ -279,6 +288,14 @@ fun FullPlayerScreen(
                 onShareLyrics = {
                     showOverflow = false
                     showShareLyrics = true
+                },
+                onPlayNext = {
+                    current?.let { PlayerController.addToQueue(it, playNext = true) }
+                    showOverflow = false
+                },
+                onAddToQueue = {
+                    current?.let { PlayerController.addToQueue(it) }
+                    showOverflow = false
                 }
             )
         }
