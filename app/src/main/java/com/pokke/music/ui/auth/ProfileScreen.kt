@@ -7,6 +7,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -38,7 +39,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.pokke.music.data.model.UserProfile
+import com.pokke.music.data.preferences.UserPreferences
 import com.pokke.music.data.repository.AuthRepository
+import com.pokke.music.ui.profile.AvatarFrames
+import com.pokke.music.ui.profile.FramedAvatar
+import com.pokke.music.ui.profile.ListeningCard
 import kotlinx.coroutines.launch
 
 private val ProfileInk = Color(0xFFF3F2FA)
@@ -63,6 +68,7 @@ fun ProfileScreen(repository: AuthRepository, onBack: () -> Unit, onSignedOut: (
     var cardStyle by remember { mutableStateOf("glass") }
     var badges by remember { mutableStateOf("Pokke listener,Music lover") }
     var isPublic by remember { mutableStateOf(true) }
+    var showListening by remember { mutableStateOf(true) }
     var linkLabel by remember { mutableStateOf("") }
     var linkUrl by remember { mutableStateOf("") }
     var loading by remember { mutableStateOf(true) }
@@ -70,6 +76,8 @@ fun ProfileScreen(repository: AuthRepository, onBack: () -> Unit, onSignedOut: (
     var editing by remember { mutableStateOf(false) }
     var tab by remember { mutableStateOf(0) }
     var message by remember { mutableStateOf<String?>(null) }
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val prefs = remember { UserPreferences(context) }
 
     LaunchedEffect(session?.userId) {
         loading = true
@@ -80,6 +88,7 @@ fun ProfileScreen(repository: AuthRepository, onBack: () -> Unit, onSignedOut: (
             frame = p?.frame ?: "none"; badge = p?.badge ?: "none"; pronouns = p?.pronouns.orEmpty()
             status = p?.statusText.orEmpty(); accent = p?.accentColor ?: "violet"; cardStyle = p?.cardStyle ?: "glass"
             badges = p?.badges ?: "Pokke listener,Music lover"; isPublic = p?.isPublic ?: true
+            showListening = p?.showListening ?: true
             linkLabel = p?.linkLabel.orEmpty(); linkUrl = p?.linkUrl.orEmpty()
         }.onFailure { message = it.localizedMessage }
         loading = false
@@ -106,14 +115,24 @@ fun ProfileScreen(repository: AuthRepository, onBack: () -> Unit, onSignedOut: (
                 ProfileTopButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Volver", tint = Color.White) }
                 ProfileTopButton(onClick = { scope.launch { repository.signOut(); onSignedOut() } }) { Icon(Icons.Default.Logout, "Cerrar sesión", tint = Color.White) }
             }
-            Box(Modifier.align(Alignment.BottomStart).padding(start = 22.dp, bottom = 0.dp).size(104.dp).clip(CircleShape)
-                .background(Color(0xFF30364D)).border(3.dp, accentColor, CircleShape), contentAlignment = Alignment.Center) {
-                if (avatar.isNotBlank()) AsyncImage(avatar, "Avatar", Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
-                else Text((displayName.firstOrNull() ?: 'P').uppercase(), color = Color.White, fontSize = 38.sp, fontWeight = FontWeight.Bold)
-                if (frame != "none") Box(Modifier.fillMaxSize().border(3.dp, frameColor(frame), CircleShape))
-            }
-            if (badge != "none") Surface(Modifier.align(Alignment.BottomStart).padding(start = 96.dp, bottom = 4.dp), shape = CircleShape, color = accentColor) {
-                Icon(Icons.Default.Badge, "Emblema destacado", tint = Color(0xFF171A28), modifier = Modifier.padding(7.dp).size(18.dp))
+            Box(Modifier.align(Alignment.BottomStart).padding(start = 18.dp, bottom = 0.dp)) {
+                FramedAvatar(
+                    avatarUrl = avatar.ifBlank { null },
+                    displayName = displayName,
+                    frameId = frame,
+                    size = 108.dp,
+                    borderColor = accentColor,
+                    borderWidth = 3.dp
+                )
+                if (badge != "none") {
+                    Surface(
+                        Modifier.align(Alignment.BottomEnd).offset(x = 4.dp, y = 2.dp),
+                        shape = CircleShape,
+                        color = accentColor
+                    ) {
+                        Icon(Icons.Default.Badge, "Emblema", tint = Color(0xFF171A28), modifier = Modifier.padding(6.dp).size(16.dp))
+                    }
+                }
             }
         }
 
@@ -164,18 +183,35 @@ fun ProfileScreen(repository: AuthRepository, onBack: () -> Unit, onSignedOut: (
                     ProfileField("Emblemas (separados por coma)", badges) { badges = it }
                     ProfileChoice("Tema", theme, listOf("midnight", "ocean", "violet", "rose", "amoled"), listOf("Noche", "Océano", "Violeta", "Rosa", "AMOLED"), accentColor) { theme = it }
                     ProfileChoice("Color de acento", accent, listOf("violet", "blue", "pink", "cyan", "green", "gold"), listOf("Violeta", "Azul", "Rosa", "Cian", "Verde", "Dorado"), accentColor) { accent = it }
-                    ProfileChoice("Marco del avatar", frame, listOf("none", "violet", "blue", "pink", "gold"), listOf("Ninguno", "Violeta", "Azul", "Rosa", "Dorado"), accentColor) { frame = it }
+                    Text("Marco del avatar", color = ProfileMuted, fontSize = 12.sp, modifier = Modifier.padding(top = 10.dp, bottom = 8.dp))
+                    FramePicker(selected = frame, accent = accentColor, onSelect = { frame = it })
                     ProfileChoice("Emblema principal", badge, listOf("none", "music", "star", "crown", "verified"), listOf("Ninguno", "Música", "Estrella", "Corona", "Verificado"), accentColor) { badge = it }
                     ProfileChoice("Estilo de tarjeta", cardStyle, listOf("glass", "solid", "outline"), listOf("Cristal", "Sólido", "Contorno"), accentColor) { cardStyle = it }
                     Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Column(Modifier.weight(1f)) { Text("Perfil público", color = ProfileInk, fontWeight = FontWeight.SemiBold); Text("Permite mostrar tu perfil en espacios públicos", color = ProfileMuted, fontSize = 11.sp) }
+                        Column(Modifier.weight(1f)) {
+                            Text("Perfil público", color = ProfileInk, fontWeight = FontWeight.SemiBold)
+                            Text("Otros pueden buscarte y ver tu perfil", color = ProfileMuted, fontSize = 11.sp)
+                        }
                         Switch(isPublic, { isPublic = it })
+                    }
+                    Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text("Mostrar lo que escucho", color = ProfileInk, fontWeight = FontWeight.SemiBold)
+                            Text("Otros ven canción y progreso en tu perfil (por defecto activado)", color = ProfileMuted, fontSize = 11.sp)
+                        }
+                        Switch(showListening, {
+                            showListening = it
+                            scope.launch { prefs.setShowListeningOnProfile(it) }
+                        })
                     }
                     if (message != null) Text(message!!, color = if (message!!.contains("correctamente")) Color(0xFF8FE0B0) else Color(0xFFFF9C9C), fontSize = 12.sp, modifier = Modifier.padding(vertical = 8.dp))
                     Button(onClick = {
                         saving = true; message = null
                         scope.launch {
-                            repository.updateProfile(displayName, username, bio, avatar, banner, theme, frame, badge, pronouns, status, accent, cardStyle, badges, isPublic, linkLabel, linkUrl)
+                            repository.updateProfile(
+                                displayName, username, bio, avatar, banner, theme, frame, badge, pronouns, status,
+                                accent, cardStyle, badges, isPublic, linkLabel, linkUrl, showListening
+                            )
                                 .onSuccess { profile = it; message = "Cambios guardados correctamente" }
                                 .onFailure { message = it.localizedMessage ?: "No se pudo guardar el perfil" }
                             saving = false
@@ -193,7 +229,18 @@ fun ProfileScreen(repository: AuthRepository, onBack: () -> Unit, onSignedOut: (
             }
             when (tab) {
                 0 -> {
-                    ProfilePanel(cardBackground, accentColor, "Actividad", "Tu espacio musical", "Cuando reproduzcas música, podrás compartir aquí lo que estás escuchando.", Icons.Default.MusicNote)
+                    if (showListening) {
+                        Spacer(Modifier.height(12.dp))
+                        ListeningCard(
+                            accent = accentColor,
+                            cardBg = cardBackground,
+                            ink = ProfileInk,
+                            muted = ProfileMuted,
+                            live = true
+                        )
+                    } else {
+                        ProfilePanel(cardBackground, accentColor, "Actividad", "Escucha oculta", "Activaste la privacidad: otros no verán lo que escuchas.", Icons.Default.MusicNote)
+                    }
                     ProfilePanel(cardBackground, accentColor, "Emblemas", "Colección del perfil", badges.ifBlank { "Todavía no has añadido emblemas." }, Icons.Default.Badge)
                 }
                 1 -> ProfilePanel(cardBackground, accentColor, "Favoritos", "Tu colección", "Tus canciones favoritas sincronizadas con Kokoro aparecen en tu biblioteca.", Icons.Default.Favorite)
@@ -252,4 +299,42 @@ fun ProfileScreen(repository: AuthRepository, onBack: () -> Unit, onSignedOut: (
 
 private fun frameColor(frame: String) = when (frame) {
     "blue" -> Color(0xFF8CB7FF); "pink" -> Color(0xFFFF9FCB); "gold" -> Color(0xFFE5C17A); else -> Color(0xFFAAA0FF)
+}
+
+@Composable
+private fun FramePicker(selected: String, accent: Color, onSelect: (String) -> Unit) {
+    val frames = AvatarFrames.ALL
+    LazyRow(
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
+    ) {
+        items(frames.size) { index ->
+            val f = frames[index]
+            val active = selected == f.id
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Box(
+                    Modifier
+                        .size(64.dp)
+                        .clip(CircleShape)
+                        .background(if (active) accent.copy(.22f) else Color.White.copy(.06f))
+                        .border(if (active) 2.dp else 1.dp, if (active) accent else Color.White.copy(.12f), CircleShape)
+                        .clickable { onSelect(f.id) },
+                    contentAlignment = Alignment.Center
+                ) {
+                    FramedAvatar(
+                        avatarUrl = null,
+                        displayName = "P",
+                        frameId = f.id,
+                        size = 56.dp
+                    )
+                }
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    if (f.id == "none") "—" else f.id.removePrefix("frame_"),
+                    color = if (active) accent else ProfileMuted,
+                    fontSize = 10.sp
+                )
+            }
+        }
+    }
 }
