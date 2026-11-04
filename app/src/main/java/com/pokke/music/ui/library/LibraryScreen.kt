@@ -8,29 +8,35 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.DeleteOutline
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.QueueMusic
-import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalContext
 import coil.compose.AsyncImage
-import coil.request.ImageRequest
 import com.pokke.music.data.model.Playlist
 import com.pokke.music.data.model.Song
 import com.pokke.music.data.repository.AuthRepository
+import com.pokke.music.data.repository.LocalLibraryStore
+import com.pokke.music.ui.theme.PokkeBlack
 import kotlinx.coroutines.launch
+import java.io.File
 
+private enum class LibraryTab { DOWNLOADS, FAVORITES, HISTORY }
+
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LibraryScreen(
     repository: AuthRepository,
@@ -38,31 +44,43 @@ fun LibraryScreen(
     onSongClick: (Song) -> Unit = {},
     onLoginRequired: () -> Unit = {}
 ) {
-    val session by repository.session.collectAsState()
+    val context = LocalContext.current
+    val localStore = remember { LocalLibraryStore(context.applicationContext) }
     val scope = rememberCoroutineScope()
+    val session by repository.session.collectAsState()
+    val downloads by localStore.downloads.collectAsState(initial = emptyList())
+    val history by localStore.history.collectAsState(initial = emptyList())
     var favorites by remember { mutableStateOf<List<Song>>(emptyList()) }
     var playlists by remember { mutableStateOf<List<Playlist>>(emptyList()) }
     var selectedPlaylist by remember { mutableStateOf<Playlist?>(null) }
     var playlistSongs by remember { mutableStateOf<List<Song>>(emptyList()) }
+    var tab by remember { mutableStateOf(LibraryTab.DOWNLOADS) }
     var loading by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var showCreate by remember { mutableStateOf(false) }
-    var newName by remember { mutableStateOf("") }
-    var newDescription by remember { mutableStateOf("") }
+    var playlistName by remember { mutableStateOf("") }
+    var playlistDescription by remember { mutableStateOf("") }
 
-    fun refresh() {
+    fun refreshRemote() {
         if (session == null) return
         scope.launch {
-            loading = true; error = null
+            loading = true
+            error = null
             repository.getFavorites().onSuccess { favorites = it }.onFailure { error = it.localizedMessage }
             repository.getPlaylists().onSuccess { playlists = it }.onFailure { error = it.localizedMessage }
             loading = false
         }
     }
+
     LaunchedEffect(session?.userId, isVisible) {
-        if (session == null) { favorites = emptyList(); playlists = emptyList() }
-        else if (isVisible) { favorites = emptyList(); playlists = emptyList(); refresh() }
+        if (session == null) {
+            favorites = emptyList()
+            playlists = emptyList()
+            selectedPlaylist = null
+            playlistSongs = emptyList()
+        } else if (isVisible) refreshRemote()
     }
+
     LaunchedEffect(selectedPlaylist?.id) {
         val selected = selectedPlaylist ?: return@LaunchedEffect
         loading = true
@@ -70,60 +88,105 @@ fun LibraryScreen(
         loading = false
     }
 
-    Column(Modifier.fillMaxSize().background(Color(0xFF080808)).statusBarsPadding()) {
-        Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-            if (selectedPlaylist != null) {
-                IconButton(onClick = { selectedPlaylist = null; playlistSongs = emptyList() }) { Icon(Icons.Default.ArrowBack, null, tint = Color.White) }
+    val visibleSongs = when (tab) {
+        LibraryTab.DOWNLOADS -> downloads.filter { it.audioUrl?.let(::File)?.exists() == true }
+        LibraryTab.FAVORITES -> favorites
+        LibraryTab.HISTORY -> history
+    }
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize().background(PokkeBlack).statusBarsPadding(),
+        contentPadding = PaddingValues(bottom = 110.dp)
+    ) {
+        item {
+            Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 18.dp), verticalAlignment = Alignment.CenterVertically) {
+                if (selectedPlaylist != null) IconButton(onClick = { selectedPlaylist = null; playlistSongs = emptyList() }) {
+                    Icon(Icons.Default.ArrowBack, "Volver", tint = Color.White)
+                }
+                Text(selectedPlaylist?.name ?: "Biblioteca", color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                if (session != null && selectedPlaylist == null) IconButton(onClick = { showCreate = true }) {
+                    Icon(Icons.Default.Add, "Crear playlist", tint = Color.White)
+                }
+                if (session != null) IconButton(onClick = { refreshRemote() }) {
+                    Icon(Icons.Default.History, "Actualizar Kokoro", tint = Color.White.copy(.75f))
+                }
             }
-            Text(selectedPlaylist?.name ?: "Tu biblioteca", color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-            if (session != null && selectedPlaylist == null) IconButton(onClick = { showCreate = true }) { Icon(Icons.Default.Add, "Crear playlist", tint = Color.White) }
         }
-        if (session == null) {
-            Column(Modifier.fillMaxSize().padding(28.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-                Icon(Icons.Default.Favorite, null, tint = Color.White.copy(.7f), modifier = Modifier.size(42.dp))
-                Spacer(Modifier.height(16.dp))
-                Text("Tu música, sincronizada", color = Color.White, fontSize = 19.sp, fontWeight = FontWeight.SemiBold)
-                Spacer(Modifier.height(8.dp))
-                Text("Inicia sesión para guardar favoritos y playlists en todos tus dispositivos.", color = Color.White.copy(.55f), fontSize = 13.sp)
-                Spacer(Modifier.height(18.dp))
-                Button(onClick = onLoginRequired, colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black)) { Text("Iniciar sesión") }
+
+        if (selectedPlaylist != null) {
+            item { Text("${playlistSongs.size} canciones · Kokoro", color = Color.White.copy(.5f), fontSize = 12.sp, modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp)) }
+            items(playlistSongs, key = { "playlist_${it.id}" }) { song ->
+                SongRow(song, trailing = "Quitar", onClick = { onSongClick(song) }, onTrailing = {
+                    scope.launch {
+                        repository.removeSongFromPlaylist(selectedPlaylist!!.id, song.id)
+                            .onSuccess { playlistSongs = playlistSongs.filterNot { it.id == song.id }; refreshRemote() }
+                            .onFailure { error = it.localizedMessage }
+                    }
+                })
             }
-        } else if (loading && favorites.isEmpty() && playlists.isEmpty() && playlistSongs.isEmpty()) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = Color.White) }
-        } else if (selectedPlaylist != null) {
-            LazyColumn(contentPadding = PaddingValues(bottom = 110.dp)) {
-                item { Text("${playlistSongs.size} canciones", color = Color.White.copy(.5f), modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp), fontSize = 12.sp) }
-                items(playlistSongs, key = { it.id }) { song -> LibrarySongRow(song, onSongClick) }
-                if (playlistSongs.isEmpty()) item { EmptyLibraryText("Esta playlist está vacía. Reproduce una canción y añádela desde el reproductor.") }
-            }
+            if (playlistSongs.isEmpty()) item { EmptyLibraryText(if (loading) "Cargando playlist…" else "Esta playlist todavía está vacía.") }
         } else {
-            LazyColumn(contentPadding = PaddingValues(bottom = 110.dp)) {
-                item { SectionTitle("Favoritos", favorites.size) }
-                if (favorites.isEmpty()) item { EmptyLibraryText("Todavía no has guardado canciones con ❤️") }
-                items(favorites.take(8), key = { "fav-${it.id}" }) { song -> LibrarySongRow(song, onSongClick) }
-                item {
-                    Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 22.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Text("Playlists", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
-                        TextButton(onClick = { showCreate = true }) { Text("Crear", color = Color.White.copy(.8f)) }
+            item {
+                Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    LibraryShortcut("Descargas", downloads.size, Icons.Default.Download, Modifier.weight(1f)) { tab = LibraryTab.DOWNLOADS }
+                    LibraryShortcut("Favoritos", favorites.size, Icons.Default.Favorite, Modifier.weight(1f)) {
+                        tab = LibraryTab.FAVORITES
+                        refreshRemote()
                     }
+                    LibraryShortcut("Historial", history.size, Icons.Default.History, Modifier.weight(1f)) { tab = LibraryTab.HISTORY }
                 }
-                if (playlists.isEmpty()) item { EmptyLibraryText("Crea tu primera playlist para organizar tu música.") }
-                items(playlists, key = { it.id }) { playlist ->
-                    Row(Modifier.fillMaxWidth().clickable { selectedPlaylist = playlist }.padding(horizontal = 20.dp, vertical = 9.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Box(Modifier.size(56.dp).clip(RoundedCornerShape(10.dp)).background(Color(0xFF242424)), contentAlignment = Alignment.Center) {
-                            if (!playlist.coverUrl.isNullOrBlank()) AsyncImage(ImageRequest.Builder(LocalContext.current).data(playlist.coverUrl).crossfade(true).build(), null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
-                            else Icon(Icons.Default.QueueMusic, null, tint = Color.White.copy(.7f), modifier = Modifier.size(26.dp))
-                        }
-                        Spacer(Modifier.width(13.dp))
-                        Column(Modifier.weight(1f)) {
-                            Text(playlist.name, color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            Text("${playlist.songCount} canciones", color = Color.White.copy(.5f), fontSize = 12.sp)
-                        }
-                        IconButton(onClick = { scope.launch { repository.deletePlaylist(playlist.id).onSuccess { refresh() }.onFailure { error = it.localizedMessage } } }) { Icon(Icons.Default.Delete, "Eliminar playlist", tint = Color.White.copy(.45f)) }
-                    }
-                }
-                if (error != null) item { Text(error!!, color = Color(0xFFFF8A80), modifier = Modifier.padding(20.dp), fontSize = 12.sp) }
+                Spacer(Modifier.height(22.dp))
             }
+            item {
+                Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text("Tus playlists", color = Color.White, fontSize = 19.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                    if (session != null) TextButton(onClick = { showCreate = true }) { Text("Nueva", color = Color.White) }
+                }
+            }
+            if (session == null) item { EmptyLibraryText("Inicia sesión con Kokoro para sincronizar favoritos y playlists.") }
+            else if (playlists.isEmpty()) item { EmptyLibraryText("Todavía no tienes playlists en Kokoro.") }
+            items(playlists, key = { "pl_${it.id}" }) { playlist ->
+                Row(Modifier.fillMaxWidth().clickable { selectedPlaylist = playlist }.padding(horizontal = 20.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.size(54.dp).clip(RoundedCornerShape(10.dp)).background(Color(0xFF252525)), contentAlignment = Alignment.Center) {
+                        if (!playlist.coverUrl.isNullOrBlank()) AsyncImage(model = playlist.coverUrl, contentDescription = null, modifier = Modifier.fillMaxSize())
+                        else Icon(Icons.Default.QueueMusic, null, tint = Color.White.copy(.8f), modifier = Modifier.size(27.dp))
+                    }
+                    Column(Modifier.weight(1f).padding(start = 13.dp)) {
+                        Text(playlist.name, color = Color.White, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text("${playlist.songCount} canciones · Kokoro", color = Color.White.copy(.5f), fontSize = 12.sp)
+                    }
+                    IconButton(onClick = { scope.launch { repository.deletePlaylist(playlist.id).onSuccess { refreshRemote() }.onFailure { error = it.localizedMessage } } }) {
+                        Icon(Icons.Default.DeleteOutline, "Eliminar playlist", tint = Color.White.copy(.55f))
+                    }
+                }
+            }
+            item {
+                Spacer(Modifier.height(18.dp))
+                Text(when (tab) { LibraryTab.DOWNLOADS -> "Descargas"; LibraryTab.FAVORITES -> "Favoritos de Kokoro"; LibraryTab.HISTORY -> "Recién escuchadas" }, color = Color.White, fontSize = 19.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp))
+            }
+            if (tab == LibraryTab.FAVORITES && session == null) {
+                item {
+                    Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp)) {
+                        EmptyLibraryText("Los favoritos se guardan en tu cuenta Kokoro, no solo en este teléfono.")
+                        TextButton(onClick = onLoginRequired) { Text("Iniciar sesión", color = Color.White) }
+                    }
+                }
+            } else if (loading && tab == LibraryTab.FAVORITES && favorites.isEmpty()) {
+                item { EmptyLibraryText("Cargando favoritos de Kokoro…") }
+            } else if (visibleSongs.isEmpty()) {
+                item { EmptyLibraryText(when (tab) { LibraryTab.DOWNLOADS -> "Las canciones descargadas aparecerán aquí."; LibraryTab.FAVORITES -> "Todavía no has guardado canciones con ❤️."; LibraryTab.HISTORY -> "Tu historial de reproducción aparecerá aquí." }) }
+            }
+            items(visibleSongs, key = { "${tab.name}_${it.id}" }) { song ->
+                SongRow(song, trailing = if (tab == LibraryTab.DOWNLOADS || tab == LibraryTab.FAVORITES) "Quitar" else null, onClick = { onSongClick(song) }, onTrailing = {
+                    scope.launch {
+                        if (tab == LibraryTab.DOWNLOADS) localStore.removeDownload(song)
+                        else if (tab == LibraryTab.FAVORITES) repository.setFavorite(song, false)
+                            .onSuccess { favorites = favorites.filterNot { it.id == song.id } }
+                            .onFailure { error = it.localizedMessage }
+                    }
+                })
+            }
+            if (error != null) item { Text(error.orEmpty(), color = Color(0xFFFF8A80), fontSize = 12.sp, modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)) }
         }
     }
 
@@ -132,42 +195,45 @@ fun LibraryScreen(
         title = { Text("Nueva playlist") },
         text = {
             Column {
-                OutlinedTextField(value = newName, onValueChange = { newName = it }, label = { Text("Nombre") }, singleLine = true)
+                OutlinedTextField(value = playlistName, onValueChange = { playlistName = it }, label = { Text("Nombre") }, singleLine = true)
                 Spacer(Modifier.height(8.dp))
-                OutlinedTextField(value = newDescription, onValueChange = { newDescription = it }, label = { Text("Descripción (opcional)") })
+                OutlinedTextField(value = playlistDescription, onValueChange = { playlistDescription = it }, label = { Text("Descripción (opcional)") })
             }
         },
-        confirmButton = {
-            TextButton(enabled = newName.isNotBlank(), onClick = {
-                scope.launch {
-                    repository.createPlaylist(newName, newDescription).onSuccess { newName = ""; newDescription = ""; showCreate = false; refresh() }.onFailure { error = it.localizedMessage }
-                }
-            }) { Text("Crear") }
-        },
+        confirmButton = { TextButton(onClick = {
+            scope.launch {
+                repository.createPlaylist(playlistName, playlistDescription).onSuccess {
+                    playlistName = ""; playlistDescription = ""; showCreate = false; refreshRemote()
+                }.onFailure { error = it.localizedMessage }
+            }
+        }, enabled = playlistName.isNotBlank()) { Text("Crear") } },
         dismissButton = { TextButton(onClick = { showCreate = false }) { Text("Cancelar") } }
     )
 }
 
 @Composable
-private fun SectionTitle(title: String, count: Int) {
-    Text("$title · $count", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp))
+private fun LibraryShortcut(title: String, count: Int, icon: androidx.compose.ui.graphics.vector.ImageVector, modifier: Modifier, onClick: () -> Unit) {
+    Column(modifier.clip(RoundedCornerShape(15.dp)).background(Color(0xFF191919)).clickable(onClick = onClick).padding(12.dp)) {
+        Icon(icon, null, tint = Color.White, modifier = Modifier.size(23.dp))
+        Spacer(Modifier.height(12.dp))
+        Text(title, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+        Text("$count", color = Color.White.copy(.5f), fontSize = 12.sp)
+    }
+}
+
+@Composable
+private fun SongRow(song: Song, trailing: String?, onClick: () -> Unit, onTrailing: () -> Unit) {
+    Row(Modifier.fillMaxWidth().clickable(enabled = !song.audioUrl.isNullOrBlank(), onClick = onClick).padding(horizontal = 20.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+        AsyncImage(model = song.displayCoverUrl, contentDescription = null, modifier = Modifier.size(50.dp).clip(RoundedCornerShape(8.dp)))
+        Column(Modifier.weight(1f).padding(start = 12.dp)) {
+            Text(song.title, color = Color.White, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(song.artist, color = Color.White.copy(.55f), fontSize = 12.sp, maxLines = 1)
+        }
+        if (trailing != null) TextButton(onClick = onTrailing) { Text(trailing, color = Color.White.copy(.65f), fontSize = 12.sp) }
+    }
 }
 
 @Composable
 private fun EmptyLibraryText(text: String) {
-    Text(text, color = Color.White.copy(.45f), fontSize = 13.sp, modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 14.dp))
-}
-
-@Composable
-private fun LibrarySongRow(song: Song, onSongClick: (Song) -> Unit) {
-    Row(Modifier.fillMaxWidth().clickable(enabled = !song.audioUrl.isNullOrBlank()) { onSongClick(song) }.padding(horizontal = 20.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-        Box(Modifier.size(48.dp).clip(RoundedCornerShape(8.dp)).background(Color(0xFF242424))) {
-            if (!song.displayCoverUrl.isNullOrBlank()) AsyncImage(ImageRequest.Builder(LocalContext.current).data(song.displayCoverUrl).crossfade(true).build(), null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
-        }
-        Spacer(Modifier.width(12.dp))
-        Column(Modifier.weight(1f)) {
-            Text(song.title, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(song.artist, color = Color.White.copy(.55f), fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        }
-    }
+    Text(text, color = Color.White.copy(.45f), fontSize = 13.sp, modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp))
 }
