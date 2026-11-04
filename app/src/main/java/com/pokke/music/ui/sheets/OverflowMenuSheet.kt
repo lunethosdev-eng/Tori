@@ -38,7 +38,9 @@ import androidx.compose.ui.unit.sp
 @Composable
 fun OverflowMenuSheet(
     onDismiss: () -> Unit,
-    onShareLyrics: () -> Unit
+    onShareLyrics: () -> Unit,
+    onPlayNext: () -> Unit,
+    onAddToQueue: () -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -50,8 +52,8 @@ fun OverflowMenuSheet(
         MenuItem(Icons.Default.VideoLibrary, "Convertir a video", onClick = {})
         HorizontalDivider(color = Color.White.copy(0.1f), modifier = Modifier.padding(vertical = 8.dp))
         MenuItem(Icons.Default.Radio, "Iniciar radio", onClick = {})
-        MenuItem(Icons.Default.Queue, "Reproducir después", onClick = {})
-        MenuItem(Icons.Default.Queue, "Agregar a la cola", onClick = {})
+        MenuItem(Icons.Default.Queue, "Reproducir después", onClick = onPlayNext)
+        MenuItem(Icons.Default.Queue, "Agregar a la cola", onClick = onAddToQueue)
         MenuItem(Icons.Default.Download, "Descargar", onClick = {})
         MenuItem(Icons.Default.Delete, "Quitar de la caché", onClick = {})
         HorizontalDivider(color = Color.White.copy(0.1f), modifier = Modifier.padding(vertical = 8.dp))
