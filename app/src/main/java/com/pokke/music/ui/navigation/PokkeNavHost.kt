@@ -50,6 +50,9 @@ import com.pokke.music.ui.settings.SettingsScreen
 sealed class Screen(val route: String) {
     data object Auth : Screen("auth")
     data object Profile : Screen("profile")
+    data object PublicProfile : Screen("user/{username}") {
+        fun create(username: String) = "user/${username.trim().lowercase().removePrefix("@")}"
+    }
     data object Home : Screen("home")
     data object Library : Screen("library")
     data object Search : Screen("search")
@@ -98,9 +101,21 @@ fun PokkeNavHost() {
                 )
             }
             composable(Screen.Search.route) {
-                SearchScreen(authRepository = auth, isVisible = route == Screen.Search.route,
+                SearchScreen(
+                    authRepository = auth,
+                    isVisible = route == Screen.Search.route,
                     onSongClick = { PlayerController.init(context); PlayerController.playSong(it); nav.navigate(Screen.Player.route) },
-                    onPlayQueue = { songs, index -> PlayerController.init(context); PlayerController.playQueue(songs, index); nav.navigate(Screen.Player.route) })
+                    onPlayQueue = { songs, index -> PlayerController.init(context); PlayerController.playQueue(songs, index); nav.navigate(Screen.Player.route) },
+                    onUserClick = { username -> nav.navigate(Screen.PublicProfile.create(username)) }
+                )
+            }
+            composable(Screen.PublicProfile.route) { entry ->
+                val username = entry.arguments?.getString("username").orEmpty()
+                com.pokke.music.ui.profile.PublicProfileScreen(
+                    username = username,
+                    repository = auth,
+                    onBack = { nav.popBackStack() }
+                )
             }
             composable(Screen.Library.route) {
                 LibraryScreen(repository = auth, isVisible = route == Screen.Library.route,
