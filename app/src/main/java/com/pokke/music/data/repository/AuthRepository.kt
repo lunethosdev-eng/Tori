@@ -356,7 +356,27 @@ class AuthRepository(context: Context) {
         return AuthSession(access, json.optString("refresh_token").nullable(), user.getString("id"), user.optString("email").nullable(), expiresAt)
     }
 
-    private fun parseProfile(o: JSONObject) = UserProfile(
+
+    /** Owner: grant emblem by username or user uuid. */
+    suspend fun grantEmblem(usernameOrId: String, emblemId: String): Result<Unit> = withContext(Dispatchers.IO) {
+        runCatching {
+            val s = requireSession()
+            val target = usernameOrId.trim().removePrefix("@")
+            require(target.isNotBlank() && emblemId.isNotBlank()) { "Usuario y emblema requeridos" }
+            val userId = if (target.matches(Regex("[0-9a-fA-F-]{36}"))) target else {
+                val rows = JSONArray(request(KokoroConfig.PROFILES, "GET", s, params = mapOf(
+                    "username" to "eq.${target.lowercase()}", "select" to "id", "limit" to "1"
+                )))
+                if (rows.length() == 0) throw IOException("Usuario no encontrado")
+                rows.getJSONObject(0).getString("id")
+            }
+            val body = JSONObject().put("user_id", userId).put("emblem_id", emblemId).put("granted_by", s.userId)
+            request("/rest/v1/user_emblems", "POST", s, params = mapOf("on_conflict" to "user_id,emblem_id"), body = body.toString(), prefer = "resolution=merge-duplicates,return=minimal")
+            Unit
+        }
+    }
+
+        private fun parseProfile(o: JSONObject) = UserProfile(
         id = o.getString("id"),
         displayName = o.optString("display_name").nullable(),
         username = o.optString("username").nullable(),
