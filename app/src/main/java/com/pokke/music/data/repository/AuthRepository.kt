@@ -128,6 +128,14 @@ class AuthRepository(context: Context) {
                 put("bio", bio.trim())
                 if (avatarUrl != null) { if (avatarUrl.isBlank()) put("avatar_url", JSONObject.NULL) else put("avatar_url", avatarUrl.trim()) }
                 if (bannerUrl != null) { if (bannerUrl.isBlank()) put("banner_url", JSONObject.NULL) else put("banner_url", bannerUrl.trim()) }
+                if (primaryColor != null) put("primary_color", primaryColor)
+                if (secondaryColor != null) put("secondary_color", secondaryColor)
+                if (gradientEnabled != null) put("gradient_enabled", gradientEnabled)
+                if (profileGifs != null) put("profile_gifs", profileGifs)
+                if (searchCardStyle != null) put("search_card_style", searchCardStyle)
+                if (searchCardColor != null) put("search_card_color", searchCardColor)
+                if (searchCardEffect != null) put("search_card_effect", searchCardEffect)
+                if (aboutExtra != null) put("about_extra", aboutExtra)
                 if (theme != null) put("theme", theme)
                 if (frame != null) put("frame", frame)
                 if (badge != null) put("badge", badge)
@@ -182,7 +190,7 @@ class AuthRepository(context: Context) {
             val pattern = "*$term*"
             val s = _session.value
             val params = mapOf(
-                "select" to "id,display_name,username,avatar_url,banner_url,bio,theme,frame,is_public,badge,pronouns,status_text,accent_color,card_style,badges,link_label,link_url,show_listening",
+                "select" to "id,display_name,username,avatar_url,banner_url,bio,theme,frame,is_public,badge,pronouns,status_text,accent_color,card_style,badges,link_label,link_url,show_listening,extra_links,favorite_mangas,search_card_style,search_card_color,search_card_effect,primary_color,secondary_color,gradient_enabled,profile_gifs,about_extra,is_owner",
                 "or" to "(username.ilike.$pattern,display_name.ilike.$pattern)",
                 "is_public" to "eq.true",
                 "order" to "username.asc",
