@@ -11,11 +11,11 @@ import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import java.net.HttpURLConnection
 import java.net.URL
-import java.net.URLEncoder
 
 /**
- * Queries all enabled music sources and merges results (uses all at once).
- * If a source fails or is full/unavailable, others still return.
+ * Queries all healthy music sources in parallel and merges results.
+ * Auto-switch: failed sources are marked unhealthy for 60s and skipped.
+ * If a source reports near softLimit capacity, prefer others for writes.
  */
 class MultiMusicRepository {
     private val songSelect =
@@ -33,15 +33,20 @@ class MultiMusicRepository {
             coroutineScope {
                 val jobs = sources.map { src ->
                     async {
-                        runCatching { searchOne(src.supabaseUrl, src.publishableKey, query, limit) }.getOrDefault(emptyList())
+                        try {
+                            searchOne(src.id, src.supabaseUrl, src.publishableKey, query, limit)
+                        } catch (e: Exception) {
+                            MusicSourcesConfig.markUnhealthy(src.id)
+                            emptyList()
+                        }
                     }
                 }
-                jobs.awaitAll().flatten().distinctBy { it.id.ifBlank { it.title + it.artist } }.take(limit)
+                jobs.awaitAll().flatten().distinctBy { it.id.ifBlank { it.title + "|" + it.artist } }.take(limit)
             }
         }
     }
 
-    private fun searchOne(baseUrl: String, key: String, query: String, limit: Int): List<Song> {
+    private fun searchOne(sourceId: String, baseUrl: String, key: String, query: String, limit: Int): List<Song> {
         val pattern = "*${query.trim()}*"
         val filter = "(title.ilike.$pattern,artist.ilike.$pattern,album.ilike.$pattern)"
         val params = "select=$songSelect&or=$filter&order=created_at.desc&limit=$limit"
@@ -55,7 +60,11 @@ class MultiMusicRepository {
             setRequestProperty("Accept", "application/json")
         }
         try {
-            if (conn.responseCode !in 200..299) return emptyList()
+            val code = conn.responseCode
+            if (code !in 200..299) {
+                MusicSourcesConfig.markUnhealthy(sourceId)
+                return emptyList()
+            }
             val body = conn.inputStream.bufferedReader().readText()
             val arr = JSONArray(body)
             return (0 until arr.length()).map { i ->
