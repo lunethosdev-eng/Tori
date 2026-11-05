@@ -279,8 +279,22 @@ private fun AlbumRow(album: Album, onClick: () -> Unit) {
 
 @Composable
 private fun UserRow(user: com.pokke.music.data.model.UserProfile, onClick: () -> Unit) {
+    val cardAccent = when (user.searchCardColor ?: user.accentColor) {
+        "blue" -> Color(0xFF8CB7FF); "pink" -> Color(0xFFFF9FCB); "cyan" -> Color(0xFF7EDCEB)
+        "green" -> Color(0xFF8ED9B0); "gold" -> Color(0xFFE5C17A); else -> Color(0xFFAAA0FF)
+    }
+    val effect = user.searchCardEffect ?: "none"
     Row(
-        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 20.dp, vertical = 10.dp),
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 6.dp)
+            .clip(RoundedCornerShape(14.dp))
+            .background(
+                if (effect == "glow") cardAccent.copy(alpha = 0.18f)
+                else Color.White.copy(alpha = 0.04f)
+            )
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         CoverImage(user.avatarUrl, 52, circle = true)
@@ -301,11 +315,16 @@ private fun UserRow(user: com.pokke.music.data.model.UserProfile, onClick: () ->
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
+            Text(
+                "ID · ${user.id.take(8)}…",
+                color = cardAccent.copy(alpha = 0.7f),
+                fontSize = 10.sp
+            )
         }
         if (!user.statusText.isNullOrBlank()) {
             Text(
                 user.statusText!!,
-                color = Color.White.copy(alpha = .4f),
+                color = cardAccent,
                 fontSize = 11.sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
