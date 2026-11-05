@@ -1,3 +1,4 @@
+import androidx.compose.material3.Button
 package com.pokke.music.ui.settings
 
 import androidx.compose.foundation.background
@@ -21,7 +22,7 @@ import com.pokke.music.data.preferences.UserPreferences
 import kotlinx.coroutines.launch
 
 @Composable
-fun SettingsScreen(onBack: () -> Unit) {
+fun SettingsScreen(onBack: () -> Unit, onOpenAdmin: (() -> Unit)? = null) {
     val context = LocalContext.current
     val prefs = remember(context) { UserPreferences(context) }
     val scope = rememberCoroutineScope()
