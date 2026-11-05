@@ -24,8 +24,9 @@ import coil.compose.AsyncImage
 import com.pokke.music.R
 
 /**
- * Built-in avatar frames.
- * Stored in profiles.frame as "none" | "frame_01"… | named id like "sakura".
+ * Built-in avatar frames (transparent PNGs in res/drawable-nodpi).
+ * Stored in profiles.frame as "none" | "frame_01" … "frame_26".
+ * Named decorative frames can be re-enabled once their webp assets are committed.
  */
 object AvatarFrames {
     data class Frame(val id: String, val label: String, @DrawableRes val resId: Int?)
@@ -42,45 +43,7 @@ object AvatarFrames {
             R.drawable.frame_25, R.drawable.frame_26
         )
         numeric.forEachIndexed { i, res ->
-            val id = "frame_%02d".format(i + 1)
-            add(Frame(id, "Marco ${i + 1}", res))
-        }
-        val named = listOf(
-            "afternoon_breeze" to R.drawable.afternoon_breeze,
-            "airona_fireworks" to R.drawable.airona_fireworks,
-            "blanket_green" to R.drawable.blanket_green,
-            "blanket_orange" to R.drawable.blanket_orange,
-            "blanket_pink" to R.drawable.blanket_pink,
-            "blanket_purple" to R.drawable.blanket_purple,
-            "box_green_red" to R.drawable.box_green_red,
-            "box_red_white" to R.drawable.box_red_white,
-            "box_red_white_blue" to R.drawable.box_red_white_blue,
-            "cab_monster" to R.drawable.cab_monster,
-            "cosy_deer" to R.drawable.cosy_deer,
-            "cyber_katana" to R.drawable.cyber_katana,
-            "dog_1" to R.drawable.dog_1,
-            "dog_2" to R.drawable.dog_2,
-            "dog_3" to R.drawable.dog_3,
-            "frog_derpy" to R.drawable.frog_derpy,
-            "fuchsia_agent" to R.drawable.fuchsia_agent,
-            "hoppy_day" to R.drawable.hoppy_day,
-            "icicle_gleaming" to R.drawable.icicle_gleaming,
-            "icicle_snowing" to R.drawable.icicle_snowing,
-            "lover_girl_autumn" to R.drawable.lover_girl_autumn,
-            "neon_cat_hoodie_black" to R.drawable.neon_cat_hoodie_black,
-            "neon_cat_hoodie_pink" to R.drawable.neon_cat_hoodie_pink,
-            "sakura" to R.drawable.sakura,
-            "sakura_gyoiko" to R.drawable.sakura_gyoiko,
-            "sakura_pink" to R.drawable.sakura_pink,
-            "sakura_ukon" to R.drawable.sakura_ukon,
-            "towerborne_play" to R.drawable.towerborne_play,
-            "treat_ghost" to R.drawable.treat_ghost,
-            "treat_pumpkin" to R.drawable.treat_pumpkin,
-            "trick_pumpkin" to R.drawable.trick_pumpkin,
-            "ultron" to R.drawable.ultron,
-        )
-        named.forEach { (id, res) ->
-            add(Frame(id, id.replace('_', ' ').replaceFirstChar { it.uppercase() }, res))
+            add(Frame("frame_%02d".format(i + 1), "Marco ${i + 1}", res))
         }
     }
 
