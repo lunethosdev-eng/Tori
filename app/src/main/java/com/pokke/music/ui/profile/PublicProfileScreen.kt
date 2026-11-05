@@ -28,6 +28,11 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.pokke.music.data.model.UserProfile
 import com.pokke.music.data.repository.AuthRepository
+import com.pokke.music.ui.profile.LinkFavicon
+import com.pokke.music.ui.profile.hostLabel
+import com.pokke.music.ui.profile.platformLabel
+import com.pokke.music.ui.profile.MangaFavoritesDisplay
+import com.pokke.music.ui.profile.ListeningCard
 import kotlinx.coroutines.launch
 
 private val Ink = Color(0xFFF3F2FA)
@@ -179,7 +184,7 @@ fun PublicProfileScreen(
                         Text(p.bio!!, color = Ink.copy(.9f), fontSize = 14.sp, lineHeight = 20.sp)
                     }
 
-                    // Primary link
+                    // Primary link with site icon
                     if (!p.linkUrl.isNullOrBlank()) {
                         Spacer(Modifier.height(14.dp))
                         Row(
@@ -190,21 +195,23 @@ fun PublicProfileScreen(
                                 .padding(12.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(Icons.Default.Link, null, tint = accent, modifier = Modifier.size(18.dp))
-                            Spacer(Modifier.width(10.dp))
+                            LinkFavicon(p.linkUrl!!, size = 28.dp)
+                            Spacer(Modifier.width(12.dp))
                             Column(Modifier.weight(1f)) {
                                 Text(
-                                    p.linkLabel?.ifBlank { null } ?: hostOf(p.linkUrl!!),
+                                    p.linkLabel?.ifBlank { null } ?: platformLabel(p.linkUrl!!) ?: hostLabel(p.linkUrl!!),
                                     color = Ink,
                                     fontSize = 14.sp,
                                     fontWeight = FontWeight.Medium,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
-                                Text(p.linkUrl!!, color = Muted, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Text(hostLabel(p.linkUrl!!), color = Muted, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             }
                         }
                     }
+
+                    MangaFavoritesDisplay(p.favoriteMangas, accent, Ink, Muted, cardBg)
 
                     Spacer(Modifier.height(40.dp))
                 }
