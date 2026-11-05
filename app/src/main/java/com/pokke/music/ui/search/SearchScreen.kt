@@ -22,6 +22,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.layout.ContentScale
@@ -100,12 +101,16 @@ fun SearchScreen(
         loading = true
         error = null
         when (kind) {
-            SearchKind.SONGS -> multiRepo.searchAll(query).fold(
-                onSuccess = { it },
-                onFailure = { repo.searchSongs(query).getOrDefault(emptyList()) }
-            )
-                .onSuccess { songs = it }
-                .onFailure { error = it.localizedMessage ?: "No se pudo buscar en Ukiyo"; songs = emptyList() }
+            SearchKind.SONGS -> {
+                val multi = multiRepo.searchAll(query)
+                if (multi.isSuccess) {
+                    songs = multi.getOrDefault(emptyList())
+                } else {
+                    repo.searchSongs(query)
+                        .onSuccess { songs = it }
+                        .onFailure { error = it.localizedMessage ?: "No se pudo buscar"; songs = emptyList() }
+                }
+            }
             SearchKind.ARTISTS -> repo.searchArtists(query)
                 .onSuccess { artists = it }
                 .onFailure { error = it.localizedMessage ?: "No se pudieron buscar artistas"; artists = emptyList() }
@@ -283,63 +288,94 @@ private fun AlbumRow(album: Album, onClick: () -> Unit) {
 }
 
 @Composable
+@Composable
 private fun UserRow(user: com.pokke.music.data.model.UserProfile, onClick: () -> Unit) {
     val cardAccent = when (user.searchCardColor ?: user.accentColor) {
         "blue" -> Color(0xFF8CB7FF); "pink" -> Color(0xFFFF9FCB); "cyan" -> Color(0xFF7EDCEB)
         "green" -> Color(0xFF8ED9B0); "gold" -> Color(0xFFE5C17A); else -> Color(0xFFAAA0FF)
     }
-    val effect = user.searchCardEffect ?: "none"
-    Row(
+    val banner = user.searchCardBannerUrl
+    val name = user.displayName?.ifBlank { null } ?: user.username ?: "Usuario"
+    val handle = "@${user.username.orEmpty()}"
+
+    // Discord-style nameplate / search card
+    Box(
         Modifier
             .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 6.dp)
+            .padding(horizontal = 14.dp, vertical = 6.dp)
+            .height(64.dp)
             .clip(RoundedCornerShape(14.dp))
-            .background(
-                if (effect == "glow") cardAccent.copy(alpha = 0.18f)
-                else Color.White.copy(alpha = 0.04f)
-            )
             .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically
     ) {
-        CoverImage(user.avatarUrl, 52, circle = true)
-        Spacer(Modifier.width(14.dp))
-        Column(Modifier.weight(1f)) {
-            Text(
-                user.displayName?.ifBlank { null } ?: user.username ?: "Usuario",
-                color = Color.White,
-                fontSize = 15.sp,
-                fontWeight = FontWeight.Medium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
+        // Custom banner background (gallery upload) or soft gradient fallback
+        if (!banner.isNullOrBlank()) {
+            AsyncImage(
+                model = banner,
+                contentDescription = null,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop
             )
-            Text(
-                "@${user.username.orEmpty()}",
-                color = Color.White.copy(alpha = .55f),
-                fontSize = 13.sp,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
+            // Dark scrim for text legibility
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.horizontalGradient(
+                            listOf(Color.Black.copy(alpha = 0.72f), Color.Black.copy(alpha = 0.25f), Color.Transparent)
+                        )
+                    )
             )
-            Text(
-                "ID · ${user.id.take(8)}…",
-                color = cardAccent.copy(alpha = 0.7f),
-                fontSize = 10.sp
+        } else {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.horizontalGradient(
+                            listOf(Color(0xFF1A1C26), cardAccent.copy(alpha = 0.35f), Color(0xFF12141C))
+                        )
+                    )
             )
         }
-        if (!user.statusText.isNullOrBlank()) {
-            Text(
-                user.statusText!!,
-                color = cardAccent,
-                fontSize = 11.sp,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.widthIn(max = 100.dp)
-            )
+
+        Row(
+            Modifier
+                .fillMaxSize()
+                .padding(horizontal = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            CoverImage(user.avatarUrl, 44, circle = true)
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text(
+                    name,
+                    color = Color.White,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    handle,
+                    color = Color.White.copy(alpha = 0.7f),
+                    fontSize = 12.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            if (!user.statusText.isNullOrBlank()) {
+                Text(
+                    user.statusText!!,
+                    color = cardAccent,
+                    fontSize = 11.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.widthIn(max = 90.dp)
+                )
+            }
         }
     }
 }
 
-@Composable
 private fun CoverImage(url: String?, size: Int, circle: Boolean = false) {
     val context = LocalContext.current
     Box(Modifier.size(size.dp).clip(if (circle) androidx.compose.foundation.shape.CircleShape else RoundedCornerShape(9.dp)).background(Color(0xFF292929))) {
