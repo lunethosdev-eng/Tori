@@ -44,6 +44,11 @@ import com.pokke.music.data.repository.AuthRepository
 import com.pokke.music.ui.profile.AvatarFrames
 import com.pokke.music.ui.profile.FramedAvatar
 import com.pokke.music.ui.profile.ListeningCard
+import com.pokke.music.ui.profile.LinkFavicon
+import com.pokke.music.ui.profile.hostLabel
+import com.pokke.music.ui.profile.platformLabel
+import com.pokke.music.ui.profile.MangaFavoritesEditor
+import com.pokke.music.ui.profile.MangaFavoritesDisplay
 import kotlinx.coroutines.launch
 
 private val ProfileInk = Color(0xFFF3F2FA)
@@ -69,6 +74,7 @@ fun ProfileScreen(repository: AuthRepository, onBack: () -> Unit, onSignedOut: (
     var badges by remember { mutableStateOf("Pokke listener,Music lover") }
     var isPublic by remember { mutableStateOf(true) }
     var showListening by remember { mutableStateOf(true) }
+    var favoriteMangasJson by remember { mutableStateOf("[]") }
     var linkLabel by remember { mutableStateOf("") }
     var linkUrl by remember { mutableStateOf("") }
     var loading by remember { mutableStateOf(true) }
@@ -89,6 +95,7 @@ fun ProfileScreen(repository: AuthRepository, onBack: () -> Unit, onSignedOut: (
             status = p?.statusText.orEmpty(); accent = p?.accentColor ?: "violet"; cardStyle = p?.cardStyle ?: "glass"
             badges = p?.badges ?: "Pokke listener,Music lover"; isPublic = p?.isPublic ?: true
             showListening = p?.showListening ?: true
+            favoriteMangasJson = p?.favoriteMangas ?: "[]"
             linkLabel = p?.linkLabel.orEmpty(); linkUrl = p?.linkUrl.orEmpty()
         }.onFailure { message = it.localizedMessage }
         loading = false
@@ -159,10 +166,22 @@ fun ProfileScreen(repository: AuthRepository, onBack: () -> Unit, onSignedOut: (
                 }
             }
             if (bio.isNotBlank()) Text(bio, color = ProfileInk.copy(.88f), fontSize = 14.sp, lineHeight = 21.sp, modifier = Modifier.padding(top = 17.dp))
-            if (linkUrl.isNotBlank()) Row(Modifier.padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.Link, null, tint = accentColor, modifier = Modifier.size(17.dp)); Spacer(Modifier.width(7.dp))
-                Text(linkLabel.ifBlank { linkUrl }, color = accentColor, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (linkUrl.isNotBlank()) Row(Modifier.padding(top = 12.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                LinkFavicon(linkUrl, size = 22.dp)
+                Spacer(Modifier.width(10.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        linkLabel.ifBlank { platformLabel(linkUrl) ?: hostLabel(linkUrl) },
+                        color = ProfileInk,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(hostLabel(linkUrl), color = ProfileMuted, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
             }
+            MangaFavoritesDisplay(favoriteMangasJson, accentColor, ProfileInk, ProfileMuted, cardBackground)
 
             Button(onClick = { editing = !editing }, modifier = Modifier.fillMaxWidth().padding(top = 22.dp).height(52.dp), shape = RoundedCornerShape(16.dp), colors = ButtonDefaults.buttonColors(containerColor = accentColor, contentColor = Color(0xFF171827))) {
                 Icon(Icons.Default.Edit, null, modifier = Modifier.size(18.dp)); Spacer(Modifier.width(9.dp)); Text(if (editing) "Cerrar editor" else "Editar perfil principal", fontWeight = FontWeight.Bold)
@@ -180,6 +199,7 @@ fun ProfileScreen(repository: AuthRepository, onBack: () -> Unit, onSignedOut: (
                     ProfileField("URL pública del banner", banner) { banner = it }
                     ProfileField("Texto del enlace", linkLabel) { linkLabel = it }
                     ProfileField("URL del enlace", linkUrl) { linkUrl = it }
+                    MangaFavoritesEditor(favoriteMangasJson, { favoriteMangasJson = it }, accentColor, ProfileInk, ProfileMuted)
                     ProfileField("Emblemas (separados por coma)", badges) { badges = it }
                     ProfileChoice("Tema", theme, listOf("midnight", "ocean", "violet", "rose", "amoled"), listOf("Noche", "Océano", "Violeta", "Rosa", "AMOLED"), accentColor) { theme = it }
                     ProfileChoice("Color de acento", accent, listOf("violet", "blue", "pink", "cyan", "green", "gold"), listOf("Violeta", "Azul", "Rosa", "Cian", "Verde", "Dorado"), accentColor) { accent = it }
@@ -210,7 +230,7 @@ fun ProfileScreen(repository: AuthRepository, onBack: () -> Unit, onSignedOut: (
                         scope.launch {
                             repository.updateProfile(
                                 displayName, username, bio, avatar, banner, theme, frame, badge, pronouns, status,
-                                accent, cardStyle, badges, isPublic, linkLabel, linkUrl, showListening
+                                accent, cardStyle, badges, isPublic, linkLabel, linkUrl, showListening, null, favoriteMangasJson
                             )
                                 .onSuccess { profile = it; message = "Cambios guardados correctamente" }
                                 .onFailure { message = it.localizedMessage ?: "No se pudo guardar el perfil" }
