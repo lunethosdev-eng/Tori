@@ -69,5 +69,10 @@ data class UserProfile(
     /** When true, other users can see what you're currently listening to on your profile. */
     val showListening: Boolean = true,
     /** Extra links as "label|url,label|url". Primary link remains linkLabel/linkUrl. */
-    val extraLinks: String? = null
+    val extraLinks: String? = null,
+    /**
+     * Favorite mangas from MangaDex, stored as JSON array string:
+     * [{"id":"...","title":"...","cover":"..."}]
+     */
+    val favoriteMangas: String? = null
 )
