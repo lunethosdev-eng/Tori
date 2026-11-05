@@ -83,5 +83,7 @@ data class UserProfile(
     val gradientEnabled: Boolean = true,
     val profileGifs: String? = null,
     val aboutExtra: String? = null,
-    val isOwner: Boolean = false
+    val isOwner: Boolean = false,
+    val searchCardBannerUrl: String? = null,
+    val customBgUrl: String? = null
 )
