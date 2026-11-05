@@ -24,43 +24,69 @@ import coil.compose.AsyncImage
 import com.pokke.music.R
 
 /**
- * Built-in avatar frames (transparent PNGs from gallery).
- * Values stored in profiles.frame column as "none" | "frame_01" … "frame_20".
+ * Built-in avatar frames.
+ * Stored in profiles.frame as "none" | "frame_01"… | named id like "sakura".
  */
 object AvatarFrames {
     data class Frame(val id: String, val label: String, @DrawableRes val resId: Int?)
 
-    val ALL: List<Frame> = listOf(
-        Frame("none", "Ninguno", null),
-        Frame("frame_01", "Marco 1", R.drawable.frame_01),
-        Frame("frame_02", "Marco 2", R.drawable.frame_02),
-        Frame("frame_03", "Marco 3", R.drawable.frame_03),
-        Frame("frame_04", "Marco 4", R.drawable.frame_04),
-        Frame("frame_05", "Marco 5", R.drawable.frame_05),
-        Frame("frame_06", "Marco 6", R.drawable.frame_06),
-        Frame("frame_07", "Marco 7", R.drawable.frame_07),
-        Frame("frame_08", "Marco 8", R.drawable.frame_08),
-        Frame("frame_09", "Marco 9", R.drawable.frame_09),
-        Frame("frame_10", "Marco 10", R.drawable.frame_10),
-        Frame("frame_11", "Marco 11", R.drawable.frame_11),
-        Frame("frame_12", "Marco 12", R.drawable.frame_12),
-        Frame("frame_13", "Marco 13", R.drawable.frame_13),
-        Frame("frame_14", "Marco 14", R.drawable.frame_14),
-        Frame("frame_15", "Marco 15", R.drawable.frame_15),
-        Frame("frame_16", "Marco 16", R.drawable.frame_16),
-        Frame("frame_17", "Marco 17", R.drawable.frame_17),
-        Frame("frame_18", "Marco 18", R.drawable.frame_18),
-        Frame("frame_19", "Marco 19", R.drawable.frame_19),
-        Frame("frame_20", "Marco 20", R.drawable.frame_20),
-    )
+    val ALL: List<Frame> = buildList {
+        add(Frame("none", "Ninguno", null))
+        val numeric = listOf(
+            R.drawable.frame_01, R.drawable.frame_02, R.drawable.frame_03, R.drawable.frame_04,
+            R.drawable.frame_05, R.drawable.frame_06, R.drawable.frame_07, R.drawable.frame_08,
+            R.drawable.frame_09, R.drawable.frame_10, R.drawable.frame_11, R.drawable.frame_12,
+            R.drawable.frame_13, R.drawable.frame_14, R.drawable.frame_15, R.drawable.frame_16,
+            R.drawable.frame_17, R.drawable.frame_18, R.drawable.frame_19, R.drawable.frame_20,
+            R.drawable.frame_21, R.drawable.frame_22, R.drawable.frame_23, R.drawable.frame_24,
+            R.drawable.frame_25, R.drawable.frame_26
+        )
+        numeric.forEachIndexed { i, res ->
+            val id = "frame_%02d".format(i + 1)
+            add(Frame(id, "Marco ${i + 1}", res))
+        }
+        val named = listOf(
+            "afternoon_breeze" to R.drawable.afternoon_breeze,
+            "airona_fireworks" to R.drawable.airona_fireworks,
+            "blanket_green" to R.drawable.blanket_green,
+            "blanket_orange" to R.drawable.blanket_orange,
+            "blanket_pink" to R.drawable.blanket_pink,
+            "blanket_purple" to R.drawable.blanket_purple,
+            "box_green_red" to R.drawable.box_green_red,
+            "box_red_white" to R.drawable.box_red_white,
+            "box_red_white_blue" to R.drawable.box_red_white_blue,
+            "cab_monster" to R.drawable.cab_monster,
+            "cosy_deer" to R.drawable.cosy_deer,
+            "cyber_katana" to R.drawable.cyber_katana,
+            "dog_1" to R.drawable.dog_1,
+            "dog_2" to R.drawable.dog_2,
+            "dog_3" to R.drawable.dog_3,
+            "frog_derpy" to R.drawable.frog_derpy,
+            "fuchsia_agent" to R.drawable.fuchsia_agent,
+            "hoppy_day" to R.drawable.hoppy_day,
+            "icicle_gleaming" to R.drawable.icicle_gleaming,
+            "icicle_snowing" to R.drawable.icicle_snowing,
+            "lover_girl_autumn" to R.drawable.lover_girl_autumn,
+            "neon_cat_hoodie_black" to R.drawable.neon_cat_hoodie_black,
+            "neon_cat_hoodie_pink" to R.drawable.neon_cat_hoodie_pink,
+            "sakura" to R.drawable.sakura,
+            "sakura_gyoiko" to R.drawable.sakura_gyoiko,
+            "sakura_pink" to R.drawable.sakura_pink,
+            "sakura_ukon" to R.drawable.sakura_ukon,
+            "towerborne_play" to R.drawable.towerborne_play,
+            "treat_ghost" to R.drawable.treat_ghost,
+            "treat_pumpkin" to R.drawable.treat_pumpkin,
+            "trick_pumpkin" to R.drawable.trick_pumpkin,
+            "ultron" to R.drawable.ultron,
+        )
+        named.forEach { (id, res) ->
+            add(Frame(id, id.replace('_', ' ').replaceFirstChar { it.uppercase() }, res))
+        }
+    }
 
     fun byId(id: String?): Frame = ALL.firstOrNull { it.id == id } ?: ALL.first()
 }
 
-/**
- * Avatar circle with optional decorative frame overlay (Discord-style).
- * Frame sits on top of the circular avatar; avatar is slightly inset so the frame border shows.
- */
 @Composable
 fun FramedAvatar(
     avatarUrl: String?,
@@ -73,14 +99,10 @@ fun FramedAvatar(
 ) {
     val frame = AvatarFrames.byId(frameId)
     val hasFrame = frame.resId != null
-    // When a PNG frame is present, shrink the photo a bit so the frame edge remains visible.
     val photoScale = if (hasFrame) 0.78f else 1f
     val photoSize = size * photoScale
 
-    Box(
-        modifier = modifier.size(size),
-        contentAlignment = Alignment.Center
-    ) {
+    Box(modifier = modifier.size(size), contentAlignment = Alignment.Center) {
         Box(
             modifier = Modifier
                 .size(photoSize)
@@ -109,7 +131,6 @@ fun FramedAvatar(
                 )
             }
         }
-
         if (hasFrame && frame.resId != null) {
             Image(
                 painter = painterResource(frame.resId),
