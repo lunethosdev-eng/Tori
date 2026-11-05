@@ -46,6 +46,7 @@ import com.pokke.music.ui.player.LyricsScreen
 import com.pokke.music.ui.queue.QueueScreen
 import com.pokke.music.ui.search.SearchScreen
 import com.pokke.music.ui.settings.SettingsScreen
+import com.pokke.music.ui.admin.AdminPanelScreen
 
 sealed class Screen(val route: String) {
     data object Auth : Screen("auth")
@@ -60,6 +61,7 @@ sealed class Screen(val route: String) {
     data object Queue : Screen("queue")
     data object Lyrics : Screen("lyrics")
     data object Settings : Screen("settings")
+    data object Admin : Screen("admin")
 }
 
 private data class NavItem(val screen: Screen, val selected: ImageVector, val normal: ImageVector)
@@ -122,7 +124,15 @@ fun PokkeNavHost() {
                     onLoginRequired = { nav.navigate(Screen.Auth.route) },
                     onSongClick = { PlayerController.init(context); PlayerController.playSong(it); nav.navigate(Screen.Player.route) })
             }
-            composable(Screen.Settings.route) { SettingsScreen(onBack = { nav.popBackStack() }) }
+            composable(Screen.Settings.route) {
+                SettingsScreen(
+                    onBack = { nav.popBackStack() },
+                    onOpenAdmin = { nav.navigate(Screen.Admin.route) }
+                )
+            }
+            composable(Screen.Admin.route) {
+                AdminPanelScreen(repository = auth, onBack = { nav.popBackStack() })
+            }
             composable(Screen.Player.route) {
                 FullPlayerScreen(onBack = { nav.popBackStack() }, onOpenQueue = { nav.navigate(Screen.Queue.route) },
                     onOpenLyrics = { nav.navigate(Screen.Lyrics.route) }, authRepository = auth, onRequireLogin = { nav.navigate(Screen.Auth.route) })
