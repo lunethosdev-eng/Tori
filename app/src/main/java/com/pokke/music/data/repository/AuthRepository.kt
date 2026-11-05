@@ -116,7 +116,17 @@ class AuthRepository(context: Context) {
         linkUrl: String? = null,
         showListening: Boolean? = null,
         extraLinks: String? = null,
-        favoriteMangas: String? = null
+        favoriteMangas: String? = null,
+        primaryColor: String? = null,
+        secondaryColor: String? = null,
+        gradientEnabled: Boolean? = null,
+        profileGifs: String? = null,
+        searchCardStyle: String? = null,
+        searchCardColor: String? = null,
+        searchCardEffect: String? = null,
+        searchCardBannerUrl: String? = null,
+        customBgUrl: String? = null,
+        aboutExtra: String? = null
     ): Result<UserProfile> = withContext(Dispatchers.IO) {
         runCatching {
             val s = requireSession()
@@ -136,6 +146,14 @@ class AuthRepository(context: Context) {
                 if (searchCardColor != null) put("search_card_color", searchCardColor)
                 if (searchCardEffect != null) put("search_card_effect", searchCardEffect)
                 if (aboutExtra != null) put("about_extra", aboutExtra)
+                if (searchCardBannerUrl != null) {
+                    if (searchCardBannerUrl.isBlank()) put("search_card_banner_url", JSONObject.NULL)
+                    else put("search_card_banner_url", searchCardBannerUrl.trim())
+                }
+                if (customBgUrl != null) {
+                    if (customBgUrl.isBlank()) put("custom_bg_url", JSONObject.NULL)
+                    else put("custom_bg_url", customBgUrl.trim())
+                }
                 if (theme != null) put("theme", theme)
                 if (frame != null) put("frame", frame)
                 if (badge != null) put("badge", badge)
@@ -405,7 +423,18 @@ class AuthRepository(context: Context) {
         linkUrl = o.optString("link_url").nullable(),
         showListening = if (o.has("show_listening")) o.optBoolean("show_listening", true) else true,
         extraLinks = o.optString("extra_links").nullable(),
-        favoriteMangas = o.optString("favorite_mangas").nullable()
+        favoriteMangas = o.optString("favorite_mangas").nullable(),
+        searchCardStyle = o.optString("search_card_style").nullable(),
+        searchCardColor = o.optString("search_card_color").nullable(),
+        searchCardEffect = o.optString("search_card_effect").nullable(),
+        primaryColor = o.optString("primary_color").nullable(),
+        secondaryColor = o.optString("secondary_color").nullable(),
+        gradientEnabled = if (o.has("gradient_enabled")) o.optBoolean("gradient_enabled", true) else true,
+        profileGifs = o.optString("profile_gifs").nullable(),
+        aboutExtra = o.optString("about_extra").nullable(),
+        isOwner = o.optBoolean("is_owner", false),
+        searchCardBannerUrl = o.optString("search_card_banner_url").nullable(),
+        customBgUrl = o.optString("custom_bg_url").nullable()
     )
 
     private fun authRequest(path: String, body: JSONObject): JSONObject = JSONObject(http(path, "POST", body = body.toString(), authToken = null))
