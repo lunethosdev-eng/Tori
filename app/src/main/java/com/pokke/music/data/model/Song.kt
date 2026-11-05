@@ -74,5 +74,14 @@ data class UserProfile(
      * Favorite mangas from MangaDex, stored as JSON array string:
      * [{"id":"...","title":"...","cover":"..."}]
      */
-    val favoriteMangas: String? = null
+    val favoriteMangas: String? = null,
+    val searchCardStyle: String? = "default",
+    val searchCardColor: String? = "violet",
+    val searchCardEffect: String? = "none",
+    val primaryColor: String? = null,
+    val secondaryColor: String? = null,
+    val gradientEnabled: Boolean = true,
+    val profileGifs: String? = null,
+    val aboutExtra: String? = null,
+    val isOwner: Boolean = false
 )
