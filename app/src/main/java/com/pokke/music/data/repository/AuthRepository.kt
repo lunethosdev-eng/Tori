@@ -115,7 +115,8 @@ class AuthRepository(context: Context) {
         linkLabel: String? = null,
         linkUrl: String? = null,
         showListening: Boolean? = null,
-        extraLinks: String? = null
+        extraLinks: String? = null,
+        favoriteMangas: String? = null
     ): Result<UserProfile> = withContext(Dispatchers.IO) {
         runCatching {
             val s = requireSession()
@@ -140,6 +141,7 @@ class AuthRepository(context: Context) {
                 if (linkUrl != null) put("link_url", linkUrl)
                 if (showListening != null) put("show_listening", showListening)
                 if (extraLinks != null) put("extra_links", extraLinks)
+                if (favoriteMangas != null) put("favorite_mangas", favoriteMangas)
             }
             val rows = JSONArray(request(KokoroConfig.PROFILES, "POST", s, params = mapOf("on_conflict" to "id"), body = body.toString(), prefer = "resolution=merge-duplicates,return=representation"))
             if (rows.length() == 0) throw IOException("Kokoro no devolvió el perfil actualizado")
@@ -374,7 +376,8 @@ class AuthRepository(context: Context) {
         linkLabel = o.optString("link_label").nullable(),
         linkUrl = o.optString("link_url").nullable(),
         showListening = if (o.has("show_listening")) o.optBoolean("show_listening", true) else true,
-        extraLinks = o.optString("extra_links").nullable()
+        extraLinks = o.optString("extra_links").nullable(),
+        favoriteMangas = o.optString("favorite_mangas").nullable()
     )
 
     private fun authRequest(path: String, body: JSONObject): JSONObject = JSONObject(http(path, "POST", body = body.toString(), authToken = null))
