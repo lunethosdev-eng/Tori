@@ -37,6 +37,7 @@ import com.pokke.music.data.model.Album
 import com.pokke.music.data.model.Artist
 import com.pokke.music.data.model.Song
 import com.pokke.music.data.repository.MusicRepository
+import com.pokke.music.data.repository.MultiMusicRepository
 import com.pokke.music.data.repository.AuthRepository
 import kotlinx.coroutines.launch
 import com.pokke.music.ui.theme.PokkeBlack
@@ -56,6 +57,7 @@ fun SearchScreen(
     onUserClick: (String) -> Unit = {}
 ) {
     val repo = remember { MusicRepository() }
+    val multiRepo = remember { MultiMusicRepository() }
     val session by authRepository.session.collectAsState()
     val scope = rememberCoroutineScope()
     var favoriteIds by remember { mutableStateOf<Set<String>>(emptySet()) }
@@ -98,7 +100,10 @@ fun SearchScreen(
         loading = true
         error = null
         when (kind) {
-            SearchKind.SONGS -> repo.searchSongs(query)
+            SearchKind.SONGS -> multiRepo.searchAll(query).fold(
+                onSuccess = { it },
+                onFailure = { repo.searchSongs(query).getOrDefault(emptyList()) }
+            )
                 .onSuccess { songs = it }
                 .onFailure { error = it.localizedMessage ?: "No se pudo buscar en Ukiyo"; songs = emptyList() }
             SearchKind.ARTISTS -> repo.searchArtists(query)
