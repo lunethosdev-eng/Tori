@@ -288,7 +288,6 @@ private fun AlbumRow(album: Album, onClick: () -> Unit) {
 }
 
 @Composable
-@Composable
 private fun UserRow(user: com.pokke.music.data.model.UserProfile, onClick: () -> Unit) {
     val cardAccent = when (user.searchCardColor ?: user.accentColor) {
         "blue" -> Color(0xFF8CB7FF); "pink" -> Color(0xFFFF9FCB); "cyan" -> Color(0xFF7EDCEB)
@@ -376,6 +375,7 @@ private fun UserRow(user: com.pokke.music.data.model.UserProfile, onClick: () ->
     }
 }
 
+@Composable
 private fun CoverImage(url: String?, size: Int, circle: Boolean = false) {
     val context = LocalContext.current
     Box(Modifier.size(size.dp).clip(if (circle) androidx.compose.foundation.shape.CircleShape else RoundedCornerShape(9.dp)).background(Color(0xFF292929))) {
