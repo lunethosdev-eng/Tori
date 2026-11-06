@@ -26,7 +26,7 @@ class UserPreferences(private val context: Context) {
         private val SHOW_LISTENING = booleanPreferencesKey("show_listening_on_profile")
         private val SHOW_LINK_EMBEDS = booleanPreferencesKey("show_link_embeds")
     }
-    val liquidGlassEnabled: Flow<Boolean> = context.dataStore.data.map { it[LIQUID_GLASS] ?: true }
+    val liquidGlassEnabled: Flow<Boolean> = context.dataStore.data.map { it[LIQUID_GLASS] ?: false }
     val autoAnimatedCovers: Flow<Boolean> = context.dataStore.data.map { it[AUTO_ANIMATED_COVERS] ?: true }
     val dynamicColors: Flow<Boolean> = context.dataStore.data.map { it[DYNAMIC_COLORS] ?: true }
     val blurPlayerBackground: Flow<Boolean> = context.dataStore.data.map { it[BLUR_PLAYER] ?: false }
