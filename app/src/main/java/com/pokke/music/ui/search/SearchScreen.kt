@@ -1,396 +1,304 @@
-package com.pokke.music.ui.search
+package com.pokke.music.ui.settings
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.Clear
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.outlined.FavoriteBorder
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.Text
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil.compose.AsyncImage
-import coil.request.ImageRequest
-import com.pokke.music.data.model.Album
-import com.pokke.music.data.model.Artist
-import com.pokke.music.data.model.Song
-import com.pokke.music.data.repository.MusicRepository
-import com.pokke.music.data.repository.MultiMusicRepository
+import com.kyant.backdrop.backdrops.layerBackdrop
+import com.kyant.backdrop.backdrops.rememberLayerBackdrop
+import com.pokke.music.data.preferences.UserPreferences
 import com.pokke.music.data.repository.AuthRepository
+import com.pokke.music.ui.liquid.LiquidSlider
+import com.pokke.music.ui.liquid.LiquidToggle
 import kotlinx.coroutines.launch
-import com.pokke.music.ui.theme.PokkeBlack
-import kotlinx.coroutines.delay
 
-private enum class SearchKind(val label: String) {
-    SONGS("Canciones"), ARTISTS("Artistas"), ALBUMS("Álbumes"), USERS("Usuarios")
-}
-private data class SearchDetail(val title: String, val artist: String? = null, val isArtist: Boolean)
+private const val OWNER_EMAIL = "lunethos.dev@gmail.com"
 
 @Composable
-fun SearchScreen(
-    authRepository: AuthRepository,
-    isVisible: Boolean = true,
-    onSongClick: (Song) -> Unit = {},
-    onPlayQueue: (List<Song>, Int) -> Unit = { songs, index -> songs.getOrNull(index)?.let(onSongClick) },
-    onUserClick: (String) -> Unit = {}
+fun SettingsScreen(
+    onBack: () -> Unit,
+    onOpenAdmin: (() -> Unit)? = null,
+    authRepository: AuthRepository? = null,
+    isScreenVisible: Boolean = true
 ) {
-    val repo = remember { MusicRepository() }
-    val multiRepo = remember { MultiMusicRepository() }
-    val session by authRepository.session.collectAsState()
+    val context = LocalContext.current
+    val prefs = remember(context) { UserPreferences(context) }
     val scope = rememberCoroutineScope()
-    var favoriteIds by remember { mutableStateOf<Set<String>>(emptySet()) }
-    var query by remember { mutableStateOf("") }
-    var kind by remember { mutableStateOf(SearchKind.SONGS) }
-    var songs by remember { mutableStateOf<List<Song>>(emptyList()) }
-    var artists by remember { mutableStateOf<List<Artist>>(emptyList()) }
-    var albums by remember { mutableStateOf<List<Album>>(emptyList()) }
-    var users by remember { mutableStateOf<List<com.pokke.music.data.model.UserProfile>>(emptyList()) }
-    var detail by remember { mutableStateOf<SearchDetail?>(null) }
-    var detailSongs by remember { mutableStateOf<List<Song>>(emptyList()) }
-    var loading by remember { mutableStateOf(false) }
-    var error by remember { mutableStateOf<String?>(null) }
+    val glass by prefs.liquidGlassEnabled.collectAsState(initial = false)
+    val blur by prefs.blurPlayerBackground.collectAsState(initial = true)
+    val accent by prefs.accentColor.collectAsState(initial = "white")
+    val theme by prefs.appTheme.collectAsState(initial = "dark")
+    val gapless by prefs.gaplessPlayback.collectAsState(initial = true)
+    val showListening by prefs.showListeningOnProfile.collectAsState(initial = true)
+    val animated by prefs.autoAnimatedCovers.collectAsState(initial = true)
+    val liquidSlider by prefs.liquidSliderEnabled.collectAsState(initial = false)
+    val performanceMode by prefs.liquidPerformanceMode.collectAsState(initial = false)
+    val glassForThisScreen = glass && isScreenVisible
+    val crossfade by prefs.crossfadeSeconds.collectAsState(initial = 0f)
 
-    LaunchedEffect(session?.userId, isVisible) {
-        if (session != null && isVisible) authRepository.getFavorites().onSuccess { favoriteIds = it.map { song -> song.id }.toSet() }
-        else if (session == null) favoriteIds = emptySet()
-    }
+    val session by (authRepository?.session ?: kotlinx.coroutines.flow.MutableStateFlow(null)).collectAsState()
+    val isOwner = session?.email?.equals(OWNER_EMAIL, ignoreCase = true) == true
 
-    fun toggleFavorite(song: Song) {
-        if (session == null) { error = "Inicia sesión para sincronizar tus favoritos"; return }
-        val wasFavorite = favoriteIds.contains(song.id)
-        favoriteIds = if (wasFavorite) favoriteIds - song.id else favoriteIds + song.id
-        scope.launch {
-            authRepository.setFavorite(song, !wasFavorite).onFailure {
-                favoriteIds = if (wasFavorite) favoriteIds + song.id else favoriteIds - song.id
-                error = it.localizedMessage ?: "No se pudo sincronizar el favorito"
-            }
-        }
-    }
-
-    LaunchedEffect(query, kind) {
-        detail = null
-        if (query.isBlank()) {
-            songs = emptyList(); artists = emptyList(); albums = emptyList(); users = emptyList()
-            loading = false; error = null
-            return@LaunchedEffect
-        }
-        delay(320)
-        loading = true
-        error = null
-        when (kind) {
-            SearchKind.SONGS -> {
-                val multi = multiRepo.searchAll(query)
-                if (multi.isSuccess) {
-                    songs = multi.getOrDefault(emptyList())
-                } else {
-                    repo.searchSongs(query)
-                        .onSuccess { songs = it }
-                        .onFailure { error = it.localizedMessage ?: "No se pudo buscar"; songs = emptyList() }
-                }
-            }
-            SearchKind.ARTISTS -> repo.searchArtists(query)
-                .onSuccess { artists = it }
-                .onFailure { error = it.localizedMessage ?: "No se pudieron buscar artistas"; artists = emptyList() }
-            SearchKind.ALBUMS -> repo.searchAlbums(query)
-                .onSuccess { albums = it }
-                .onFailure { error = it.localizedMessage ?: "No se pudieron buscar álbumes"; albums = emptyList() }
-            SearchKind.USERS -> authRepository.searchUsers(query)
-                .onSuccess { users = it }
-                .onFailure { error = it.localizedMessage ?: "No se pudieron buscar usuarios"; users = emptyList() }
-        }
-        loading = false
-    }
-
-    LaunchedEffect(detail) {
-        val selected = detail ?: return@LaunchedEffect
-        loading = true
-        error = null
-        val result = if (selected.isArtist) repo.getSongsByArtist(selected.title)
-        else repo.getSongsByAlbum(selected.title, selected.artist)
-        result.onSuccess { detailSongs = it }
-            .onFailure { error = it.localizedMessage ?: "No se pudo cargar el catálogo"; detailSongs = emptyList() }
-        loading = false
-    }
+    // Capture settings background so liquid controls refract it (Kyant Backdrop)
+    val settingsBackdrop = rememberLayerBackdrop()
 
     Column(
-        modifier = Modifier.fillMaxSize().background(PokkeBlack).statusBarsPadding()
-    ) {
-        if (detail != null) {
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(start = 8.dp, end = 20.dp, top = 14.dp, bottom = 12.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(onClick = { detail = null; detailSongs = emptyList() }) {
-                    Icon(Icons.Default.ArrowBack, contentDescription = "Volver", tint = Color.White)
-                }
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(detail!!.title, color = Color.White, fontSize = 19.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(if (detail!!.isArtist) "Artista" else "Álbum · ${detail!!.artist.orEmpty()}", color = Color.White.copy(alpha = .55f), fontSize = 12.sp)
-                }
-            }
-        } else {
-            SearchField(query = query, onQueryChange = { query = it })
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                SearchKind.entries.forEach { item ->
-                    FilterChip(
-                        selected = kind == item,
-                        onClick = { kind = item },
-                        label = { Text(item.label) }
-                    )
-                }
-            }
-        }
-
-        when {
-            loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = Color.White) }
-            error != null -> Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
-                Text(error.orEmpty(), color = Color(0xFFFF8A80))
-            }
-            detail != null -> {
-                if (detailSongs.isEmpty()) EmptyMessage("Este artista o álbum todavía no tiene canciones disponibles")
-                else LazyColumn(contentPadding = PaddingValues(bottom = 112.dp)) {
-                    itemsIndexed(detailSongs, key = { _, song -> song.id }) { index, song ->
-                        SongRow(song, favoriteIds.contains(song.id), { toggleFavorite(song) }) { onPlayQueue(detailSongs, index) }
-                    }
-                }
-            }
-            query.isBlank() -> EmptyMessage("Busca canciones, artistas, álbumes o usuarios")
-            kind == SearchKind.SONGS -> {
-                if (songs.isEmpty()) EmptyMessage("No se encontraron canciones")
-                else LazyColumn(contentPadding = PaddingValues(bottom = 112.dp)) {
-                    itemsIndexed(songs, key = { _, song -> song.id }) { index, song -> SongRow(song, favoriteIds.contains(song.id), { toggleFavorite(song) }) { onPlayQueue(songs, index) } }
-                }
-            }
-            kind == SearchKind.ARTISTS -> {
-                if (artists.isEmpty()) EmptyMessage("No se encontraron artistas")
-                else LazyColumn(contentPadding = PaddingValues(bottom = 112.dp)) {
-                    itemsIndexed(artists, key = { _, artist -> artist.id.ifBlank { artist.name } }) { _, artist ->
-                        ArtistRow(artist) { detail = SearchDetail(artist.name, isArtist = true) }
-                    }
-                }
-            }
-            kind == SearchKind.USERS -> {
-                if (users.isEmpty()) EmptyMessage("No se encontraron usuarios públicos")
-                else LazyColumn(contentPadding = PaddingValues(bottom = 112.dp)) {
-                    itemsIndexed(users, key = { _, u -> u.id }) { _, user ->
-                        UserRow(user) { user.username?.let(onUserClick) }
-                    }
-                }
-            }
-            else -> {
-                if (albums.isEmpty()) EmptyMessage("No se encontraron álbumes")
-                else LazyColumn(contentPadding = PaddingValues(bottom = 112.dp)) {
-                    itemsIndexed(albums, key = { _, album -> "${album.name}-${album.artist}" }) { _, album ->
-                        AlbumRow(album) { detail = SearchDetail(album.name, album.artist, isArtist = false) }
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun SearchField(query: String, onQueryChange: (String) -> Unit) {
-    Box(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp)
-            .clip(RoundedCornerShape(24.dp)).background(Color(0xFF1C1C1C)).padding(horizontal = 16.dp, vertical = 12.dp)
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Default.Search, contentDescription = null, tint = Color.White.copy(alpha = .55f), modifier = Modifier.size(22.dp))
-            Spacer(Modifier.width(12.dp))
-            BasicTextField(
-                value = query, onValueChange = onQueryChange, singleLine = true,
-                textStyle = TextStyle(color = Color.White, fontSize = 16.sp), cursorBrush = SolidColor(Color.White),
-                modifier = Modifier.weight(1f),
-                decorationBox = { inner ->
-                    if (query.isEmpty()) Text("Buscar en Ukiyo…", color = Color.White.copy(alpha = .4f), fontSize = 16.sp)
-                    inner()
-                }
-            )
-            if (query.isNotEmpty()) IconButton(onClick = { onQueryChange("") }, modifier = Modifier.size(32.dp)) {
-                Icon(Icons.Default.Clear, contentDescription = "Borrar", tint = Color.White.copy(alpha = .65f), modifier = Modifier.size(18.dp))
-            }
-        }
-    }
-}
-
-@Composable
-private fun SongRow(song: Song, isFavorite: Boolean, onFavoriteClick: () -> Unit, onClick: () -> Unit) {
-    Row(
-        modifier = Modifier.fillMaxWidth().clickable(enabled = !song.audioUrl.isNullOrBlank(), onClick = onClick).padding(horizontal = 20.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        CoverImage(song.displayCoverUrl, 52)
-        Spacer(Modifier.width(14.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            Text(song.title, color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(
-                if (song.audioUrl.isNullOrBlank()) "${song.artist} · Audio no disponible" else song.artist,
-                color = Color.White.copy(alpha = .58f), fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis
-            )
-        }
-        if (song.durationSeconds > 0) Text(formatDuration(song.durationSeconds), color = Color.White.copy(alpha = .4f), fontSize = 11.sp)
-        IconButton(onClick = onFavoriteClick, modifier = Modifier.size(40.dp)) {
-            Icon(if (isFavorite) Icons.Default.Favorite else Icons.Outlined.FavoriteBorder, contentDescription = "Favorito", tint = if (isFavorite) Color(0xFFFF6B81) else Color.White.copy(.55f), modifier = Modifier.size(20.dp))
-        }
-    }
-}
-
-@Composable
-private fun ArtistRow(artist: Artist, onClick: () -> Unit) {
-    Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 20.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-        CoverImage(artist.imageUrl, 52, circle = true)
-        Spacer(Modifier.width(14.dp))
-        Column {
-            Text(artist.name, color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Medium)
-            Text("Artista", color = Color.White.copy(alpha = .55f), fontSize = 13.sp)
-        }
-    }
-}
-
-@Composable
-private fun AlbumRow(album: Album, onClick: () -> Unit) {
-    Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 20.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-        CoverImage(album.coverUrl, 52)
-        Spacer(Modifier.width(14.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            Text(album.name, color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(album.artist, color = Color.White.copy(alpha = .55f), fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        }
-        Text("${album.songCount} pistas", color = Color.White.copy(alpha = .4f), fontSize = 11.sp)
-    }
-}
-
-@Composable
-private fun UserRow(user: com.pokke.music.data.model.UserProfile, onClick: () -> Unit) {
-    val cardAccent = when (user.searchCardColor ?: user.accentColor) {
-        "blue" -> Color(0xFF8CB7FF); "pink" -> Color(0xFFFF9FCB); "cyan" -> Color(0xFF7EDCEB)
-        "green" -> Color(0xFF8ED9B0); "gold" -> Color(0xFFE5C17A); else -> Color(0xFFAAA0FF)
-    }
-    val banner = user.searchCardBannerUrl
-    val name = user.displayName?.ifBlank { null } ?: user.username ?: "Usuario"
-    val handle = "@${user.username.orEmpty()}"
-
-    // Discord-style nameplate / search card
-    Box(
         Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 14.dp, vertical = 6.dp)
-            .height(64.dp)
-            .clip(RoundedCornerShape(14.dp))
-            .clickable(onClick = onClick)
+            .fillMaxSize()
+            .then(if (glassForThisScreen) Modifier.layerBackdrop(settingsBackdrop) else Modifier)
+            .background(Color(0xFF09090B))
+            .verticalScroll(rememberScrollState())
+            .statusBarsPadding()
     ) {
-        // Custom banner background (gallery upload) or soft gradient fallback
-        if (!banner.isNullOrBlank()) {
-            AsyncImage(
-                model = banner,
-                contentDescription = null,
-                modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Crop
-            )
-            // Dark scrim for text legibility
-            Box(
-                Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.horizontalGradient(
-                            listOf(Color.Black.copy(alpha = 0.72f), Color.Black.copy(alpha = 0.25f), Color.Transparent)
-                        )
-                    )
-            )
-        } else {
-            Box(
-                Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.horizontalGradient(
-                            listOf(Color(0xFF1A1C26), cardAccent.copy(alpha = 0.35f), Color(0xFF12141C))
-                        )
-                    )
-            )
-        }
-
         Row(
-            Modifier
-                .fillMaxSize()
-                .padding(horizontal = 12.dp),
+            Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            CoverImage(user.avatarUrl, 44, circle = true)
-            Spacer(Modifier.width(12.dp))
-            Column(Modifier.weight(1f)) {
+            IconButton(onClick = onBack) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = Color.White)
+            }
+            Column {
+                Text("Ajustes", color = Color.White, fontSize = 23.sp, fontWeight = FontWeight.Bold)
                 Text(
-                    name,
-                    color = Color.White,
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Text(
-                    handle,
-                    color = Color.White.copy(alpha = 0.7f),
-                    fontSize = 12.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    if (glass) "Liquid Glass activo · controles Kyant Backdrop" else "Preferencias del dispositivo",
+                    color = Color.White.copy(.5f),
+                    fontSize = 12.sp
                 )
             }
-            if (!user.statusText.isNullOrBlank()) {
-                Text(
-                    user.statusText!!,
-                    color = cardAccent,
-                    fontSize = 11.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.widthIn(max = 90.dp)
+        }
+
+        Section("APARIENCIA")
+        LiquidOrMaterialToggle(
+            title = "Liquid Glass",
+            subtitle = "Efecto tipo iOS (refracción, blur, lente). Usa io.github.kyant0:backdrop. Apagado por defecto.",
+            checked = glass,
+            glass = glassForThisScreen,
+            backdrop = settingsBackdrop,
+            onChange = { scope.launch { prefs.setLiquidGlass(it) } }
+        )
+        if (glass) {
+            LiquidOrMaterialToggle(
+                title = "Modo rendimiento",
+                subtitle = "Aplica los efectos Liquid Glass solo en la pantalla visible para reducir trabajo de GPU y memoria.",
+                checked = performanceMode,
+                glass = glassForThisScreen,
+                backdrop = settingsBackdrop,
+                onChange = { scope.launch { prefs.setLiquidPerformanceMode(it) } }
+            )
+        }
+        LiquidOrMaterialToggle(
+            title = "Fondo desenfocado en el reproductor",
+            subtitle = "Portada como fondo ambiental del player.",
+            checked = blur,
+            glass = glassForThisScreen,
+            backdrop = settingsBackdrop,
+            onChange = { scope.launch { prefs.setBlurPlayerBackground(it) } }
+        )
+        LiquidOrMaterialToggle(
+            title = "Portadas animadas",
+            subtitle = "Prefiere animated_cover cuando exista.",
+            checked = animated,
+            glass = glassForThisScreen,
+            backdrop = settingsBackdrop,
+            onChange = { scope.launch { prefs.setAutoAnimatedCovers(it) } }
+        )
+        LiquidOrMaterialToggle(
+            title = "Liquid Slider",
+            subtitle = "Sliders con vidrio líquido (opcional, más costo de GPU).",
+            checked = liquidSlider,
+            glass = glassForThisScreen,
+            backdrop = settingsBackdrop,
+            onChange = { scope.launch { prefs.setLiquidSlider(it) } }
+        )
+
+        if (liquidSlider && glassForThisScreen) {
+            Text(
+                "Crossfade (s)",
+                color = Color.White.copy(.75f),
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Medium,
+                modifier = Modifier.padding(start = 22.dp, top = 8.dp, bottom = 8.dp)
+            )
+            Box(Modifier.padding(horizontal = 22.dp, vertical = 8.dp).fillMaxWidth().height(48.dp)) {
+                LiquidSlider(
+                    value = { crossfade },
+                    onValueChange = { v -> scope.launch { prefs.setCrossfadeSeconds(v) } },
+                    valueRange = 0f..12f,
+                    visibilityThreshold = 0.001f,
+                    backdrop = settingsBackdrop,
+                    modifier = Modifier.fillMaxWidth()
                 )
             }
+            Text(
+                "${"%.1f".format(crossfade)} s",
+                color = Color.White.copy(.45f),
+                fontSize = 12.sp,
+                modifier = Modifier.padding(start = 22.dp, bottom = 8.dp)
+            )
+        }
+
+        Text(
+            "Tema",
+            color = Color.White.copy(.75f),
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Medium,
+            modifier = Modifier.padding(start = 22.dp, top = 8.dp, bottom = 8.dp)
+        )
+        Row(Modifier.fillMaxWidth().padding(horizontal = 22.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            ChoiceChip("Oscuro", theme == "dark") { scope.launch { prefs.setAppTheme("dark") } }
+            ChoiceChip("Claro", theme == "light") { scope.launch { prefs.setAppTheme("light") } }
+            ChoiceChip("Sistema", theme == "system") { scope.launch { prefs.setAppTheme("system") } }
+        }
+
+        Text(
+            "Color de acento",
+            color = Color.White.copy(.75f),
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Medium,
+            modifier = Modifier.padding(start = 22.dp, top = 16.dp, bottom = 8.dp)
+        )
+        Row(Modifier.fillMaxWidth().padding(horizontal = 22.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            listOf(
+                "white" to Color.White,
+                "violet" to Color(0xFFB69CFF),
+                "blue" to Color(0xFF83B9FF),
+                "pink" to Color(0xFFFFA6D2),
+                "green" to Color(0xFF9DDBB2)
+            ).forEach { (id, color) ->
+                Box(
+                    Modifier
+                        .weight(1f)
+                        .height(42.dp)
+                        .background(color, RoundedCornerShape(12.dp))
+                        .clickable { scope.launch { prefs.setAccentColor(id) } },
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (accent == id) Text("✓", color = Color.Black, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+
+        Section("PRIVACIDAD Y PERFIL")
+        LiquidOrMaterialToggle(
+            title = "Mostrar lo que escucho",
+            subtitle = "Otros pueden ver la canción actual en tu perfil público.",
+            checked = showListening,
+            glass = glassForThisScreen,
+            backdrop = settingsBackdrop,
+            onChange = { scope.launch { prefs.setShowListeningOnProfile(it) } }
+        )
+
+        Section("REPRODUCCIÓN")
+        LiquidOrMaterialToggle(
+            title = "Reproducción gapless",
+            subtitle = "Intenta encadenar pistas sin silencio.",
+            checked = gapless,
+            glass = glassForThisScreen,
+            backdrop = settingsBackdrop,
+            onChange = { scope.launch { prefs.setGaplessPlayback(it) } }
+        )
+
+        if (isOwner && onOpenAdmin != null) {
+            Section("OWNER")
+            Button(
+                onClick = onOpenAdmin,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 22.dp, vertical = 8.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFFE5C17A),
+                    contentColor = Color.Black
+                )
+            ) {
+                Text("Admin Panel (Owner)", fontWeight = FontWeight.Bold)
+            }
+        }
+
+        Spacer(Modifier.height(100.dp))
+    }
+}
+
+@Composable
+private fun LiquidOrMaterialToggle(
+    title: String,
+    subtitle: String,
+    checked: Boolean,
+    glass: Boolean,
+    backdrop: com.kyant.backdrop.Backdrop,
+    onChange: (Boolean) -> Unit
+) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 22.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(Modifier.weight(1f).clickable { onChange(!checked) }) {
+            Text(title, color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Medium)
+            Text(
+                subtitle,
+                color = Color.White.copy(.5f),
+                fontSize = 12.sp,
+                lineHeight = 17.sp,
+                modifier = Modifier.padding(top = 3.dp)
+            )
+        }
+        if (glass) {
+            LiquidToggle(
+                selected = { checked },
+                onSelect = onChange,
+                backdrop = backdrop,
+                modifier = Modifier.padding(start = 8.dp)
+            )
+        } else {
+            Switch(
+                checked,
+                onChange,
+                colors = SwitchDefaults.colors(
+                    checkedThumbColor = Color.Black,
+                    checkedTrackColor = Color.White,
+                    uncheckedTrackColor = Color(0xFF333338)
+                )
+            )
         }
     }
 }
 
 @Composable
-private fun CoverImage(url: String?, size: Int, circle: Boolean = false) {
-    val context = LocalContext.current
-    Box(Modifier.size(size.dp).clip(if (circle) androidx.compose.foundation.shape.CircleShape else RoundedCornerShape(9.dp)).background(Color(0xFF292929))) {
-        if (!url.isNullOrBlank()) AsyncImage(
-            model = ImageRequest.Builder(context).data(url).crossfade(true).build(),
-            contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize()
-        )
-    }
+private fun Section(text: String) {
+    Text(
+        text,
+        color = Color.White.copy(.45f),
+        fontSize = 11.sp,
+        fontWeight = FontWeight.Bold,
+        letterSpacing = 1.4.sp,
+        modifier = Modifier.padding(start = 22.dp, top = 22.dp, bottom = 8.dp)
+    )
 }
 
 @Composable
-private fun EmptyMessage(message: String) {
-    Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
-        Text(message, color = Color.White.copy(alpha = .45f), fontSize = 14.sp)
+private fun RowScope.ChoiceChip(label: String, selected: Boolean, onClick: () -> Unit) {
+    Box(
+        Modifier
+            .weight(1f)
+            .background(if (selected) Color.White else Color(0xFF202024), RoundedCornerShape(12.dp))
+            .clickable { onClick() }
+            .padding(vertical = 12.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(label, color = if (selected) Color.Black else Color.White, fontSize = 12.sp)
     }
 }
-
-private fun formatDuration(seconds: Int): String = "%d:%02d".format(seconds / 60, seconds % 60)
