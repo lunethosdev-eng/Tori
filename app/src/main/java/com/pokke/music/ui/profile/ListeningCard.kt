@@ -1,10 +1,7 @@
 package com.pokke.music.ui.profile
 
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -33,6 +30,7 @@ import coil.compose.AsyncImage
 import com.pokke.music.data.model.LyricLine
 import com.pokke.music.data.model.Song
 import com.pokke.music.player.PlayerController
+import kotlinx.coroutines.launch
 
 private fun formatMs(ms: Long): String {
     val total = (ms / 1000).toInt().coerceAtLeast(0)
@@ -48,51 +46,49 @@ fun currentLyricLine(lyrics: List<LyricLine>, positionMs: Long): LyricLine? {
     return current
 }
 
+fun nextLyricTime(lyrics: List<LyricLine>, current: LyricLine?): Long? {
+    if (current == null || lyrics.isEmpty()) return null
+    val idx = lyrics.indexOfFirst { it.timeMs == current.timeMs && it.text == current.text }
+    if (idx < 0 || idx >= lyrics.lastIndex) return null
+    return lyrics[idx + 1].timeMs
+}
+
+/**
+ * Karaoke: already-sung characters stay white; the "cursor" of 2 chars is colored;
+ * upcoming stays dim. Progress advances through the line based on time until next line.
+ */
 @Composable
 fun KaraokeLyricText(
     text: String,
+    progressInLine: Float,
     accent: Color,
     ink: Color,
     modifier: Modifier = Modifier
 ) {
     val clean = text.trim().removePrefix("\"").removeSuffix("\"")
-    // Strip leading [mm:ss.xx] timestamps if present
     val body = clean.replace(Regex("^\\[\\d{2}:\\d{2}(?:\\.\\d+)?]\\s*"), "")
-    val transition = rememberInfiniteTransition(label = "karaoke")
-    val progress by transition.animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = (1200 + body.length * 40).coerceIn(1400, 4200), easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "kprog"
-    )
-    // Color pairs: highlight 2 characters at a time
-    val pairCount = ((body.length + 1) / 2).coerceAtLeast(1)
-    val activePair = (progress * pairCount).toInt().coerceIn(0, pairCount - 1)
-    val activeStart = activePair * 2
+    if (body.isEmpty()) return
 
-    val gradientColors = listOf(
-        accent,
-        Color(0xFFFF9FCB),
-        Color(0xFF8CB7FF),
-        Color(0xFF8FE0B0),
-        Color(0xFFE5C17A)
-    )
-    val hi = gradientColors[activePair % gradientColors.size]
+    val p = progressInLine.coerceIn(0f, 1f)
+    // Highlight window of 2 characters moves forward; everything before is white (sung)
+    val cursor = ((body.length + 1) * p).toInt().coerceIn(0, body.length)
+    val colors = listOf(accent, Color(0xFFFF9FCB), Color(0xFF8CB7FF), Color(0xFF8FE0B0), Color(0xFFE5C17A))
+    val hi = colors[(cursor / 2) % colors.size]
 
     Text(
         text = buildAnnotatedString {
             body.forEachIndexed { i, c ->
-                val isActive = i == activeStart || i == activeStart + 1
-                withStyle(
-                    SpanStyle(
-                        color = if (isActive) hi else ink.copy(alpha = 0.55f),
-                        fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal,
-                        fontStyle = FontStyle.Italic
-                    )
-                ) { append(c) }
+                when {
+                    i < cursor -> withStyle(
+                        SpanStyle(color = Color.White, fontWeight = FontWeight.Medium, fontStyle = FontStyle.Italic)
+                    ) { append(c) }
+                    i == cursor || i == cursor + 1 -> withStyle(
+                        SpanStyle(color = hi, fontWeight = FontWeight.Bold, fontStyle = FontStyle.Italic)
+                    ) { append(c) }
+                    else -> withStyle(
+                        SpanStyle(color = ink.copy(alpha = 0.45f), fontStyle = FontStyle.Italic)
+                    ) { append(c) }
+                }
             }
         },
         fontSize = 14.sp,
@@ -126,7 +122,17 @@ fun ListeningCard(
     val lyric = remember(song.id, position, showLyrics) {
         if (!showLyrics) null
         else if (song.lyrics.isNotEmpty()) currentLyricLine(song.lyrics, position)
-        else song.lyricsText?.lineSequence()?.map { it.trim() }?.firstOrNull { it.isNotBlank() }?.let { LyricLine(0, it) }
+        else null
+    }
+    val nextT = remember(song.lyrics, lyric) { nextLyricTime(song.lyrics, lyric) }
+    val lineProgress = remember(lyric, position, nextT) {
+        if (lyric == null) 0f
+        else {
+            val start = lyric.timeMs.toFloat()
+            val end = (nextT ?: (duration.takeIf { it > 0 } ?: (start + 4000))).toFloat()
+            val span = (end - start).coerceAtLeast(1f)
+            ((position - start) / span).coerceIn(0f, 1f)
+        }
     }
 
     Column(
@@ -184,7 +190,12 @@ fun ListeningCard(
                     .background(Color.Black.copy(alpha = 0.28f))
                     .padding(horizontal = 12.dp, vertical = 10.dp)
             ) {
-                KaraokeLyricText(text = lyric.text, accent = accent, ink = ink)
+                KaraokeLyricText(
+                    text = lyric.text,
+                    progressInLine = lineProgress,
+                    accent = accent,
+                    ink = ink
+                )
             }
         }
     }
