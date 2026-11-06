@@ -17,12 +17,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.kyant.backdrop.backdrops.layerBackdrop
-import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import com.pokke.music.data.preferences.UserPreferences
 import com.pokke.music.data.repository.AuthRepository
-import com.pokke.music.ui.liquid.LiquidSlider
-import com.pokke.music.ui.liquid.LiquidToggle
 import kotlinx.coroutines.launch
 
 private const val OWNER_EMAIL = "lunethos.dev@gmail.com"
@@ -43,19 +39,18 @@ fun SettingsScreen(
     val gapless by prefs.gaplessPlayback.collectAsState(initial = true)
     val showListening by prefs.showListeningOnProfile.collectAsState(initial = true)
     val animated by prefs.autoAnimatedCovers.collectAsState(initial = true)
-    val liquidSlider by prefs.liquidSliderEnabled.collectAsState(initial = false)
-    val crossfade by prefs.crossfadeSeconds.collectAsState(initial = 0f)
+    val liquidSlider by prefs.liquidSliderEnabled.collectAsState(initial = true)
+    val performance by prefs.liquidPerformanceMode.collectAsState(initial = true)
+    val chatsEnabled by prefs.experimentalChatsEnabled.collectAsState(initial = false)
+    val mapsEnabled by prefs.experimentalMapsEnabled.collectAsState(initial = false)
 
     val session by (authRepository?.session ?: kotlinx.coroutines.flow.MutableStateFlow(null)).collectAsState()
     val isOwner = session?.email?.equals(OWNER_EMAIL, ignoreCase = true) == true
 
-    // Capture settings background so liquid controls refract it (Kyant Backdrop)
-    val settingsBackdrop = rememberLayerBackdrop()
 
     Column(
         Modifier
             .fillMaxSize()
-            .layerBackdrop(settingsBackdrop)
             .background(Color(0xFF09090B))
             .verticalScroll(rememberScrollState())
             .statusBarsPadding()
@@ -82,59 +77,40 @@ fun SettingsScreen(
             title = "Liquid Glass",
             subtitle = "Efecto tipo iOS (refracción, blur, lente). Usa io.github.kyant0:backdrop. Apagado por defecto.",
             checked = glass,
-            glass = glass,
-            backdrop = settingsBackdrop,
+            glass = false,
             onChange = { scope.launch { prefs.setLiquidGlass(it) } }
         )
         LiquidOrMaterialToggle(
             title = "Fondo desenfocado en el reproductor",
             subtitle = "Portada como fondo ambiental del player.",
             checked = blur,
-            glass = glass,
-            backdrop = settingsBackdrop,
+            glass = false,
             onChange = { scope.launch { prefs.setBlurPlayerBackground(it) } }
         )
         LiquidOrMaterialToggle(
             title = "Portadas animadas",
             subtitle = "Prefiere animated_cover cuando exista.",
             checked = animated,
-            glass = glass,
-            backdrop = settingsBackdrop,
+            glass = false,
             onChange = { scope.launch { prefs.setAutoAnimatedCovers(it) } }
         )
         LiquidOrMaterialToggle(
             title = "Liquid Slider",
             subtitle = "Sliders con vidrio líquido (opcional, más costo de GPU).",
             checked = liquidSlider,
-            glass = glass,
-            backdrop = settingsBackdrop,
+            glass = false,
             onChange = { scope.launch { prefs.setLiquidSlider(it) } }
         )
 
-        if (liquidSlider && glass) {
-            Text(
-                "Crossfade (s)",
-                color = Color.White.copy(.75f),
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Medium,
-                modifier = Modifier.padding(start = 22.dp, top = 8.dp, bottom = 8.dp)
+        if (glass) {
+            LiquidOrMaterialToggle(
+                title = "Modo rendimiento",
+                subtitle = "Prioriza efectos solo en la pantalla visible y reduce capas y trabajo gráfico fuera de ella.",
+                checked = performance,
+                glass = false,
+                onChange = { scope.launch { prefs.setLiquidPerformanceMode(it) } }
             )
-            Box(Modifier.padding(horizontal = 22.dp, vertical = 8.dp).fillMaxWidth().height(48.dp)) {
-                LiquidSlider(
-                    value = { crossfade },
-                    onValueChange = { v -> scope.launch { prefs.setCrossfadeSeconds(v) } },
-                    valueRange = 0f..12f,
-                    visibilityThreshold = 0.001f,
-                    backdrop = settingsBackdrop,
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
-            Text(
-                "${"%.1f".format(crossfade)} s",
-                color = Color.White.copy(.45f),
-                fontSize = 12.sp,
-                modifier = Modifier.padding(start = 22.dp, bottom = 8.dp)
-            )
+            Text("El modo rendimiento evita mantener capturas y efectos de cristal en pantallas que no están visibles.", color = Color.White.copy(.42f), fontSize = 11.sp, modifier = Modifier.padding(horizontal = 22.dp, vertical = 4.dp))
         }
 
         Text(
@@ -183,8 +159,7 @@ fun SettingsScreen(
             title = "Mostrar lo que escucho",
             subtitle = "Otros pueden ver la canción actual en tu perfil público.",
             checked = showListening,
-            glass = glass,
-            backdrop = settingsBackdrop,
+            glass = false,
             onChange = { scope.launch { prefs.setShowListeningOnProfile(it) } }
         )
 
@@ -193,10 +168,29 @@ fun SettingsScreen(
             title = "Reproducción gapless",
             subtitle = "Intenta encadenar pistas sin silencio.",
             checked = gapless,
-            glass = glass,
-            backdrop = settingsBackdrop,
+            glass = false,
             onChange = { scope.launch { prefs.setGaplessPlayback(it) } }
         )
+
+        Section("FUNCIONES EXPERIMENTALES")
+        Text("Funciones alfa: pueden cambiar y requieren la migración SQL correspondiente en Supabase.", color = Color.White.copy(.48f), fontSize = 12.sp, modifier = Modifier.padding(horizontal = 22.dp, vertical = 4.dp))
+        LiquidOrMaterialToggle(
+            title = "Chats · Alfa 1.0",
+            subtitle = "Conversaciones entre amigos aceptados. Activa el acceso experimental.",
+            checked = chatsEnabled,
+            glass = false,
+            onChange = { scope.launch { prefs.setExperimentalChats(it) } }
+        )
+        LiquidOrMaterialToggle(
+            title = "Mapas con amigos · Alfa 1.0",
+            subtitle = "Requiere Chats. La ubicación se comparte solo después de conceder permiso y elegir amigos.",
+            checked = mapsEnabled,
+            glass = false,
+            onChange = { if (chatsEnabled) scope.launch { prefs.setExperimentalMaps(it) } },
+        )
+        if (!chatsEnabled && mapsEnabled) {
+            Text("Activa Chats antes de habilitar Mapas.", color = Color(0xFFE5C17A), fontSize = 12.sp, modifier = Modifier.padding(horizontal = 22.dp))
+        }
 
         if (isOwner && onOpenAdmin != null) {
             Section("OWNER")
@@ -224,7 +218,6 @@ private fun LiquidOrMaterialToggle(
     subtitle: String,
     checked: Boolean,
     glass: Boolean,
-    backdrop: com.kyant.backdrop.Backdrop,
     onChange: (Boolean) -> Unit
 ) {
     Row(
@@ -243,24 +236,15 @@ private fun LiquidOrMaterialToggle(
                 modifier = Modifier.padding(top = 3.dp)
             )
         }
-        if (glass) {
-            LiquidToggle(
-                selected = { checked },
-                onSelect = onChange,
-                backdrop = backdrop,
-                modifier = Modifier.padding(start = 8.dp)
+        Switch(
+            checked = checked,
+            onCheckedChange = onChange,
+            colors = SwitchDefaults.colors(
+                checkedThumbColor = Color.Black,
+                checkedTrackColor = Color.White,
+                uncheckedTrackColor = Color(0xFF333338)
             )
-        } else {
-            Switch(
-                checked,
-                onChange,
-                colors = SwitchDefaults.colors(
-                    checkedThumbColor = Color.Black,
-                    checkedTrackColor = Color.White,
-                    uncheckedTrackColor = Color(0xFF333338)
-                )
-            )
-        }
+        )
     }
 }
 
