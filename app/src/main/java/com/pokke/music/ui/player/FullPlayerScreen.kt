@@ -54,6 +54,8 @@ import coil.request.ImageRequest
 import com.pokke.music.player.PlayerController
 import com.pokke.music.ui.sheets.AudioOutputSheet
 import com.pokke.music.ui.sheets.OverflowMenuSheet
+import com.pokke.music.ui.liquid.LiquidSlider
+import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -67,7 +69,9 @@ fun FullPlayerScreen(
     val context = LocalContext.current
     val preferences = remember(context) { UserPreferences(context) }
     val blurPlayerBackground by preferences.blurPlayerBackground.collectAsState(false)
-    val liquidGlassEnabled by preferences.liquidGlassEnabled.collectAsState(true)
+    val liquidGlassEnabled by preferences.liquidGlassEnabled.collectAsState(false)
+    val liquidSliderEnabled by preferences.liquidSliderEnabled.collectAsState(true)
+    val liquidPerformanceMode by preferences.liquidPerformanceMode.collectAsState(true)
     val current by PlayerController.currentSong.collectAsState()
     val isPlaying by PlayerController.isPlaying.collectAsState()
     val positionMs by PlayerController.positionMs.collectAsState()
@@ -227,16 +231,29 @@ fun FullPlayerScreen(
             Spacer(modifier = Modifier.height(12.dp))
 
             Column {
-                Slider(
-                    value = progress,
-                    onValueChange = { PlayerController.seekToFraction(it) },
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = SliderDefaults.colors(
-                        thumbColor = Color.White,
-                        activeTrackColor = Color.White,
-                        inactiveTrackColor = Color.White.copy(alpha = 0.25f)
+                if (liquidGlassEnabled && liquidSliderEnabled) {
+                    val playerBackdrop = rememberLayerBackdrop()
+                    LiquidSlider(
+                        value = { progress },
+                        onValueChange = { PlayerController.seekToFraction(it) },
+                        valueRange = 0f..1f,
+                        visibilityThreshold = 0.001f,
+                        backdrop = playerBackdrop,
+                        modifier = Modifier.fillMaxWidth().height(42.dp),
+                        performanceMode = liquidPerformanceMode
                     )
-                )
+                } else {
+                    Slider(
+                        value = progress,
+                        onValueChange = { PlayerController.seekToFraction(it) },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = SliderDefaults.colors(
+                            thumbColor = Color.White,
+                            activeTrackColor = Color.White,
+                            inactiveTrackColor = Color.White.copy(alpha = 0.25f)
+                        )
+                    )
+                }
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween
