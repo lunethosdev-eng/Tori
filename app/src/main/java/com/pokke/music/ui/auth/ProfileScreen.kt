@@ -1,4 +1,7 @@
 package com.pokke.music.ui.auth
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import android.net.Uri
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -84,6 +87,68 @@ fun ProfileScreen(repository: AuthRepository, onBack: () -> Unit, onSignedOut: (
     var message by remember { mutableStateOf<String?>(null) }
     val context = androidx.compose.ui.platform.LocalContext.current
     val prefs = remember { UserPreferences(context) }
+    var uploadingMedia by remember { mutableStateOf(false) }
+    val pickAvatar = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        scope.launch {
+            uploadingMedia = true
+            runCatching {
+                val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+                    ?: error("No se pudo leer la imagen")
+                val mime = context.contentResolver.getType(uri) ?: "image/jpeg"
+                val ext = when {
+                    mime.contains("png") -> "png"
+                    mime.contains("webp") -> "webp"
+                    mime.contains("gif") -> "gif"
+                    else -> "jpg"
+                }
+                repository.uploadPublicImage("avatar", "avatar.$ext", bytes, mime).getOrThrow()
+            }.onSuccess { avatar = it; message = "Avatar actualizado" }
+                .onFailure { message = it.message ?: "Error al subir avatar" }
+            uploadingMedia = false
+        }
+    }
+    val pickBanner = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        scope.launch {
+            uploadingMedia = true
+            runCatching {
+                val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+                    ?: error("No se pudo leer la imagen")
+                val mime = context.contentResolver.getType(uri) ?: "image/jpeg"
+                val ext = when {
+                    mime.contains("png") -> "png"
+                    mime.contains("webp") -> "webp"
+                    mime.contains("gif") -> "gif"
+                    else -> "jpg"
+                }
+                repository.uploadPublicImage("banner", "banner.$ext", bytes, mime).getOrThrow()
+            }.onSuccess { banner = it; message = "Banner actualizado" }
+                .onFailure { message = it.message ?: "Error al subir banner" }
+            uploadingMedia = false
+        }
+    }
+    val pickCardBanner = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        scope.launch {
+            uploadingMedia = true
+            runCatching {
+                val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+                    ?: error("No se pudo leer la imagen")
+                val mime = context.contentResolver.getType(uri) ?: "image/jpeg"
+                repository.uploadPublicImage("card", "search_card.jpg", bytes, mime).getOrThrow()
+            }.onSuccess { url ->
+                repository.updateProfile(
+                    displayName, username, bio, avatar, banner, theme, frame, badge, pronouns, status,
+                    accent, cardStyle, badges, isPublic, linkLabel, linkUrl, showListening, null, favoriteMangasJson,
+                    searchCardBannerUrl = url
+                ).onSuccess { profile = it; message = "Nameplate del search actualizado" }
+                    .onFailure { message = it.message }
+            }.onFailure { message = it.message ?: "Error al subir nameplate" }
+            uploadingMedia = false
+        }
+    }
+
 
     LaunchedEffect(session?.userId) {
         loading = true
@@ -119,7 +184,7 @@ fun ProfileScreen(repository: AuthRepository, onBack: () -> Unit, onSignedOut: (
             else Box(Modifier.fillMaxSize().background(Brush.linearGradient(listOf(accentColor.copy(.78f), Color(0xFF20243B), pageBackground))))
             Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color.Black.copy(.10f), Color.Black.copy(.55f)))))
             Row(Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 12.dp, vertical = 8.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-                ProfileTopButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Volver", tint = Color.White) }
+                ProfileTopButton(onClick = { if (editing) editing = false else onBack() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Volver", tint = Color.White) }
                 ProfileTopButton(onClick = { scope.launch { repository.signOut(); onSignedOut() } }) { Icon(Icons.Default.Logout, "Cerrar sesión", tint = Color.White) }
             }
             Box(Modifier.align(Alignment.BottomStart).padding(start = 18.dp, bottom = 0.dp)) {
@@ -195,12 +260,33 @@ fun ProfileScreen(repository: AuthRepository, onBack: () -> Unit, onSignedOut: (
                     ProfileField("Pronombres", pronouns) { pronouns = it }
                     ProfileField("Estado personalizado", status) { status = it }
                     ProfileField("Biografía", bio, false) { bio = it }
-                    ProfileField("URL pública del avatar", avatar) { avatar = it }
-                    ProfileField("URL pública del banner", banner) { banner = it }
+                    Text("Foto y banner", color = ProfileMuted, fontSize = 12.sp, modifier = Modifier.padding(bottom = 8.dp))
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(
+                            onClick = { pickAvatar.launch("image/*") },
+                            enabled = !uploadingMedia,
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2A2F42), contentColor = ProfileInk)
+                        ) { Text(if (uploadingMedia) "…" else "Elegir avatar") }
+                        Button(
+                            onClick = { pickBanner.launch("image/*") },
+                            enabled = !uploadingMedia,
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2A2F42), contentColor = ProfileInk)
+                        ) { Text(if (uploadingMedia) "…" else "Elegir banner") }
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    Button(
+                        onClick = { pickCardBanner.launch("image/*") },
+                        enabled = !uploadingMedia,
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2A2F42), contentColor = ProfileInk)
+                    ) { Text("Nameplate del search (galería)") }
+                    Spacer(Modifier.height(10.dp))
                     ProfileField("Texto del enlace", linkLabel) { linkLabel = it }
                     ProfileField("URL del enlace", linkUrl) { linkUrl = it }
                     MangaFavoritesEditor(favoriteMangasJson, { favoriteMangasJson = it }, accentColor, ProfileInk, ProfileMuted)
-                    ProfileField("Emblemas (separados por coma)", badges) { badges = it }
+                    Text("Los emblemas los otorga el Owner desde Admin (no se escriben a mano).", color = ProfileMuted, fontSize = 12.sp, modifier = Modifier.padding(bottom = 10.dp))
                     ProfileChoice("Tema", theme, listOf("midnight", "ocean", "violet", "rose", "amoled"), listOf("Noche", "Océano", "Violeta", "Rosa", "AMOLED"), accentColor) { theme = it }
                     ProfileChoice("Color de acento", accent, listOf("violet", "blue", "pink", "cyan", "green", "gold"), listOf("Violeta", "Azul", "Rosa", "Cian", "Verde", "Dorado"), accentColor) { accent = it }
                     Text("Marco del avatar", color = ProfileMuted, fontSize = 12.sp, modifier = Modifier.padding(top = 10.dp, bottom = 8.dp))
@@ -263,8 +349,40 @@ fun ProfileScreen(repository: AuthRepository, onBack: () -> Unit, onSignedOut: (
                     }
                     ProfilePanel(cardBackground, accentColor, "Emblemas", "Colección del perfil", badges.ifBlank { "Todavía no has añadido emblemas." }, Icons.Default.Badge)
                 }
-                1 -> ProfilePanel(cardBackground, accentColor, "Favoritos", "Tu colección", "Tus canciones favoritas sincronizadas con Kokoro aparecen en tu biblioteca.", Icons.Default.Favorite)
-                else -> ProfilePanel(cardBackground, accentColor, "Información", if (isPublic) "Perfil público" else "Perfil privado", "Miembro de Pokke · ${session?.email.orEmpty()}", Icons.Default.Public)
+                1 -> {
+                        var favs by remember { mutableStateOf<List<com.pokke.music.data.model.Song>>(emptyList()) }
+                        LaunchedEffect(session?.userId) {
+                            repository.getFavorites().onSuccess { favs = it }
+                        }
+                        if (favs.isEmpty()) {
+                            ProfilePanel(cardBackground, accentColor, "Favoritos", "Tu colección", "Aún no hay canciones favoritas sincronizadas.", Icons.Default.Favorite)
+                        } else {
+                            Column(Modifier.fillMaxWidth().padding(top = 12.dp)) {
+                                Text("Canciones favoritas", color = ProfileInk, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(bottom = 8.dp))
+                                favs.take(30).forEach { s ->
+                                    Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                                        Box(Modifier.size(44.dp).clip(RoundedCornerShape(8.dp)).background(Color(0xFF292929))) {
+                                            s.coverUrl?.let { AsyncImage(it, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop) }
+                                        }
+                                        Spacer(Modifier.width(10.dp))
+                                        Column {
+                                            Text(s.title, color = ProfileInk, fontSize = 14.sp, maxLines = 1)
+                                            Text(s.artist, color = ProfileMuted, fontSize = 12.sp, maxLines = 1)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                else -> {
+                        ProfilePanel(cardBackground, accentColor, "Información", if (isPublic) "Perfil público" else "Perfil privado",
+                            buildString {
+                                append("Miembro de Pokke")
+                                session?.email?.let { append(" · $it") }
+                                if (bio.isNotBlank()) append("\n\n$bio")
+                                if (pronouns.isNotBlank()) append("\nPronombres: $pronouns")
+                            }, Icons.Default.Public)
+                    }
             }
             Spacer(Modifier.height(40.dp))
         }
