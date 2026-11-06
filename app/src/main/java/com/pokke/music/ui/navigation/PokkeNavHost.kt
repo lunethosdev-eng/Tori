@@ -112,7 +112,7 @@ fun PokkeNavHost() {
     }
 
     LaunchedEffect(auth) { auth.restoreSession() }
-    val glass by prefs.liquidGlassEnabled.collectAsState(true)
+    val glass by prefs.liquidGlassEnabled.collectAsState(false)
     val backStack by nav.currentBackStackEntryAsState()
     val route = backStack?.destination?.route
     val showNav = route in listOf(Screen.Home.route, Screen.Search.route, Screen.Library.route)
@@ -177,9 +177,10 @@ fun PokkeNavHost() {
         }
 
         AnimatedVisibility(visible = showNav, modifier = Modifier.align(Alignment.BottomCenter), enter = fadeIn() + slideInVertically { it / 2 }, exit = fadeOut() + slideOutVertically { it / 2 }) {
+            // Liquid Glass bottom bar (Kyant-inspired surface when toggle ON)
             Row(
                 modifier = Modifier.padding(bottom = 10.dp).navigationBarsPadding().clip(RoundedCornerShape(40.dp))
-                    .background(if (glass) Color(0xB82A292D) else Color(0xF01A1A1D))
+                    .background(if (glass) Color(0x99FFFFFF).copy(alpha = 0.12f) else Color(0xF01A1A1D))
                     .padding(horizontal = 9.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(7.dp)
