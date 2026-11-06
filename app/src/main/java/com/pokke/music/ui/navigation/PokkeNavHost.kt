@@ -163,7 +163,8 @@ fun PokkeNavHost() {
                 SettingsScreen(
                     onBack = { nav.popBackStack() },
                     onOpenAdmin = { nav.navigate(Screen.Admin.route) },
-                    authRepository = auth
+                    authRepository = auth,
+                    isScreenVisible = route == Screen.Settings.route
                 )
             }
             composable(Screen.Admin.route) {
@@ -181,14 +182,14 @@ fun PokkeNavHost() {
             // Liquid Glass bottom bar (Kyant-inspired surface when toggle ON)
             Row(
                 modifier = Modifier.padding(bottom = 10.dp).navigationBarsPadding().clip(RoundedCornerShape(40.dp))
-                    .background(if (glass) Color(0x99FFFFFF).copy(alpha = 0.12f) else Color(0xF01A1A1D))
+                    .background(if (glass && showNav) Color(0x99FFFFFF).copy(alpha = 0.12f) else Color(0xF01A1A1D))
                     .padding(horizontal = 9.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(7.dp)
             ) {
                 navItems.forEach { item ->
                     val selected = route == item.screen.route
-                    Box(Modifier.size(50.dp).clip(CircleShape).background(if (selected) Color.White.copy(if (glass) .20f else .12f) else Color.Transparent)
+                    Box(Modifier.size(50.dp).clip(CircleShape).background(if (selected) Color.White.copy(if (glass && showNav) .20f else .12f) else Color.Transparent)
                         .clickable { nav.navigate(item.screen.route) { popUpTo(nav.graph.findStartDestination().id) { saveState = true }; launchSingleTop = true; restoreState = true } }, contentAlignment = Alignment.Center) {
                         Icon(if (selected) item.selected else item.normal, item.screen.route, tint = if (selected) Color.White else Color(0xFF929297), modifier = Modifier.size(24.dp))
                     }
