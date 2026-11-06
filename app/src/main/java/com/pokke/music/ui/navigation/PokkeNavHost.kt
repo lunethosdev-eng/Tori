@@ -15,9 +15,11 @@ import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Forum
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.LibraryMusic
 import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.Forum
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -47,6 +49,7 @@ import com.pokke.music.ui.queue.QueueScreen
 import com.pokke.music.ui.search.SearchScreen
 import com.pokke.music.ui.settings.SettingsScreen
 import com.pokke.music.ui.admin.AdminPanelScreen
+import com.pokke.music.ui.social.ChatScreen
 import com.pokke.music.data.remote.UpdateChecker
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.TextButton
@@ -64,6 +67,7 @@ sealed class Screen(val route: String) {
     data object Home : Screen("home")
     data object Library : Screen("library")
     data object Search : Screen("search")
+    data object Chats : Screen("chats")
     data object Player : Screen("player")
     data object Queue : Screen("queue")
     data object Lyrics : Screen("lyrics")
@@ -72,7 +76,7 @@ sealed class Screen(val route: String) {
 }
 
 private data class NavItem(val screen: Screen, val selected: ImageVector, val normal: ImageVector)
-private val navItems = listOf(
+private val baseNavItems = listOf(
     NavItem(Screen.Home, Icons.Filled.Home, Icons.Outlined.Home),
     NavItem(Screen.Library, Icons.Filled.LibraryMusic, Icons.Outlined.LibraryMusic),
     NavItem(Screen.Search, Icons.Filled.Search, Icons.Outlined.Search)
@@ -114,9 +118,11 @@ fun PokkeNavHost() {
 
     LaunchedEffect(auth) { auth.restoreSession() }
     val glass by prefs.liquidGlassEnabled.collectAsState(false)
+    val chatsEnabled by prefs.experimentalChatsEnabled.collectAsState(false)
     val backStack by nav.currentBackStackEntryAsState()
     val route = backStack?.destination?.route
-    val showNav = route in listOf(Screen.Home.route, Screen.Search.route, Screen.Library.route)
+    val showNav = route in listOf(Screen.Home.route, Screen.Search.route, Screen.Library.route, Screen.Chats.route)
+    val navItems = remember(chatsEnabled) { if (chatsEnabled) baseNavItems + NavItem(Screen.Chats, Icons.Filled.Forum, Icons.Outlined.Forum) else baseNavItems }
     var avatar by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(route) { auth.getProfile().onSuccess { avatar = it?.avatarUrl } }
 
@@ -159,12 +165,15 @@ fun PokkeNavHost() {
                     onLoginRequired = { nav.navigate(Screen.Auth.route) },
                     onSongClick = { PlayerController.init(context); PlayerController.playSong(it); nav.navigate(Screen.Player.route) })
             }
+            composable(Screen.Chats.route) {
+                if (chatsEnabled) ChatScreen(authRepository = auth)
+                else SettingsScreen(onBack = { nav.popBackStack() }, authRepository = auth)
+            }
             composable(Screen.Settings.route) {
                 SettingsScreen(
                     onBack = { nav.popBackStack() },
                     onOpenAdmin = { nav.navigate(Screen.Admin.route) },
-                    authRepository = auth,
-                    isScreenVisible = route == Screen.Settings.route
+                    authRepository = auth
                 )
             }
             composable(Screen.Admin.route) {
@@ -182,14 +191,14 @@ fun PokkeNavHost() {
             // Liquid Glass bottom bar (Kyant-inspired surface when toggle ON)
             Row(
                 modifier = Modifier.padding(bottom = 10.dp).navigationBarsPadding().clip(RoundedCornerShape(40.dp))
-                    .background(if (glass && showNav) Color(0x99FFFFFF).copy(alpha = 0.12f) else Color(0xF01A1A1D))
+                    .background(if (glass) Color(0x99FFFFFF).copy(alpha = 0.12f) else Color(0xF01A1A1D))
                     .padding(horizontal = 9.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(7.dp)
             ) {
                 navItems.forEach { item ->
                     val selected = route == item.screen.route
-                    Box(Modifier.size(50.dp).clip(CircleShape).background(if (selected) Color.White.copy(if (glass && showNav) .20f else .12f) else Color.Transparent)
+                    Box(Modifier.size(50.dp).clip(CircleShape).background(if (selected) Color.White.copy(if (glass) .20f else .12f) else Color.Transparent)
                         .clickable { nav.navigate(item.screen.route) { popUpTo(nav.graph.findStartDestination().id) { saveState = true }; launchSingleTop = true; restoreState = true } }, contentAlignment = Alignment.Center) {
                         Icon(if (selected) item.selected else item.normal, item.screen.route, tint = if (selected) Color.White else Color(0xFF929297), modifier = Modifier.size(24.dp))
                     }
