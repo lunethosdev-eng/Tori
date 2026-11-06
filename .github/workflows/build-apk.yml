@@ -25,51 +25,29 @@ jobs:
 
       - name: Setup Android environment
         run: |
-          echo "ANDROID_HOME=/usr/local/lib/android/sdk" >> $GITHUB_ENV
-          echo "ANDROID_SDK_ROOT=/usr/local/lib/android/sdk" >> $GITHUB_ENV
+          echo "ANDROID_HOME=/usr/local/lib/android/sdk" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=/usr/local/lib/android/sdk" >> "$GITHUB_ENV"
           echo "sdk.dir=/usr/local/lib/android/sdk" > local.properties
 
-          # Locate sdkmanager
           SDKMANAGER=$(find /usr/local/lib/android/sdk -name sdkmanager -type f 2>/dev/null | head -n 1)
           if [ -z "$SDKMANAGER" ]; then
-            echo "Downloading cmdline-tools..."
-            mkdir -p /usr/local/lib/android/sdk/cmdline-tools
-            curl -sL https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -o /tmp/cmdtools.zip
-            unzip -q /tmp/cmdtools.zip -d /usr/local/lib/android/sdk/cmdline-tools
-            mv /usr/local/lib/android/sdk/cmdline-tools/cmdline-tools /usr/local/lib/android/sdk/cmdline-tools/latest || true
-            SDKMANAGER=/usr/local/lib/android/sdk/cmdline-tools/latest/bin/sdkmanager
-          fi
-          echo "Using sdkmanager: $SDKMANAGER"
-          chmod +x "$SDKMANAGER" || true
-          yes | "$SDKMANAGER" --licenses >/dev/null 2>&1 || true
-          "$SDKMANAGER" "platform-tools" "platforms;android-35" "build-tools;35.0.0" 2>/dev/null || \
-          "$SDKMANAGER" "platform-tools" "platforms;android-34" "build-tools;34.0.0" || true
-
-      - name: Make gradlew executable
-        run: |
-          if [ -f gradlew ]; then
-            chmod +x gradlew
-          else
-            echo "WARNING: gradlew not found in repo root"
-            ls -la
-          fi
-
-      - name: Build Debug APK
-        run: |
-          if [ -f gradlew ]; then
-            ./gradlew assembleDebug --stacktrace --no-daemon
-          else
-            echo "No gradlew. Listing project structure:"
-            find . -maxdepth 3 -type f | head -50
+            echo "Android sdkmanager was not found on the runner."
             exit 1
           fi
+
+          yes | "$SDKMANAGER" --licenses >/dev/null 2>&1 || true
+          "$SDKMANAGER" --install "platform-tools" "platforms;android-37" "build-tools;36.0.0"
+
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
+
+      - name: Build Debug APK
+        run: ./gradlew assembleDebug --stacktrace --no-daemon
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: Pokke-debug
-          path: |
-            app/build/outputs/apk/debug/*.apk
-            **/build/outputs/apk/debug/*.apk
+          path: app/build/outputs/apk/debug/*.apk
           retention-days: 14
-          if-no-files-found: warn
+          if-no-files-found: error
