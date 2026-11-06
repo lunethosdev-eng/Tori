@@ -1,35 +1,56 @@
 package com.pokke.music.ui.social
 
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Send
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Send
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
+import com.pokke.music.data.preferences.UserPreferences
 import com.pokke.music.data.repository.AuthRepository
 import com.pokke.music.data.repository.SocialRepository
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 @Composable
-fun ChatScreen(authRepository: AuthRepository, onBack: (() -> Unit)? = null) {
+fun ChatScreen(
+    authRepository: AuthRepository,
+    onBack: (() -> Unit)? = null,
+    onOpenStoryPublisher: (() -> Unit)? = null,
+    onOpenMaps: (() -> Unit)? = null
+) {
+    val context = LocalContext.current
+    val prefs = remember { UserPreferences(context) }
+    val storiesOn by prefs.experimentalStoriesEnabled.collectAsState(false)
+    val mapsOn by prefs.experimentalMapsEnabled.collectAsState(false)
     val social = remember(authRepository) { SocialRepository(authRepository) }
     val scope = rememberCoroutineScope()
     var friends by remember { mutableStateOf<List<SocialRepository.Friend>>(emptyList()) }
     var conversations by remember { mutableStateOf<List<SocialRepository.Conversation>>(emptyList()) }
+    var stories by remember { mutableStateOf<List<SocialRepository.Story>>(emptyList()) }
     var selected by remember { mutableStateOf<SocialRepository.Conversation?>(null) }
     var messages by remember { mutableStateOf<List<SocialRepository.Message>>(emptyList()) }
     var draft by remember { mutableStateOf("") }
@@ -37,91 +58,210 @@ fun ChatScreen(authRepository: AuthRepository, onBack: (() -> Unit)? = null) {
     var error by remember { mutableStateOf<String?>(null) }
     val myId = authRepository.session.collectAsState().value?.userId
 
-    fun refresh() {
+    fun refreshLists() {
         scope.launch {
             loading = true
             social.friends().onSuccess { friends = it }.onFailure { error = it.message }
             social.conversations().onSuccess { conversations = it }.onFailure { error = it.message }
-            selected?.let { convo -> social.messages(convo.id).onSuccess { messages = it }.onFailure { error = it.message } }
+            if (storiesOn) social.activeStories().onSuccess { stories = it }
             loading = false
         }
     }
-    LaunchedEffect(Unit) { refresh() }
 
-    Column(Modifier.fillMaxSize().background(Color(0xFF09090B)).statusBarsPadding()) {
-        Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-            if (selected != null) IconButton(onClick = { selected = null; messages = emptyList() }) { Icon(Icons.Default.ArrowBack, null, tint = Color.White) }
-            Column(Modifier.weight(1f)) {
-                Text(selected?.friend?.displayName ?: "Chats", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
-                Text(if (selected == null) "Solo puedes conversar con amigos aceptados" else "Chat privado · Pokke Alfa 1.0", color = Color.White.copy(.5f), fontSize = 12.sp)
-            }
-            IconButton(onClick = { refresh() }) { Icon(Icons.Default.Refresh, "Actualizar", tint = Color.White) }
+    fun loadMessages(id: String) {
+        scope.launch {
+            social.messages(id).onSuccess { messages = it }.onFailure { error = it.message }
         }
-        error?.let { Text(it, color = Color(0xFFFF8B8B), modifier = Modifier.padding(horizontal = 18.dp, vertical = 6.dp), fontSize = 12.sp) }
+    }
 
+    LaunchedEffect(Unit) { refreshLists() }
+
+    // Simple realtime: poll open conversation every 3s
+    LaunchedEffect(selected?.id) {
+        val id = selected?.id ?: return@LaunchedEffect
+        while (true) {
+            social.messages(id).onSuccess { messages = it }
+            delay(3000)
+        }
+    }
+
+    val pickImage = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
+        val convo = selected ?: return@rememberLauncherForActivityResult
+        if (uri == null) return@rememberLauncherForActivityResult
+        scope.launch {
+            runCatching {
+                val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+                    ?: error("No se pudo leer la imagen")
+                val mime = context.contentResolver.getType(uri) ?: "image/jpeg"
+                val url = authRepository.uploadPublicImage("chat", "img_${System.currentTimeMillis()}.jpg", bytes, mime).getOrThrow()
+                social.sendImage(convo.id, url).getOrThrow()
+                loadMessages(convo.id)
+            }.onFailure { error = it.message }
+        }
+    }
+
+    Column(
+        Modifier
+            .fillMaxSize()
+            .background(Color(0xFF09090B))
+            .statusBarsPadding()
+    ) {
         if (selected == null) {
-            Text("CONVERSACIONES", color = Color(0xFFE5C17A), fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 18.dp, top = 12.dp, bottom = 8.dp))
-            LazyColumn(Modifier.weight(1f)) {
-                items(conversations, key = { it.id }) { convo ->
-                    Row(Modifier.fillMaxWidth().clickable {
-                        selected = convo
-                        scope.launch {
-                            social.messages(convo.id).onSuccess { messages = it }.onFailure { error = it.message }
-                        }
-                    }.padding(horizontal = 18.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Box(Modifier.size(46.dp).clip(CircleShape).background(Color(0xFF29252A)), contentAlignment = Alignment.Center) { Text(convo.friend.displayName.take(1).uppercase(), color = Color(0xFFE5C17A), fontWeight = FontWeight.Bold) }
-                        Column(Modifier.weight(1f).padding(start = 12.dp)) {
-                            Text(convo.friend.displayName.ifBlank { convo.friend.username }, color = Color.White, fontWeight = FontWeight.SemiBold)
-                            Text(convo.lastMessage ?: "Inicia una conversación", color = Color.White.copy(.48f), fontSize = 12.sp, maxLines = 1)
+            Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                if (onBack != null) {
+                    IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, null, tint = Color.White) }
+                }
+                Text("Chats", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 22.sp, modifier = Modifier.weight(1f))
+                if (mapsOn && onOpenMaps != null) {
+                    TextButton(onClick = onOpenMaps) { Text("Mapas", color = Color(0xFFE5C17A)) }
+                }
+                IconButton(onClick = { refreshLists() }) { Icon(Icons.Default.Refresh, null, tint = Color.White) }
+            }
+
+            if (storiesOn) {
+                LazyRow(Modifier.padding(horizontal = 12.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    item {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.clickable { onOpenStoryPublisher?.invoke() }) {
+                            Box(
+                                Modifier.size(56.dp).clip(CircleShape).background(Color(0xFF2A2F42)),
+                                contentAlignment = Alignment.Center
+                            ) { Icon(Icons.Default.Add, null, tint = Color.White) }
+                            Text("Tu historia", color = Color.White.copy(.7f), fontSize = 11.sp)
                         }
                     }
-                }
-                item { Text("AMIGOS", color = Color(0xFFE5C17A), fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 18.dp, top = 16.dp, bottom = 8.dp)) }
-                items(friends, key = { it.id }) { friend ->
-                    Row(Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 9.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Box(Modifier.size(40.dp).clip(CircleShape).background(Color(0xFF29252A)), contentAlignment = Alignment.Center) { Text(friend.displayName.take(1).uppercase(), color = Color(0xFFE5C17A)) }
-                        Column(Modifier.weight(1f).padding(start = 12.dp)) {
-                            Text(friend.displayName.ifBlank { friend.username }, color = Color.White)
-                            Text("@${friend.username}", color = Color.White.copy(.45f), fontSize = 11.sp)
-                        }
-                        TextButton(onClick = {
-                            scope.launch {
-                                loading = true
-                                social.openConversation(friend.id).onSuccess { id ->
-                                    selected = SocialRepository.Conversation(id, friend, null, null)
-                                    social.messages(id).onSuccess { messages = it }.onFailure { error = it.message }
-                                }.onFailure { error = it.message }
-                                loading = false
+                    items(stories, key = { it.id }) { s ->
+                        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.clickable {
+                            scope.launch { social.markStoryViewed(s.id) }
+                        }) {
+                            Box(
+                                Modifier
+                                    .size(56.dp)
+                                    .clip(CircleShape)
+                                    .background(if (s.viewed) Color(0xFF333338) else Color(0xFFE5C17A))
+                                    .padding(2.dp)
+                            ) {
+                                AsyncImage(
+                                    model = s.avatarUrl ?: s.mediaUrl,
+                                    contentDescription = null,
+                                    modifier = Modifier.fillMaxSize().clip(CircleShape).background(Color(0xFF1A1A1E)),
+                                    contentScale = ContentScale.Crop
+                                )
                             }
-                        }) { Text("Mensaje", color = Color(0xFFE5C17A)) }
+                            Text((s.displayName ?: s.username ?: "?").take(8), color = Color.White.copy(.7f), fontSize = 11.sp)
+                        }
                     }
                 }
-                if (friends.isEmpty() && conversations.isEmpty()) item { Text("Todavía no tienes amigos aceptados. Cuando ambos acepten la solicitud, aparecerán aquí.", color = Color.White.copy(.5f), modifier = Modifier.padding(20.dp)) }
+            }
+
+            if (loading) LinearProgressIndicator(Modifier.fillMaxWidth(), color = Color.White)
+            error?.let { Text(it, color = Color(0xFFFF8A80), fontSize = 12.sp, modifier = Modifier.padding(12.dp)) }
+
+            LazyColumn(Modifier.fillMaxSize()) {
+                items(conversations, key = { it.id }) { c ->
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .clickable { selected = c; loadMessages(c.id) }
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(Modifier.size(48.dp).clip(CircleShape).background(Color(0xFF29292E))) {
+                            c.friend.avatarUrl?.let {
+                                AsyncImage(it, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                            }
+                        }
+                        Spacer(Modifier.width(12.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text(c.nickname ?: c.friend.displayName.ifBlank { c.friend.username }, color = Color.White, fontWeight = FontWeight.Medium)
+                            Text(c.lastMessage ?: "Sin mensajes", color = Color.White.copy(.5f), fontSize = 13.sp, maxLines = 1)
+                        }
+                        if (c.unread > 0) {
+                            Badge { Text("${c.unread}") }
+                        }
+                    }
+                }
+                if (conversations.isEmpty() && friends.isNotEmpty()) {
+                    item {
+                        Text("Amigos — toca para abrir chat", color = Color.White.copy(.5f), modifier = Modifier.padding(16.dp))
+                    }
+                    items(friends, key = { it.id }) { f ->
+                        Row(
+                            Modifier.fillMaxWidth().clickable {
+                                scope.launch {
+                                    social.openConversation(f.id).onSuccess { id ->
+                                        selected = SocialRepository.Conversation(id, f, null, null)
+                                        loadMessages(id)
+                                    }.onFailure { error = it.message }
+                                }
+                            }.padding(16.dp)
+                        ) {
+                            Text(f.displayName.ifBlank { f.username }, color = Color.White)
+                        }
+                    }
+                }
             }
         } else {
-            LazyColumn(Modifier.weight(1f).fillMaxWidth().padding(horizontal = 14.dp), reverseLayout = false) {
-                items(messages, key = { it.id }) { message ->
-                    val mine = message.senderId == myId
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = if (mine) Arrangement.End else Arrangement.Start) {
-                        Column(Modifier.padding(vertical = 4.dp).widthIn(max = 290.dp).clip(RoundedCornerShape(18.dp)).background(if (mine) Color(0xFFB98C48) else Color(0xFF252329)).padding(horizontal = 14.dp, vertical = 10.dp)) {
-                            Text(message.body ?: if (message.type == "image") "Imagen adjunta" else "Archivo adjunto", color = if (mine) Color.Black else Color.White)
+            val convo = selected!!
+            Row(Modifier.fillMaxWidth().padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = { selected = null }) { Icon(Icons.Default.ArrowBack, null, tint = Color.White) }
+                Text(convo.nickname ?: convo.friend.displayName.ifBlank { convo.friend.username }, color = Color.White, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+            }
+            LazyColumn(
+                Modifier.weight(1f).padding(horizontal = 12.dp),
+                reverseLayout = false
+            ) {
+                items(messages, key = { it.id }) { m ->
+                    val mine = m.senderId == myId
+                    Column(
+                        Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                        horizontalAlignment = if (mine) Alignment.End else Alignment.Start
+                    ) {
+                        Box(
+                            Modifier
+                                .widthIn(max = 280.dp)
+                                .background(
+                                    if (mine) Color(0xFFE5C17A) else Color(0xFF2A2F42),
+                                    RoundedCornerShape(14.dp)
+                                )
+                                .padding(10.dp)
+                        ) {
+                            when (m.type) {
+                                "image", "gif" -> if (!m.mediaUrl.isNullOrBlank()) {
+                                    AsyncImage(m.mediaUrl, null, Modifier.width(200.dp).height(160.dp).clip(RoundedCornerShape(8.dp)), contentScale = ContentScale.Crop)
+                                } else Text(m.body ?: "", color = if (mine) Color.Black else Color.White)
+                                else -> Text(m.body ?: "", color = if (mine) Color.Black else Color.White, fontSize = 15.sp)
+                            }
                         }
                     }
                 }
             }
-            Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                OutlinedTextField(value = draft, onValueChange = { draft = it }, modifier = Modifier.weight(1f), placeholder = { Text("Escribe un mensaje…") }, shape = RoundedCornerShape(24.dp), colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White, focusedBorderColor = Color(0xFFE5C17A), unfocusedBorderColor = Color(0xFF49454D)))
-                IconButton(enabled = draft.isNotBlank() && !loading, onClick = {
-                    val text = draft
-                    draft = ""
+            Row(Modifier.fillMaxWidth().padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = { pickImage.launch("image/*") }) {
+                    Icon(Icons.Default.Image, null, tint = Color.White)
+                }
+                OutlinedTextField(
+                    value = draft,
+                    onValueChange = { draft = it },
+                    modifier = Modifier.weight(1f),
+                    placeholder = { Text("Mensaje") },
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = Color.White, unfocusedTextColor = Color.White,
+                        focusedBorderColor = Color.White.copy(.4f), unfocusedBorderColor = Color.White.copy(.2f)
+                    )
+                )
+                IconButton(onClick = {
+                    val text = draft.trim(); if (text.isEmpty()) return@IconButton
                     scope.launch {
-                        loading = true
-                        social.sendText(selected!!.id, text).onSuccess { social.messages(selected!!.id).onSuccess { messages = it } }.onFailure { error = it.message; draft = text }
-                        loading = false
+                        social.sendText(convo.id, text).onSuccess {
+                            draft = ""
+                            loadMessages(convo.id)
+                        }.onFailure { error = it.message }
                     }
-                }) { Icon(Icons.Filled.Send, "Enviar", tint = Color(0xFFE5C17A)) }
+                }) {
+                    Icon(Icons.Default.Send, null, tint = Color(0xFFE5C17A))
+                }
             }
         }
-        if (loading) LinearProgressIndicator(Modifier.fillMaxWidth(), color = Color(0xFFE5C17A), trackColor = Color.Transparent)
     }
 }
