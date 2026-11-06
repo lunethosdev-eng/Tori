@@ -193,33 +193,30 @@ fun SettingsScreen(
         )
         if (!chatsEnabled && mapsEnabled) {
             Text("Activa Chats antes de habilitar Mapas.", color = Color(0xFFE5C17A), fontSize = 12.sp, modifier = Modifier.padding(horizontal = 22.dp))
+        }
 
         LiquidOrMaterialToggle(
             title = "Historias · Alfa 1.0",
-            subtitle = "Fotos y vídeos ≤60s con expiración 24h. Visible arriba de Chats.",
+            subtitle = "Fotos y vídeos ≤60s. Expiran a las 24h. Arriba de Chats.",
             checked = storiesEnabled,
-            glass = glassForThisScreen,
-            backdrop = settingsBackdrop,
+            glass = false,
             onChange = { scope.launch { prefs.setExperimentalStories(it) } }
         )
         LiquidOrMaterialToggle(
             title = "Personalización avanzada del reproductor",
-            subtitle = "Temas Sakura, layout de portada y efectos del player.",
+            subtitle = "Temas Sakura, layout y efectos del player.",
             checked = playerCustomEnabled,
-            glass = glassForThisScreen,
-            backdrop = settingsBackdrop,
+            glass = false,
             onChange = { scope.launch { prefs.setExperimentalPlayerCustom(it) } }
         )
         LiquidOrMaterialToggle(
             title = "Decoraciones del perfil",
-            subtitle = "GIFs Giphy, stickers y capas arrastrables.",
+            subtitle = "GIFs Giphy y stickers cuando el flag está activo.",
             checked = profileDecorEnabled,
-            glass = glassForThisScreen,
-            backdrop = settingsBackdrop,
+            glass = false,
             onChange = { scope.launch { prefs.setExperimentalProfileDecor(it) } }
         )
 
-        }
 
         if (isOwner && onOpenAdmin != null) {
             Section("OWNER")
