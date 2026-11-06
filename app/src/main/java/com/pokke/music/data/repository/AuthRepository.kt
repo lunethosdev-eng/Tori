@@ -97,6 +97,34 @@ class AuthRepository(context: Context) {
         }
     }
 
+
+    /** Upload bytes to public storage bucket and return public URL. */
+    suspend fun uploadPublicImage(folder: String, fileName: String, bytes: ByteArray, mime: String = "image/jpeg"): Result<String> =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                val s = requireSession()
+                val path = "$folder/${s.userId}/$fileName"
+                val url = URL("${KokoroConfig.SUPABASE_URL}/storage/v1/object/avatars/$path")
+                val conn = (url.openConnection() as HttpURLConnection).apply {
+                    requestMethod = "POST"
+                    doOutput = true
+                    connectTimeout = 30_000
+                    readTimeout = 60_000
+                    setRequestProperty("apikey", KokoroConfig.SUPABASE_PUBLISHABLE_KEY)
+                    setRequestProperty("Authorization", "Bearer ${s.accessToken}")
+                    setRequestProperty("Content-Type", mime)
+                    setRequestProperty("x-upsert", "true")
+                }
+                conn.outputStream.use { it.write(bytes) }
+                val code = conn.responseCode
+                val resp = (if (code in 200..299) conn.inputStream else conn.errorStream)
+                    ?.bufferedReader()?.readText().orEmpty()
+                conn.disconnect()
+                if (code !in 200..299) throw IOException("Upload falló HTTP $code: $resp")
+                "${KokoroConfig.SUPABASE_URL}/storage/v1/object/public/avatars/$path"
+            }
+        }
+
     suspend fun updateProfile(
         displayName: String,
         username: String,
