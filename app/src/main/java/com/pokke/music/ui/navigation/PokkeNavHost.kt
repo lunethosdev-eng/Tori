@@ -47,6 +47,12 @@ import com.pokke.music.ui.queue.QueueScreen
 import com.pokke.music.ui.search.SearchScreen
 import com.pokke.music.ui.settings.SettingsScreen
 import com.pokke.music.ui.admin.AdminPanelScreen
+import com.pokke.music.data.remote.UpdateChecker
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
+import android.content.Intent
+import android.net.Uri
+import com.pokke.music.BuildConfig
 
 sealed class Screen(val route: String) {
     data object Auth : Screen("auth")
@@ -77,6 +83,34 @@ fun PokkeNavHost() {
     val context = LocalContext.current
     val prefs = remember { UserPreferences(context) }
     val auth = remember(context) { AuthRepository(context) }
+
+    var updateInfo by remember { mutableStateOf<com.pokke.music.data.remote.AppRelease?>(null) }
+    LaunchedEffect(Unit) {
+        UpdateChecker.fetchLatest().onSuccess { rel ->
+            if (UpdateChecker.isNewer(rel.tag, BuildConfig.VERSION_NAME)) updateInfo = rel
+        }
+    }
+    updateInfo?.let { rel ->
+        AlertDialog(
+            onDismissRequest = { updateInfo = null },
+            title = { Text("Nueva versión ${rel.tag}") },
+            text = {
+                Text((rel.name + "\n\n" + rel.body).take(900).ifBlank { "Hay una actualización disponible." })
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    if (rel.htmlUrl.isNotBlank()) {
+                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(rel.htmlUrl)))
+                    }
+                    updateInfo = null
+                }) { Text("Ver release") }
+            },
+            dismissButton = {
+                TextButton(onClick = { updateInfo = null }) { Text("Después") }
+            }
+        )
+    }
+
     LaunchedEffect(auth) { auth.restoreSession() }
     val glass by prefs.liquidGlassEnabled.collectAsState(true)
     val backStack by nav.currentBackStackEntryAsState()
@@ -127,7 +161,8 @@ fun PokkeNavHost() {
             composable(Screen.Settings.route) {
                 SettingsScreen(
                     onBack = { nav.popBackStack() },
-                    onOpenAdmin = { nav.navigate(Screen.Admin.route) }
+                    onOpenAdmin = { nav.navigate(Screen.Admin.route) },
+                    authRepository = auth
                 )
             }
             composable(Screen.Admin.route) {
