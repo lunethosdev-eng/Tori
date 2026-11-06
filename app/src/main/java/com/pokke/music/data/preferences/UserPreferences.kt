@@ -16,6 +16,7 @@ val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "po
 class UserPreferences(private val context: Context) {
     companion object {
         private val LIQUID_GLASS = booleanPreferencesKey("liquid_glass_enabled")
+        private val LIQUID_SLIDER = booleanPreferencesKey("liquid_slider_enabled")
         private val AUTO_ANIMATED_COVERS = booleanPreferencesKey("auto_animated_covers")
         private val DYNAMIC_COLORS = booleanPreferencesKey("dynamic_colors")
         private val BLUR_PLAYER = booleanPreferencesKey("blur_player_background")
@@ -27,6 +28,7 @@ class UserPreferences(private val context: Context) {
         private val SHOW_LINK_EMBEDS = booleanPreferencesKey("show_link_embeds")
     }
     val liquidGlassEnabled: Flow<Boolean> = context.dataStore.data.map { it[LIQUID_GLASS] ?: false }
+    val liquidSliderEnabled: Flow<Boolean> = context.dataStore.data.map { it[LIQUID_SLIDER] ?: false }
     val autoAnimatedCovers: Flow<Boolean> = context.dataStore.data.map { it[AUTO_ANIMATED_COVERS] ?: true }
     val dynamicColors: Flow<Boolean> = context.dataStore.data.map { it[DYNAMIC_COLORS] ?: true }
     val blurPlayerBackground: Flow<Boolean> = context.dataStore.data.map { it[BLUR_PLAYER] ?: false }
@@ -40,6 +42,7 @@ class UserPreferences(private val context: Context) {
     val showLinkEmbeds: Flow<Boolean> = context.dataStore.data.map { it[SHOW_LINK_EMBEDS] ?: true }
 
     suspend fun setLiquidGlass(v: Boolean) = context.dataStore.edit { it[LIQUID_GLASS] = v }
+    suspend fun setLiquidSlider(v: Boolean) = context.dataStore.edit { it[LIQUID_SLIDER] = v }
     suspend fun setAutoAnimatedCovers(v: Boolean) = context.dataStore.edit { it[AUTO_ANIMATED_COVERS] = v }
     suspend fun setDynamicColors(v: Boolean) = context.dataStore.edit { it[DYNAMIC_COLORS] = v }
     suspend fun setBlurPlayerBackground(v: Boolean) = context.dataStore.edit { it[BLUR_PLAYER] = v }
