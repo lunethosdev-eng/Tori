@@ -9,9 +9,6 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.net.URLEncoder
 
-/**
- * Friends, chats, stories and location sharing against Pokke Users (same session as Auth).
- */
 class SocialRepository(private val auth: AuthRepository) {
 
     data class Friend(val id: String, val username: String, val displayName: String, val avatarUrl: String?)
@@ -60,7 +57,7 @@ class SocialRepository(private val auth: AuthRepository) {
 
     private fun request(
         path: String,
-        method: String,
+        method: String = "GET",
         body: String? = null,
         prefer: String? = null
     ): String {
@@ -98,12 +95,7 @@ class SocialRepository(private val auth: AuthRepository) {
             val rows = JSONArray(request("/rest/v1/rpc/pokke_my_friends", "POST", "{}"))
             (0 until rows.length()).map { i ->
                 rows.getJSONObject(i).let {
-                    Friend(
-                        it.optString("friend_id"),
-                        it.optString("username"),
-                        it.optString("display_name"),
-                        it.optString("avatar_url").takeIf(String::isNotBlank)
-                    )
+                    Friend(it.optString("friend_id"), it.optString("username"), it.optString("display_name"), it.optString("avatar_url").takeIf(String::isNotBlank))
                 }
             }
         }
@@ -116,12 +108,7 @@ class SocialRepository(private val auth: AuthRepository) {
                 val row = rows.getJSONObject(i)
                 Conversation(
                     id = row.optString("conversation_id"),
-                    friend = Friend(
-                        row.optString("friend_id"),
-                        row.optString("friend_username"),
-                        row.optString("friend_display_name"),
-                        row.optString("friend_avatar_url").takeIf(String::isNotBlank)
-                    ),
+                    friend = Friend(row.optString("friend_id"), row.optString("friend_username"), row.optString("friend_display_name"), row.optString("friend_avatar_url").takeIf(String::isNotBlank)),
                     lastMessage = row.optString("last_message").takeIf(String::isNotBlank),
                     lastMessageAt = row.optString("last_message_at").takeIf(String::isNotBlank),
                     unread = row.optInt("unread_count", 0),
@@ -133,8 +120,8 @@ class SocialRepository(private val auth: AuthRepository) {
 
     suspend fun openConversation(friendId: String): Result<String> = withContext(Dispatchers.IO) {
         runCatching {
-            val encoded = JSONObject().put("friend_uuid", friendId).toString()
-            request("/rest/v1/rpc/pokke_open_direct_conversation", "POST", encoded).trim().removeSurrounding("\"")
+            request("/rest/v1/rpc/pokke_open_direct_conversation", "POST", JSONObject().put("friend_uuid", friendId).toString())
+                .trim().removeSurrounding("\"")
         }
     }
 
@@ -142,20 +129,11 @@ class SocialRepository(private val auth: AuthRepository) {
         runCatching {
             val id = URLEncoder.encode(conversationId, "UTF-8")
             val rows = JSONArray(
-                request(
-                    "/rest/v1/pokke_messages?select=id,sender_id,message_type,body,media_url,created_at&conversation_id=eq.$id&deleted_at=is.null&order=created_at.asc&limit=200"
-                )
+                request("/rest/v1/pokke_messages?select=id,sender_id,message_type,body,media_url,created_at&conversation_id=eq.$id&deleted_at=is.null&order=created_at.asc&limit=200")
             )
             (0 until rows.length()).map { i ->
                 rows.getJSONObject(i).let {
-                    Message(
-                        it.optString("id"),
-                        it.optString("sender_id"),
-                        it.optString("message_type"),
-                        it.optString("body").takeIf(String::isNotBlank),
-                        it.optString("media_url").takeIf(String::isNotBlank),
-                        it.optString("created_at")
-                    )
+                    Message(it.optString("id"), it.optString("sender_id"), it.optString("message_type"), it.optString("body").takeIf(String::isNotBlank), it.optString("media_url").takeIf(String::isNotBlank), it.optString("created_at"))
                 }
             }
         }
@@ -173,73 +151,46 @@ class SocialRepository(private val auth: AuthRepository) {
     suspend fun sendAudio(conversationId: String, mediaUrl: String): Result<Unit> =
         sendMessage(conversationId, "audio", null, mediaUrl)
 
-    private suspend fun sendMessage(
-        conversationId: String,
-        type: String,
-        body: String?,
-        mediaUrl: String?
-    ): Result<Unit> = withContext(Dispatchers.IO) {
-        runCatching {
-            if (type == "text") require(!body.isNullOrBlank()) { "Escribe un mensaje" }
-            val sender = session().userId
-            val obj = JSONObject()
-                .put("conversation_id", conversationId)
-                .put("sender_id", sender)
-                .put("message_type", type)
-            if (!body.isNullOrBlank()) obj.put("body", body)
-            if (!mediaUrl.isNullOrBlank()) obj.put("media_url", mediaUrl)
-            request("/rest/v1/pokke_messages", "POST", JSONArray().put(obj).toString(), "return=minimal")
-            Unit
-        }
-    }
-
-    suspend fun setConversationNickname(conversationId: String, nickname: String?): Result<Unit> =
+    private suspend fun sendMessage(conversationId: String, type: String, body: String?, mediaUrl: String?): Result<Unit> =
         withContext(Dispatchers.IO) {
             runCatching {
-                val id = URLEncoder.encode(conversationId, "UTF-8")
-                val payload = JSONObject().put(
-                    "nickname",
-                    if (nickname.isNullOrBlank()) JSONObject.NULL else nickname
-                )
-                request(
-                    "/rest/v1/pokke_conversation_members?conversation_id=eq.$id&user_id=eq.${session().userId}",
-                    "PATCH",
-                    payload.toString(),
-                    "return=minimal"
-                )
+                if (type == "text") require(!body.isNullOrBlank()) { "Escribe un mensaje" }
+                val obj = JSONObject()
+                    .put("conversation_id", conversationId)
+                    .put("sender_id", session().userId)
+                    .put("message_type", type)
+                if (!body.isNullOrBlank()) obj.put("body", body)
+                if (!mediaUrl.isNullOrBlank()) obj.put("media_url", mediaUrl)
+                request("/rest/v1/pokke_messages", "POST", JSONArray().put(obj).toString(), "return=minimal")
                 Unit
             }
         }
 
-    // --- Stories ---
     suspend fun activeStories(): Result<List<Story>> = withContext(Dispatchers.IO) {
         runCatching {
             val rows = JSONArray(request("/rest/v1/rpc/pokke_active_stories", "POST", "{}"))
             (0 until rows.length()).map { i ->
                 rows.getJSONObject(i).let {
                     Story(
-                        id = it.optString("id"),
-                        userId = it.optString("user_id"),
-                        username = it.optString("username").takeIf(String::isNotBlank),
-                        displayName = it.optString("display_name").takeIf(String::isNotBlank),
-                        avatarUrl = it.optString("avatar_url").takeIf(String::isNotBlank),
-                        mediaUrl = it.optString("media_url"),
-                        mediaType = it.optString("media_type", "image"),
-                        caption = it.optString("caption").takeIf(String::isNotBlank),
-                        createdAt = it.optString("created_at"),
-                        viewed = it.optBoolean("viewed", false)
+                        it.optString("id"), it.optString("user_id"),
+                        it.optString("username").takeIf(String::isNotBlank),
+                        it.optString("display_name").takeIf(String::isNotBlank),
+                        it.optString("avatar_url").takeIf(String::isNotBlank),
+                        it.optString("media_url"), it.optString("media_type", "image"),
+                        it.optString("caption").takeIf(String::isNotBlank),
+                        it.optString("created_at"), it.optBoolean("viewed", false)
                     )
                 }
             }
         }
     }
 
-    suspend fun publishStory(mediaUrl: String, mediaType: String, caption: String?): Result<Unit> =
+    suspend fun publishStory(mediaPath: String, mediaType: String, caption: String?): Result<Unit> =
         withContext(Dispatchers.IO) {
             runCatching {
                 val obj = JSONObject()
                     .put("user_id", session().userId)
-                    .put("media_path", mediaUrl)
+                    .put("media_path", mediaPath)
                     .put("media_type", mediaType)
                     .put("expires_at", java.time.Instant.now().plusSeconds(24 * 3600).toString())
                 if (!caption.isNullOrBlank()) obj.put("caption", caption)
@@ -250,29 +201,26 @@ class SocialRepository(private val auth: AuthRepository) {
 
     suspend fun markStoryViewed(storyId: String): Result<Unit> = withContext(Dispatchers.IO) {
         runCatching {
-            val obj = JSONObject().put("story_id", storyId).put("viewer_id", session().userId)
-            request("/rest/v1/pokke_story_views", "POST", JSONArray().put(obj).toString(), "return=minimal")
+            request(
+                "/rest/v1/pokke_story_views",
+                "POST",
+                JSONArray().put(JSONObject().put("story_id", storyId).put("viewer_id", session().userId)).toString(),
+                "return=minimal"
+            )
             Unit
         }
     }
 
-    // --- Location ---
     suspend fun updateMyLocation(
-        lat: Double,
-        lng: Double,
-        shareWith: String, // none | selected | all_friends
-        shareMusic: Boolean,
-        shareBattery: Boolean,
-        batteryPct: Int?,
-        currentTrack: String?
+        lat: Double, lng: Double, shareWith: String,
+        shareMusic: Boolean, shareBattery: Boolean, batteryPct: Int?
     ): Result<Unit> = withContext(Dispatchers.IO) {
         runCatching {
-            val sharing = shareWith != "none"
             val obj = JSONObject()
                 .put("user_id", session().userId)
                 .put("latitude", lat)
                 .put("longitude", lng)
-                .put("is_sharing", sharing)
+                .put("is_sharing", shareWith != "none")
                 .put("share_music", shareMusic)
                 .put("share_battery", shareBattery)
                 .put("updated_at", java.time.Instant.now().toString())
@@ -305,16 +253,15 @@ class SocialRepository(private val auth: AuthRepository) {
             (0 until rows.length()).map { i ->
                 rows.getJSONObject(i).let {
                     FriendLocation(
-                        userId = it.optString("user_id"),
-                        username = it.optString("username").takeIf(String::isNotBlank),
-                        displayName = it.optString("display_name").takeIf(String::isNotBlank),
-                        lat = it.optDouble("lat"),
-                        lng = it.optDouble("lng"),
-                        shareMusic = it.optBoolean("share_music", false),
-                        shareBattery = it.optBoolean("share_battery", false),
-                        batteryPct = if (it.has("battery_pct") && !it.isNull("battery_pct")) it.optInt("battery_pct") else null,
-                        currentTrack = it.optString("current_track").takeIf(String::isNotBlank),
-                        updatedAt = it.optString("updated_at")
+                        it.optString("user_id"),
+                        it.optString("username").takeIf(String::isNotBlank),
+                        it.optString("display_name").takeIf(String::isNotBlank),
+                        it.optDouble("lat"), it.optDouble("lng"),
+                        it.optBoolean("share_music", false),
+                        it.optBoolean("share_battery", false),
+                        if (it.has("battery_pct") && !it.isNull("battery_pct")) it.optInt("battery_pct") else null,
+                        it.optString("current_track").takeIf(String::isNotBlank),
+                        it.optString("updated_at")
                     )
                 }
             }
