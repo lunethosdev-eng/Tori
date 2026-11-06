@@ -59,6 +59,8 @@ dependencies {
     implementation("io.github.kyant0:backdrop:2.0.1")
     implementation("io.github.kyant0:shapes:1.2.1")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
+    // MapLibre — free/open map (no Google billing). Style: demotiles / OpenFreeMap
+    implementation("org.maplibre.gl:android-sdk:11.8.0")
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-extended")
     implementation("androidx.navigation:navigation-compose:2.8.3")
