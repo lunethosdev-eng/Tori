@@ -75,6 +75,10 @@ fun ProfileScreen(repository: AuthRepository, onBack: () -> Unit, onSignedOut: (
     var accent by remember { mutableStateOf("violet") }
     var cardStyle by remember { mutableStateOf("glass") }
     var badges by remember { mutableStateOf("Pokke listener,Music lover") }
+    var primaryColor by remember { mutableStateOf("#AAA0FF") }
+    var secondaryColor by remember { mutableStateOf("#1A1C26") }
+    var gradientEnabled by remember { mutableStateOf(true) }
+    var customBg by remember { mutableStateOf("") }
     var isPublic by remember { mutableStateOf(true) }
     var showListening by remember { mutableStateOf(true) }
     var favoriteMangasJson by remember { mutableStateOf("[]") }
@@ -128,6 +132,20 @@ fun ProfileScreen(repository: AuthRepository, onBack: () -> Unit, onSignedOut: (
             uploadingMedia = false
         }
     }
+    val pickCustomBg = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        scope.launch {
+            uploadingMedia = true
+            runCatching {
+                val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+                    ?: error("No se pudo leer la imagen")
+                val mime = context.contentResolver.getType(uri) ?: "image/jpeg"
+                repository.uploadPublicImage("bg", "custom_bg.jpg", bytes, mime).getOrThrow()
+            }.onSuccess { customBg = it; message = "Fondo custom actualizado" }
+                .onFailure { message = it.message ?: "Error al subir fondo" }
+            uploadingMedia = false
+        }
+    }
     val pickCardBanner = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
         if (uri == null) return@rememberLauncherForActivityResult
         scope.launch {
@@ -159,6 +177,10 @@ fun ProfileScreen(repository: AuthRepository, onBack: () -> Unit, onSignedOut: (
             frame = p?.frame ?: "none"; badge = p?.badge ?: "none"; pronouns = p?.pronouns.orEmpty()
             status = p?.statusText.orEmpty(); accent = p?.accentColor ?: "violet"; cardStyle = p?.cardStyle ?: "glass"
             badges = p?.badges ?: "Pokke listener,Music lover"; isPublic = p?.isPublic ?: true
+            primaryColor = p?.primaryColor ?: "#AAA0FF"
+            secondaryColor = p?.secondaryColor ?: "#1A1C26"
+            gradientEnabled = p?.gradientEnabled ?: true
+            customBg = p?.customBgUrl.orEmpty()
             showListening = p?.showListening ?: true
             favoriteMangasJson = p?.favoriteMangas ?: "[]"
             linkLabel = p?.linkLabel.orEmpty(); linkUrl = p?.linkUrl.orEmpty()
@@ -180,7 +202,17 @@ fun ProfileScreen(repository: AuthRepository, onBack: () -> Unit, onSignedOut: (
 
     Column(Modifier.fillMaxSize().background(pageBackground).verticalScroll(rememberScrollState())) {
         Box(Modifier.fillMaxWidth().height(236.dp)) {
-            if (banner.isNotBlank()) AsyncImage(banner, "Banner del perfil", Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+            val bg = customBg.ifBlank { profile?.customBgUrl.orEmpty() }
+            if (bg.isNotBlank()) {
+                AsyncImage(bg, "Fondo custom", Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.45f)))
+            } else if (banner.isNotBlank()) {
+                AsyncImage(banner, "Banner del perfil", Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+            } else if (gradientEnabled) {
+                val pCol = try { Color(android.graphics.Color.parseColor(primaryColor)) } catch (_: Exception) { Color(0xFFAAA0FF) }
+                val sCol = try { Color(android.graphics.Color.parseColor(secondaryColor)) } catch (_: Exception) { Color(0xFF1A1C26) }
+                Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(pCol.copy(alpha=0.55f), sCol, Color.Black))))
+            }
             else Box(Modifier.fillMaxSize().background(Brush.linearGradient(listOf(accentColor.copy(.78f), Color(0xFF20243B), pageBackground))))
             Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color.Black.copy(.10f), Color.Black.copy(.55f)))))
             Row(Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 12.dp, vertical = 8.dp), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -282,6 +314,46 @@ fun ProfileScreen(repository: AuthRepository, onBack: () -> Unit, onSignedOut: (
                         modifier = Modifier.fillMaxWidth(),
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2A2F42), contentColor = ProfileInk)
                     ) { Text("Nameplate del search (galería)") }
+                    Spacer(Modifier.height(8.dp))
+                    Button(
+                        onClick = { pickCustomBg.launch("image/*") },
+                        enabled = !uploadingMedia,
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2A2F42), contentColor = ProfileInk)
+                    ) { Text("Fondo custom del perfil (galería)") }
+                    if (customBg.isNotBlank()) {
+                        Text("Fondo listo · toca Guardar", color = ProfileMuted, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp, bottom = 6.dp))
+                    }
+                    Spacer(Modifier.height(10.dp))
+                    Text("Gradiente del perfil", color = ProfileMuted, fontSize = 12.sp, modifier = Modifier.padding(bottom = 6.dp))
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text("Usar gradiente primary/secondary", color = ProfileInk, fontSize = 13.sp)
+                            Text("Si hay fondo custom, el gradiente se mezcla encima", color = ProfileMuted, fontSize = 11.sp)
+                        }
+                        Switch(gradientEnabled, { gradientEnabled = it })
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    Text("Primary", color = ProfileMuted, fontSize = 11.sp)
+                    Row(Modifier.fillMaxWidth().padding(bottom = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        listOf("#AAA0FF","#8CB7FF","#FF9FCB","#8FE0B0","#E5C17A","#FFFFFF").forEach { hex ->
+                            val c = try { Color(android.graphics.Color.parseColor(hex)) } catch (_: Exception) { Color.Gray }
+                            Box(
+                                Modifier.size(36.dp).clip(CircleShape).background(c)
+                                    .clickable { primaryColor = hex }
+                            )
+                        }
+                    }
+                    Text("Secondary", color = ProfileMuted, fontSize = 11.sp)
+                    Row(Modifier.fillMaxWidth().padding(bottom = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        listOf("#1A1C26","#0B0B10","#1E1030","#102018","#2A1A10","#12141C").forEach { hex ->
+                            val c = try { Color(android.graphics.Color.parseColor(hex)) } catch (_: Exception) { Color.Gray }
+                            Box(
+                                Modifier.size(36.dp).clip(CircleShape).background(c)
+                                    .clickable { secondaryColor = hex }
+                            )
+                        }
+                    }
                     Spacer(Modifier.height(10.dp))
                     ProfileField("Texto del enlace", linkLabel) { linkLabel = it }
                     ProfileField("URL del enlace", linkUrl) { linkUrl = it }
@@ -316,7 +388,11 @@ fun ProfileScreen(repository: AuthRepository, onBack: () -> Unit, onSignedOut: (
                         scope.launch {
                             repository.updateProfile(
                                 displayName, username, bio, avatar, banner, theme, frame, badge, pronouns, status,
-                                accent, cardStyle, badges, isPublic, linkLabel, linkUrl, showListening, null, favoriteMangasJson
+                                accent, cardStyle, badges, isPublic, linkLabel, linkUrl, showListening, null, favoriteMangasJson,
+                                primaryColor = primaryColor,
+                                secondaryColor = secondaryColor,
+                                gradientEnabled = gradientEnabled,
+                                customBgUrl = customBg
                             )
                                 .onSuccess { profile = it; message = "Cambios guardados correctamente" }
                                 .onFailure { message = it.localizedMessage ?: "No se pudo guardar el perfil" }
