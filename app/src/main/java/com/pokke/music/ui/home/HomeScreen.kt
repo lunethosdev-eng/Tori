@@ -28,6 +28,7 @@ import coil.compose.AsyncImage
 import com.pokke.music.data.model.Song
 import com.pokke.music.data.repository.AuthRepository
 import com.pokke.music.data.repository.MusicRepository
+import com.pokke.music.data.repository.MultiMusicRepository
 
 @Composable
 fun HomeScreen(
@@ -40,11 +41,18 @@ fun HomeScreen(
 ) {
     val listState = rememberLazyListState()
     val repo = remember { MusicRepository() }
+    val multiRepo = remember { MultiMusicRepository() }
     var songs by remember { mutableStateOf<List<Song>>(emptyList()) }
     var avatarUrl by remember { mutableStateOf<String?>(null) }
     val isScrolled by remember { derivedStateOf { listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 48 } }
     LaunchedEffect(isScrolled) { onScrollStateChanged(isScrolled) }
-    LaunchedEffect(Unit) { repo.getRecentSongs(40).onSuccess { songs = it } }
+    LaunchedEffect(Unit) {
+        // Merge Ukiyo + Pokke Server 2 (and any other healthy sources)
+        multiRepo.getRecentAll(40).onSuccess { songs = it }
+            .onFailure {
+                repo.getRecentSongs(40).onSuccess { songs = it }
+            }
+    }
     LaunchedEffect(authRepository) { authRepository?.getProfile()?.onSuccess { avatarUrl = it?.avatarUrl } }
 
     LazyColumn(
