@@ -6,12 +6,12 @@ plugins {
 
 android {
     namespace = "com.pokke.music"
-    compileSdk = 37
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "com.pokke.music"
         minSdk = 26
-        targetSdk = 36
+        targetSdk = 35
         versionCode = 1
         versionName = "1.0.0"
 
