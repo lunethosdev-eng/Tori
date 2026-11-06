@@ -112,6 +112,12 @@ class DampedDragAnimation(
         }
     }
 
+    /** Updates the drag target directly so consecutive pointer deltas accumulate. */
+    fun dragToValue(value: Float) {
+        val target = value.coerceIn(valueRange)
+        animationScope.launch { valueAnimation.snapTo(target) }
+    }
+
     fun animateToValue(value: Float) {
         animationScope.launch {
             mutatorMutex.mutate {
