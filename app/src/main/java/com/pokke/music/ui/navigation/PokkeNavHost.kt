@@ -50,6 +50,7 @@ import com.pokke.music.ui.search.SearchScreen
 import com.pokke.music.ui.settings.SettingsScreen
 import com.pokke.music.ui.admin.AdminPanelScreen
 import com.pokke.music.ui.social.ChatScreen
+import com.pokke.music.ui.social.StoryPublisherScreen
 import com.pokke.music.ui.social.FriendsMapScreen
 import com.pokke.music.data.remote.UpdateChecker
 import androidx.compose.material3.AlertDialog
@@ -69,6 +70,7 @@ sealed class Screen(val route: String) {
     data object Library : Screen("library")
     data object Search : Screen("search")
     data object Chats : Screen("chats")
+    data object StoryPublish : Screen("story_publish")
     data object Maps : Screen("maps")
     data object Player : Screen("player")
     data object Queue : Screen("queue")
@@ -169,17 +171,20 @@ fun PokkeNavHost() {
                     onSongClick = { PlayerController.init(context); PlayerController.playSong(it); nav.navigate(Screen.Player.route) })
             }
             composable(Screen.Chats.route) {
-                if (chatsEnabled) ChatScreen(authRepository = auth)
+                if (chatsEnabled) ChatScreen(
+                    authRepository = auth,
+                    onOpenStoryPublisher = { nav.navigate(Screen.StoryPublish.route) },
+                    onOpenMaps = { nav.navigate(Screen.Maps.route) }
+                )
                 else SettingsScreen(onBack = { nav.popBackStack() }, authRepository = auth)
             }
-            
-            composable(Screen.Maps.route) {
-                if (mapsEnabled) FriendsMapScreen(authRepository = auth, onBack = { nav.popBackStack() })
-                else {
-                    androidx.compose.material3.Text("Activa Mapas en Ajustes → Funciones experimentales", color = androidx.compose.ui.graphics.Color.White)
-                }
+            composable(Screen.StoryPublish.route) {
+                StoryPublisherScreen(authRepository = auth, onBack = { nav.popBackStack() }, onPublished = { nav.popBackStack() })
             }
-
+            composable(Screen.Maps.route) {
+                val mapsOn = mapsEnabled
+                if (mapsOn) FriendsMapScreen(authRepository = auth, onBack = { nav.popBackStack() })
+            }
             composable(Screen.Settings.route) {
                 SettingsScreen(
                     onBack = { nav.popBackStack() },
