@@ -50,6 +50,7 @@ import com.pokke.music.ui.search.SearchScreen
 import com.pokke.music.ui.settings.SettingsScreen
 import com.pokke.music.ui.admin.AdminPanelScreen
 import com.pokke.music.ui.social.ChatScreen
+import com.pokke.music.ui.social.FriendsMapScreen
 import com.pokke.music.data.remote.UpdateChecker
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.TextButton
@@ -68,6 +69,7 @@ sealed class Screen(val route: String) {
     data object Library : Screen("library")
     data object Search : Screen("search")
     data object Chats : Screen("chats")
+    data object Maps : Screen("maps")
     data object Player : Screen("player")
     data object Queue : Screen("queue")
     data object Lyrics : Screen("lyrics")
@@ -119,6 +121,7 @@ fun PokkeNavHost() {
     LaunchedEffect(auth) { auth.restoreSession() }
     val glass by prefs.liquidGlassEnabled.collectAsState(false)
     val chatsEnabled by prefs.experimentalChatsEnabled.collectAsState(false)
+    val mapsEnabled by prefs.experimentalMapsEnabled.collectAsState(false)
     val backStack by nav.currentBackStackEntryAsState()
     val route = backStack?.destination?.route
     val showNav = route in listOf(Screen.Home.route, Screen.Search.route, Screen.Library.route, Screen.Chats.route)
@@ -169,6 +172,14 @@ fun PokkeNavHost() {
                 if (chatsEnabled) ChatScreen(authRepository = auth)
                 else SettingsScreen(onBack = { nav.popBackStack() }, authRepository = auth)
             }
+            
+            composable(Screen.Maps.route) {
+                if (mapsEnabled) FriendsMapScreen(authRepository = auth, onBack = { nav.popBackStack() })
+                else {
+                    androidx.compose.material3.Text("Activa Mapas en Ajustes → Funciones experimentales", color = androidx.compose.ui.graphics.Color.White)
+                }
+            }
+
             composable(Screen.Settings.route) {
                 SettingsScreen(
                     onBack = { nav.popBackStack() },
