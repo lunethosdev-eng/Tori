@@ -52,7 +52,8 @@ fun LiquidSlider(
     valueRange: ClosedFloatingPointRange<Float>,
     visibilityThreshold: Float,
     backdrop: Backdrop,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    performanceMode: Boolean = false
 ) {
     val isLightTheme = !isSystemInDarkTheme()
     val accentColor =
@@ -81,7 +82,7 @@ fun LiquidSlider(
                 visibilityThreshold = visibilityThreshold,
                 initialScale = 1f,
                 pressedScale = 1.5f,
-                onDragStarted = {},
+                onDragStarted = { didDrag = false },
                 onDragStopped = {
                     if (didDrag) {
                         onValueChange(targetValue)
@@ -92,10 +93,10 @@ fun LiquidSlider(
                         didDrag = dragAmount.x != 0f
                     }
                     val delta = (valueRange.endInclusive - valueRange.start) * (dragAmount.x / trackWidth)
-                    onValueChange(
-                        if (isLtr) (targetValue + delta).coerceIn(valueRange)
-                        else (targetValue - delta).coerceIn(valueRange)
-                    )
+                    val next = if (isLtr) (targetValue + delta).coerceIn(valueRange)
+                    else (targetValue - delta).coerceIn(valueRange)
+                    dragToValue(next)
+                    onValueChange(next)
                 }
             )
         }
@@ -166,11 +167,11 @@ fun LiquidSlider(
                     shape = { Capsule() },
                     effects = {
                         val progress = dampedDragAnimation.pressProgress
-                        blur(8f.dp.toPx() * (1f - progress))
+                        blur((if (performanceMode) 4f else 8f).dp.toPx() * (1f - progress))
                         lens(
-                            10f.dp.toPx() * progress,
-                            14f.dp.toPx() * progress,
-                            chromaticAberration = true
+                            (if (performanceMode) 5f else 10f).dp.toPx() * progress,
+                            (if (performanceMode) 7f else 14f).dp.toPx() * progress,
+                            chromaticAberration = !performanceMode
                         )
                     },
                     highlight = {
