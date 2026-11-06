@@ -43,6 +43,9 @@ fun SettingsScreen(
     val performance by prefs.liquidPerformanceMode.collectAsState(initial = true)
     val chatsEnabled by prefs.experimentalChatsEnabled.collectAsState(initial = false)
     val mapsEnabled by prefs.experimentalMapsEnabled.collectAsState(initial = false)
+    val storiesEnabled by prefs.experimentalStoriesEnabled.collectAsState(initial = false)
+    val playerCustomEnabled by prefs.experimentalPlayerCustomEnabled.collectAsState(initial = false)
+    val profileDecorEnabled by prefs.experimentalProfileDecorEnabled.collectAsState(initial = false)
 
     val session by (authRepository?.session ?: kotlinx.coroutines.flow.MutableStateFlow(null)).collectAsState()
     val isOwner = session?.email?.equals(OWNER_EMAIL, ignoreCase = true) == true
@@ -190,6 +193,32 @@ fun SettingsScreen(
         )
         if (!chatsEnabled && mapsEnabled) {
             Text("Activa Chats antes de habilitar Mapas.", color = Color(0xFFE5C17A), fontSize = 12.sp, modifier = Modifier.padding(horizontal = 22.dp))
+
+        LiquidOrMaterialToggle(
+            title = "Historias · Alfa 1.0",
+            subtitle = "Fotos y vídeos ≤60s con expiración 24h. Visible arriba de Chats.",
+            checked = storiesEnabled,
+            glass = glassForThisScreen,
+            backdrop = settingsBackdrop,
+            onChange = { scope.launch { prefs.setExperimentalStories(it) } }
+        )
+        LiquidOrMaterialToggle(
+            title = "Personalización avanzada del reproductor",
+            subtitle = "Temas Sakura, layout de portada y efectos del player.",
+            checked = playerCustomEnabled,
+            glass = glassForThisScreen,
+            backdrop = settingsBackdrop,
+            onChange = { scope.launch { prefs.setExperimentalPlayerCustom(it) } }
+        )
+        LiquidOrMaterialToggle(
+            title = "Decoraciones del perfil",
+            subtitle = "GIFs Giphy, stickers y capas arrastrables.",
+            checked = profileDecorEnabled,
+            glass = glassForThisScreen,
+            backdrop = settingsBackdrop,
+            onChange = { scope.launch { prefs.setExperimentalProfileDecor(it) } }
+        )
+
         }
 
         if (isOwner && onOpenAdmin != null) {
