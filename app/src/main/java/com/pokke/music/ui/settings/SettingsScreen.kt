@@ -124,6 +124,7 @@ fun SettingsScreen(
                     value = { crossfade },
                     onValueChange = { v -> scope.launch { prefs.setCrossfadeSeconds(v) } },
                     valueRange = 0f..12f,
+                    visibilityThreshold = 0.001f,
                     backdrop = settingsBackdrop,
                     modifier = Modifier.fillMaxWidth()
                 )
