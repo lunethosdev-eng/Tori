@@ -198,7 +198,7 @@ class AuthRepository(context: Context) {
                 if (favoriteMangas != null) put("favorite_mangas", favoriteMangas)
             }
             val rows = JSONArray(request(KokoroConfig.PROFILES, "POST", s, params = mapOf("on_conflict" to "id"), body = body.toString(), prefer = "resolution=merge-duplicates,return=representation"))
-            if (rows.length() == 0) throw IOException("Kokoro no devolvió el perfil actualizado")
+            if (rows.length() == 0) throw IOException("Pokke Users no devolvió el perfil actualizado")
             parseProfile(rows.getJSONObject(0))
         }
     }
@@ -495,7 +495,7 @@ class AuthRepository(context: Context) {
                     val e = JSONObject(response)
                     e.optString("msg").ifBlank { e.optString("message") }.ifBlank { e.optString("error_description") }.ifBlank { e.optString("error") }
                 }.getOrNull().orEmpty()
-                throw IOException("Kokoro respondió HTTP $status${detail.takeIf(String::isNotBlank)?.let { ": $it" } ?: ""}")
+                throw IOException("Pokke Users respondió HTTP $status${detail.takeIf(String::isNotBlank)?.let { ": $it" } ?: ""}")
             }
             return response
         } finally { connection.disconnect() }
