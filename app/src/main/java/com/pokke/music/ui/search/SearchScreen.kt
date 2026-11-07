@@ -1,5 +1,12 @@
 package com.pokke.music.ui.search
 
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -153,19 +160,13 @@ fun SearchScreen(
                 }
             }
         } else {
-            SearchField(query = query, onQueryChange = { query = it })
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                SearchKind.entries.forEach { item ->
-                    FilterChip(
-                        selected = kind == item,
-                        onClick = { kind = item },
-                        label = { Text(item.label) }
-                    )
-                }
-            }
+            CompactSearchBar(
+                query = query,
+                onQueryChange = { query = it },
+                expanded = searchExpanded,
+                onExpandedChange = { searchExpanded = it },
+                focusRequester = focusRequester
+            )
         }
 
         when {
@@ -395,3 +396,64 @@ private fun EmptyMessage(message: String) {
 }
 
 private fun formatDuration(seconds: Int): String = "%d:%02d".format(seconds / 60, seconds % 60)
+
+
+@Composable
+private fun CompactSearchBar(
+    query: String,
+    onQueryChange: (String) -> Unit,
+    expanded: Boolean,
+    onExpandedChange: (Boolean) -> Unit,
+    focusRequester: FocusRequester
+) {
+    val height by animateDpAsState(if (expanded || query.isNotEmpty()) 52.dp else 44.dp, tween(220), label = "searchH")
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 10.dp)
+            .height(height)
+            .clip(RoundedCornerShape(24.dp))
+            .background(Color(0xFF1C1C1E))
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null
+            ) {
+                onExpandedChange(true)
+                focusRequester.requestFocus()
+            }
+            .padding(horizontal = 14.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(Icons.Default.Search, null, tint = Color.White.copy(.55f), modifier = Modifier.size(20.dp))
+        Spacer(Modifier.width(10.dp))
+        BasicTextField(
+            value = query,
+            onValueChange = {
+                onQueryChange(it)
+                if (!expanded) onExpandedChange(true)
+            },
+            singleLine = true,
+            textStyle = TextStyle(color = Color.White, fontSize = 16.sp),
+            cursorBrush = SolidColor(Color.White),
+            modifier = Modifier
+                .weight(1f)
+                .focusRequester(focusRequester)
+                .onFocusChanged { if (it.isFocused) onExpandedChange(true) },
+            decorationBox = { inner ->
+                if (query.isEmpty()) {
+                    Text(
+                        if (expanded) "Canciones, artistas, usuarios…" else "Buscar",
+                        color = Color.White.copy(.4f),
+                        fontSize = 15.sp
+                    )
+                }
+                inner()
+            }
+        )
+        if (query.isNotEmpty()) {
+            IconButton(onClick = { onQueryChange("") }, modifier = Modifier.size(32.dp)) {
+                Icon(Icons.Default.Clear, null, tint = Color.White.copy(.6f), modifier = Modifier.size(18.dp))
+            }
+        }
+    }
+}
