@@ -107,16 +107,21 @@ fun ListeningCard(
     muted: Color,
     live: Boolean = true,
     fallbackSong: Song? = null,
+    fallbackPositionMs: Long = 0L,
+    fallbackDurationMs: Long = 0L,
     showLyrics: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     val current by PlayerController.currentSong.collectAsState()
     val playing by PlayerController.isPlaying.collectAsState()
-    val position by PlayerController.positionMs.collectAsState()
-    val duration by PlayerController.durationMs.collectAsState()
+    val livePosition by PlayerController.positionMs.collectAsState()
+    val liveDuration by PlayerController.durationMs.collectAsState()
 
     val song = if (live) current else fallbackSong
     if (song == null) return
+
+    val position = if (live) livePosition else fallbackPositionMs
+    val duration = if (live) liveDuration else fallbackDurationMs.coerceAtLeast(1L)
 
     val progress = if (duration > 0) (position.toFloat() / duration).coerceIn(0f, 1f) else 0f
     val lyric = remember(song.id, position, showLyrics) {
