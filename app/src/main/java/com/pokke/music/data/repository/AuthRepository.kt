@@ -203,6 +203,48 @@ class AuthRepository(context: Context) {
         }
     }
 
+
+    data class FollowStats(val followers: Int, val following: Int, val isFollowing: Boolean)
+
+    /** Read follow counts and whether the signed-in user follows this profile. */
+    suspend fun getFollowStats(profileId: String): Result<FollowStats> = withContext(Dispatchers.IO) {
+        runCatching {
+            val me = session.value
+            val followers = JSONArray(http(
+                "/rest/v1/pokke_user_follows", "GET",
+                params = mapOf("following_id" to "eq.$profileId", "select" to "follower_id", "limit" to "1000"),
+                authToken = me?.accessToken
+            )).length()
+            val following = JSONArray(http(
+                "/rest/v1/pokke_user_follows", "GET",
+                params = mapOf("follower_id" to "eq.$profileId", "select" to "following_id", "limit" to "1000"),
+                authToken = me?.accessToken
+            )).length()
+            val isFollowing = if (me == null || me.userId == profileId) false else {
+                JSONArray(request("/rest/v1/pokke_user_follows", "GET", me, params = mapOf(
+                    "follower_id" to "eq.${me.userId}", "following_id" to "eq.$profileId", "select" to "follower_id", "limit" to "1"
+                ))).length() > 0
+            }
+            FollowStats(followers, following, isFollowing)
+        }
+    }
+
+    suspend fun setFollowing(profileId: String, follow: Boolean): Result<Unit> = withContext(Dispatchers.IO) {
+        runCatching {
+            val me = requireSession()
+            require(me.userId != profileId) { "No puedes seguirte a ti mismo" }
+            if (follow) {
+                val payload = JSONArray().put(JSONObject().put("follower_id", me.userId).put("following_id", profileId))
+                request("/rest/v1/pokke_user_follows", "POST", me, body = payload.toString(), prefer = "resolution=ignore-duplicates,return=minimal")
+            } else {
+                request("/rest/v1/pokke_user_follows", "DELETE", me, params = mapOf(
+                    "follower_id" to "eq.${me.userId}", "following_id" to "eq.$profileId"
+                ), prefer = "return=minimal")
+            }
+            Unit
+        }
+    }
+
     /** Public lookup by username (only returns is_public = true profiles unless it's your own). */
     
     data class ListeningPresence(
