@@ -1,6 +1,8 @@
 package com.pokke.music.ui.navigation
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
@@ -52,6 +54,7 @@ import com.pokke.music.ui.settings.SettingsScreen
 import com.pokke.music.ui.admin.AdminPanelScreen
 import com.pokke.music.ui.social.ChatScreen
 import com.pokke.music.ui.player.MiniPlayerBar
+import com.pokke.music.ui.player.LocalPlayerSharedTransitionScope
 import com.pokke.music.ui.social.StoryPublisherScreen
 import com.pokke.music.ui.social.FriendsMapScreen
 import com.pokke.music.ui.liquid.LocalAppBackdrop
@@ -95,6 +98,7 @@ private val baseNavItems = listOf(
     NavItem(Screen.Search, Icons.Filled.Search, Icons.Outlined.Search)
 )
 
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 fun PokkeNavHost() {
     val nav = rememberNavController()
@@ -142,7 +146,9 @@ fun PokkeNavHost() {
     LaunchedEffect(route) { auth.getProfile().onSuccess { avatar = it?.avatarUrl } }
 
     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-        NavHost(navController = nav, startDestination = Screen.Home.route, modifier = Modifier.fillMaxSize()) {
+        SharedTransitionLayout {
+            CompositionLocalProvider(LocalPlayerSharedTransitionScope provides this) {
+                NavHost(navController = nav, startDestination = Screen.Home.route, modifier = Modifier.fillMaxSize()) {
             composable(Screen.Auth.route) {
                 LoginScreen(repository = auth, onContinueAsGuest = { nav.popBackStack() }, onLoginSuccess = { nav.popBackStack() })
             }
@@ -202,11 +208,19 @@ fun PokkeNavHost() {
                 AdminPanelScreen(repository = auth, onBack = { nav.popBackStack() })
             }
             composable(Screen.Player.route) {
-                FullPlayerScreen(onBack = { nav.popBackStack() }, onOpenQueue = { nav.navigate(Screen.Queue.route) },
-                    onOpenLyrics = { nav.navigate(Screen.Lyrics.route) }, authRepository = auth, onRequireLogin = { nav.navigate(Screen.Auth.route) })
+                FullPlayerScreen(
+                    onBack = { nav.popBackStack() },
+                    onOpenQueue = { nav.navigate(Screen.Queue.route) },
+                    onOpenLyrics = { nav.navigate(Screen.Lyrics.route) },
+                    authRepository = auth,
+                    onRequireLogin = { nav.navigate(Screen.Auth.route) },
+                    animatedVisibilityScope = this
+                )
             }
             composable(Screen.Queue.route) { QueueScreen(onBack = { nav.popBackStack() }) }
             composable(Screen.Lyrics.route) { LyricsScreen(onBack = { nav.popBackStack() }) }
+                }
+            }
         }
 
         val currentSong by PlayerController.currentSong.collectAsState()
