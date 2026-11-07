@@ -5,7 +5,8 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.
+*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -68,7 +69,7 @@ fun LyricsScreen(onBack: () -> Unit) {
     }
     LaunchedEffect(active, lines.size) { if (lines.isNotEmpty() && active in lines.indices) listState.animateScrollToItem((active - 2).coerceAtLeast(0)) }
 
-    Box(Modifier.fillMaxSize().background(Color(0xFF160F0C))) {
+    Box(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().background(Color(0xFF160F0C))) {
         AsyncImage(song?.displayCoverUrl, null, Modifier.fillMaxSize().blur(65.dp).graphicsLayer { alpha = .43f }, contentScale = ContentScale.Crop)
         Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color(0x6620100A), Color(0xE6090808), Color(0xF5090808)))))
         Column(Modifier.fillMaxSize().statusBarsPadding()) {
