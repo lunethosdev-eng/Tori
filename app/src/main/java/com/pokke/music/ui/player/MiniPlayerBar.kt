@@ -1,6 +1,7 @@
 package com.pokke.music.ui.player
 
 import androidx.compose.animation.*
+import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
@@ -43,6 +44,7 @@ import com.kyant.backdrop.effects.vibrancy
  * glass=true → liquid glass look; glass=false → Material Expressive solid.
  * compact=true shrinks on scroll.
  */
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 fun MiniPlayerBar(
     visible: Boolean,
