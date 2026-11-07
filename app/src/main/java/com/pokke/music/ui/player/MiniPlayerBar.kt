@@ -15,9 +15,8 @@ import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialThemeButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -53,6 +52,8 @@ fun MiniPlayerBar(
     modifier: Modifier = Modifier
 ) {
     val backdrop = LocalAppBackdrop.current
+    val surfaceColor = MaterialTheme.colorScheme.surface
+    val sharedTransitionScope = LocalPlayerSharedTransitionScope.current
     val song by PlayerController.currentSong.collectAsState()
     val playing by PlayerController.isPlaying.collectAsState()
     val position by PlayerController.positionMs.collectAsState()
@@ -67,6 +68,14 @@ fun MiniPlayerBar(
         modifier = modifier
     ) {
         val s = song ?: return@AnimatedVisibility
+        val sharedCoverModifier = if (sharedTransitionScope != null) {
+            with(sharedTransitionScope) {
+                Modifier.sharedElement(
+                    rememberSharedContentState(key = "player-cover-${s.id}"),
+                    animatedVisibilityScope = this@AnimatedVisibility
+                )
+            }
+        } else Modifier
         Box(
             Modifier
                 .fillMaxWidth()
@@ -78,7 +87,7 @@ fun MiniPlayerBar(
                         backdrop = backdrop,
                         shape = { RoundedCornerShape(28.dp) },
                         effects = { vibrancy(); blur(20f.dp.toPx()); lens(18f.dp.toPx(), 26f.dp.toPx()) },
-                        onDrawSurface = { drawRect(MaterialTheme.colorScheme.surface.copy(alpha = 0.76f)) }
+                        onDrawSurface = { drawRect(surfaceColor.copy(alpha = 0.76f)) }
                     ).border(0.7.dp, Color.White.copy(0.24f), RoundedCornerShape(28.dp))
                     else Modifier.background(MaterialTheme.colorScheme.surface)
                 )
@@ -89,6 +98,7 @@ fun MiniPlayerBar(
                 AsyncImage(
                     s.displayCoverUrl ?: s.coverUrl, null,
                     Modifier
+                        .then(sharedCoverModifier)
                         .size(coverSize.dp)
                         .clip(RoundedCornerShape(10.dp))
                         .background(Color(0xFF2A2A30)),
