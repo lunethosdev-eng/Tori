@@ -5,6 +5,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -53,9 +54,16 @@ import com.pokke.music.ui.social.ChatScreen
 import com.pokke.music.ui.player.MiniPlayerBar
 import com.pokke.music.ui.social.StoryPublisherScreen
 import com.pokke.music.ui.social.FriendsMapScreen
+import com.pokke.music.ui.liquid.LocalAppBackdrop
+import com.kyant.backdrop.drawBackdrop
+import com.kyant.backdrop.effects.blur
+import com.kyant.backdrop.effects.lens
+import com.kyant.backdrop.effects.vibrancy
+import com.kyant.shapes.Capsule
 import com.pokke.music.data.remote.UpdateChecker
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import android.content.Intent
 import android.net.Uri
@@ -123,6 +131,7 @@ fun PokkeNavHost() {
 
     LaunchedEffect(auth) { auth.restoreSession() }
     val glass by prefs.liquidGlassEnabled.collectAsState(false)
+    val appBackdrop = LocalAppBackdrop.current
     val chatsEnabled by prefs.experimentalChatsEnabled.collectAsState(false)
     val backStack by nav.currentBackStackEntryAsState()
     val route = backStack?.destination?.route
@@ -132,7 +141,7 @@ fun PokkeNavHost() {
     var avatar by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(route) { auth.getProfile().onSuccess { avatar = it?.avatarUrl } }
 
-    Box(Modifier.fillMaxSize().background(Color(0xFF080808))) {
+    Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         NavHost(navController = nav, startDestination = Screen.Home.route, modifier = Modifier.fillMaxSize()) {
             composable(Screen.Auth.route) {
                 LoginScreen(repository = auth, onContinueAsGuest = { nav.popBackStack() }, onLoginSuccess = { nav.popBackStack() })
@@ -213,23 +222,29 @@ fun PokkeNavHost() {
                 .navigationBarsPadding()
         )
 
-        AnimatedVisibility(visible = showNav, modifier = Modifier.align(Alignment.BottomCenter), enter = fadeIn() + slideInVertically { it / 2 }, exit = fadeOut() + slideOutVertically { it / 2 }) {
+        AnimatedVisibility(visible = showNav, modifier = Modifier.align(Alignment.BottomCenter), enter = fadeIn(androidx.compose.animation.core.tween(150)) + slideInVertically(androidx.compose.animation.core.tween(180)) { it / 3 }, exit = fadeOut(androidx.compose.animation.core.tween(110)) + slideOutVertically(androidx.compose.animation.core.tween(140)) { it / 3 }) {
             // Liquid Glass bottom bar (Kyant-inspired surface when toggle ON)
             Row(
-                modifier = Modifier.padding(bottom = 10.dp).navigationBarsPadding().clip(RoundedCornerShape(40.dp))
-                    .background(if (glass) Color(0x40FFFFFF) else Color(0xF01A1A1D))
-                    .padding(horizontal = 9.dp, vertical = 8.dp),
+                modifier = Modifier.padding(bottom = 10.dp).navigationBarsPadding()
+                    .animateContentSize(androidx.compose.animation.core.tween(190))
+                    .then(if (glass && appBackdrop != null) Modifier.drawBackdrop(
+                        backdrop = appBackdrop,
+                        shape = { Capsule() },
+                        effects = { vibrancy(); blur(24f.dp.toPx()); lens(22f.dp.toPx(), 28f.dp.toPx()) },
+                        onDrawSurface = { drawRect(Color(0x7F292930)) }
+                    ) else Modifier.clip(RoundedCornerShape(40.dp)).background(Color(0xFF19191E)))
+                    .padding(horizontal = if (navCompact) 6.dp else 9.dp, vertical = if (navCompact) 5.dp else 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(7.dp)
             ) {
-                navItems.forEach { item ->
+                (if (navCompact) baseNavItems else navItems).forEach { item ->
                     val selected = route == item.screen.route
-                    Box(Modifier.size(50.dp).clip(CircleShape).background(if (selected) Color.White.copy(if (glass) .20f else .12f) else Color.Transparent)
+                    Box(Modifier.size(if (navCompact) 44.dp else 50.dp).clip(CircleShape).background(if (selected) Color.White.copy(if (glass) .20f else .12f) else Color.Transparent)
                         .clickable { nav.navigate(item.screen.route) { popUpTo(nav.graph.findStartDestination().id) { saveState = true }; launchSingleTop = true; restoreState = true } }, contentAlignment = Alignment.Center) {
                         Icon(if (selected) item.selected else item.normal, item.screen.route, tint = if (selected) Color.White else Color(0xFF929297), modifier = Modifier.size(24.dp))
                     }
                 }
-                Box(Modifier.size(50.dp).clip(CircleShape).background(Color(0xFF29292E)).clickable { nav.navigate(if (auth.session.value == null) Screen.Auth.route else Screen.Profile.route) }, contentAlignment = Alignment.Center) {
+                if (!navCompact) Box(Modifier.size(if (navCompact) 44.dp else 50.dp).clip(CircleShape).background(Color(0xFF29292E)).clickable { nav.navigate(if (auth.session.value == null) Screen.Auth.route else Screen.Profile.route) }, contentAlignment = Alignment.Center) {
                     if (!avatar.isNullOrBlank()) AsyncImage(avatar, "Perfil", Modifier.fillMaxSize().clip(CircleShape))
                     else Icon(Icons.Default.Person, "Perfil", tint = Color.White, modifier = Modifier.size(23.dp))
                 }
