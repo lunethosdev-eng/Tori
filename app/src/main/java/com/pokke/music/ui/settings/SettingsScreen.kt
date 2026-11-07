@@ -1,3 +1,4 @@
+import com.pokke.music.player.PlayerController
 package com.pokke.music.ui.settings
 
 import androidx.compose.foundation.background
@@ -169,7 +170,7 @@ fun SettingsScreen(
             subtitle = "Intenta encadenar pistas sin silencio.",
             checked = gapless,
             glass = false,
-            onChange = { scope.launch { prefs.setGaplessPlayback(it) } }
+            onChange = { scope.launch { prefs.setGaplessPlayback(it); PlayerController.setGapless(it) } }
         )
 
         Section("FUNCIONES EXPERIMENTALES")
