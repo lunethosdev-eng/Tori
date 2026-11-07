@@ -50,6 +50,8 @@ object PlayerController {
     private val _currentIndex = MutableStateFlow(0)
     val currentIndex: StateFlow<Int> = _currentIndex.asStateFlow()
     private val _playbackError = MutableStateFlow<String?>(null)
+    private val _gaplessEnabled = MutableStateFlow(true)
+    val gaplessEnabled: StateFlow<Boolean> = _gaplessEnabled.asStateFlow()
     val playbackError: StateFlow<String?> = _playbackError.asStateFlow()
 
     private val listener = object : Player.Listener {
@@ -238,6 +240,11 @@ object PlayerController {
     fun seekToFraction(fraction: Float) {
         val duration = _durationMs.value
         if (duration > 0L) seekTo((fraction.coerceIn(0f, 1f) * duration).toLong())
+    }
+
+    fun setGapless(enabled: Boolean) {
+        _gaplessEnabled.value = enabled
+        // Media3 gapless is handled by consecutive MediaItems without pause when enabled
     }
 
     fun setVolume(volume: Float) {
