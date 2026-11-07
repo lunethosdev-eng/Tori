@@ -63,6 +63,8 @@ fun HomeScreen(
     val prefs = remember { UserPreferences(ctx) }
     val glass by prefs.liquidGlassEnabled.collectAsState(false)
     val backdrop = LocalAppBackdrop.current
+    val headerSurfaceColor = MaterialTheme.colorScheme.surface
+    val headerOutlineColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.22f)
 
     val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
     val greetingBase = when {
@@ -115,9 +117,9 @@ fun HomeScreen(
                                     backdrop = backdrop,
                                     shape = { RoundedCornerShape(22.dp) },
                                     effects = { vibrancy(); blur(22f.dp.toPx()); lens(18f.dp.toPx(), 24f.dp.toPx()) },
-                                    onDrawSurface = { drawRect(MaterialTheme.colorScheme.surface.copy(alpha = 0.78f)) }
+                                    onDrawSurface = { drawRect(headerSurfaceColor.copy(alpha = 0.78f)) }
                                 )
-                                .border(0.7.dp, MaterialTheme.colorScheme.onSurface.copy(0.22f), RoundedCornerShape(22.dp))
+                                .border(0.7.dp, headerOutlineColor, RoundedCornerShape(22.dp))
                             else Modifier
                                 .clip(RoundedCornerShape(22.dp))
                                 .background(MaterialTheme.colorScheme.surface)
