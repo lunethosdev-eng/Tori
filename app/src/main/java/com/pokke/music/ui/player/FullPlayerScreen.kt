@@ -58,7 +58,6 @@ import com.pokke.music.ui.sheets.AudioOutputSheet
 import com.pokke.music.ui.sheets.OverflowMenuSheet
 import com.pokke.music.ui.liquid.LiquidSlider
 import com.kyant.backdrop.backdrops.rememberLayerBackdrop
-import androidx.compose.animation.sharedElement
 import com.pokke.music.ui.player.LocalPlayerSharedTransitionScope
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class)
