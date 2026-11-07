@@ -67,6 +67,7 @@ dependencies {
     implementation("androidx.compose.foundation:foundation")
     // Image loading
     implementation("io.coil-kt:coil-compose:2.7.0")
+    implementation("io.coil-kt:coil-gif:2.7.0")
 
     // Palette for dynamic color extraction from album art
     implementation("androidx.palette:palette-ktx:1.0.0")
