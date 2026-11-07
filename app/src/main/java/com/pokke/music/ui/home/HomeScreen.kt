@@ -18,6 +18,7 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -38,6 +39,11 @@ import com.pokke.music.player.PlayerController
 import androidx.compose.ui.platform.LocalContext
 import java.util.Calendar
 import kotlinx.coroutines.delay
+import com.pokke.music.ui.liquid.LocalAppBackdrop
+import com.kyant.backdrop.drawBackdrop
+import com.kyant.backdrop.effects.blur
+import com.kyant.backdrop.effects.lens
+import com.kyant.backdrop.effects.vibrancy
 
 @Composable
 fun HomeScreen(
@@ -56,6 +62,7 @@ fun HomeScreen(
     val ctx = LocalContext.current
     val prefs = remember { UserPreferences(ctx) }
     val glass by prefs.liquidGlassEnabled.collectAsState(false)
+    val backdrop = LocalAppBackdrop.current
 
     val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
     val greetingBase = when {
@@ -90,7 +97,7 @@ fun HomeScreen(
 
     val current by PlayerController.currentSong.collectAsState()
 
-    Box(Modifier.fillMaxSize().background(Color(0xFF08080A))) {
+    Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         LazyColumn(
             state = listState,
             modifier = Modifier.fillMaxSize().statusBarsPadding(),
@@ -103,11 +110,17 @@ fun HomeScreen(
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp, vertical = 10.dp)
                         .then(
-                            if (glass) Modifier
-                                .clip(RoundedCornerShape(22.dp))
-                                .background(Color(0x9918181C))
-                                .border(0.6.dp, Color.White.copy(0.14f), RoundedCornerShape(22.dp))
+                            if (glass && backdrop != null) Modifier
+                                .drawBackdrop(
+                                    backdrop = backdrop,
+                                    shape = { RoundedCornerShape(22.dp) },
+                                    effects = { vibrancy(); blur(22f.dp.toPx()); lens(18f.dp.toPx(), 24f.dp.toPx()) },
+                                    onDrawSurface = { drawRect(MaterialTheme.colorScheme.surface.copy(alpha = 0.78f)) }
+                                )
+                                .border(0.7.dp, MaterialTheme.colorScheme.onSurface.copy(0.22f), RoundedCornerShape(22.dp))
                             else Modifier
+                                .clip(RoundedCornerShape(22.dp))
+                                .background(MaterialTheme.colorScheme.surface)
                         )
                         .padding(horizontal = 12.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically
@@ -116,14 +129,14 @@ fun HomeScreen(
                         AnimatedContent(
                             targetState = headerTitle,
                             transitionSpec = {
-                                (fadeIn(tween(320)) + slideInVertically { -it / 3 }) togetherWith
-                                    (fadeOut(tween(220)) + slideOutVertically { it / 3 })
+                                (fadeIn(tween(180)) + slideInVertically(tween(210)) { -it / 4 }) togetherWith
+                                    (fadeOut(tween(120)) + slideOutVertically(tween(160)) { it / 4 })
                             },
                             label = "headerTitle"
                         ) { title ->
                             Text(
                                 title,
-                                color = Color.White,
+                                color = MaterialTheme.colorScheme.onSurface,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 24.sp,
                                 maxLines = 1,
@@ -132,7 +145,7 @@ fun HomeScreen(
                         }
                     }
                     IconButton(onClick = onOpenSettings) {
-                        Icon(Icons.Default.Settings, null, tint = Color.White.copy(.9f))
+                        Icon(Icons.Default.Settings, null, tint = MaterialTheme.colorScheme.onSurface.copy(.9f))
                     }
                 }
             }
@@ -157,9 +170,9 @@ fun HomeScreen(
                         )
                         Spacer(Modifier.width(12.dp))
                         Column(Modifier.weight(1f)) {
-                            Text("Reproduciendo", color = Color.White.copy(.5f), fontSize = 11.sp)
-                            Text(song.title, color = Color.White, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            Text(song.artist, color = Color.White.copy(.6f), fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text("Reproduciendo", color = MaterialTheme.colorScheme.onSurface.copy(.5f), fontSize = 11.sp)
+                            Text(song.title, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(song.artist, color = MaterialTheme.colorScheme.onSurface.copy(.6f), fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         }
                         Box(
                             Modifier.size(40.dp).clip(CircleShape).background(Color.White)
@@ -173,7 +186,7 @@ fun HomeScreen(
             }
 
             item {
-                Text("Recientes", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 20.sp,
+                Text("Recientes", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold, fontSize = 20.sp,
                     modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 12.dp))
             }
             item {
@@ -185,19 +198,19 @@ fun HomeScreen(
                         Column(Modifier.width(128.dp).clickable { onSongClick(song) }) {
                             AsyncImage(
                                 song.displayCoverUrl ?: song.coverUrl, null,
-                                Modifier.size(128.dp).clip(RoundedCornerShape(14.dp)).background(Color(0xFF1A1A20)),
+                                Modifier.size(128.dp).clip(RoundedCornerShape(14.dp)).background(MaterialTheme.colorScheme.surface),
                                 contentScale = ContentScale.Crop
                             )
                             Spacer(Modifier.height(8.dp))
-                            Text(song.title, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            Text(song.artist, color = Color.White.copy(.5f), fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(song.title, color = MaterialTheme.colorScheme.onSurface, fontSize = 13.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(song.artist, color = MaterialTheme.colorScheme.onSurface.copy(.5f), fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         }
                     }
                 }
             }
 
             item {
-                Text("Para ti", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 20.sp,
+                Text("Para ti", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold, fontSize = 20.sp,
                     modifier = Modifier.padding(start = 16.dp, top = 22.dp, bottom = 8.dp))
             }
             items(recent.drop(8).ifEmpty { recent }, key = { "ft-${it.id}" }) { song ->
@@ -208,13 +221,13 @@ fun HomeScreen(
                 ) {
                     AsyncImage(
                         song.displayCoverUrl ?: song.coverUrl, null,
-                        Modifier.size(52.dp).clip(RoundedCornerShape(10.dp)).background(Color(0xFF1A1A20)),
+                        Modifier.size(52.dp).clip(RoundedCornerShape(10.dp)).background(MaterialTheme.colorScheme.surface),
                         contentScale = ContentScale.Crop
                     )
                     Spacer(Modifier.width(12.dp))
                     Column(Modifier.weight(1f)) {
-                        Text(song.title, color = Color.White, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Text(song.artist, color = Color.White.copy(.5f), fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(song.title, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(song.artist, color = MaterialTheme.colorScheme.onSurface.copy(.5f), fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                 }
             }
