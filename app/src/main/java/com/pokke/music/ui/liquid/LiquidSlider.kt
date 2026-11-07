@@ -50,7 +50,7 @@ fun LiquidSlider(
     value: () -> Float,
     onValueChange: (Float) -> Unit,
     valueRange: ClosedFloatingPointRange<Float>,
-    visibilityThreshold: Float,
+    visibilityThreshold: Float = 0.001f,
     backdrop: Backdrop,
     modifier: Modifier = Modifier,
     performanceMode: Boolean = false
