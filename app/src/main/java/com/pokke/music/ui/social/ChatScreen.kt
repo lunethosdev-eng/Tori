@@ -25,7 +25,7 @@ import com.pokke.music.data.repository.SocialRepository
 import kotlinx.coroutines.launch
 
 @Composable
-fun ChatScreen(authRepository: AuthRepository, onBack: (() -> Unit)? = null, onOpenStoryPublisher: (() -> Unit)? = null, onOpenMaps: (() -> Unit)? = null) {
+fun ChatScreen(authRepository: AuthRepository, onBack: (() -> Unit)? = null) {
     val social = remember(authRepository) { SocialRepository(authRepository) }
     val scope = rememberCoroutineScope()
     var friends by remember { mutableStateOf<List<SocialRepository.Friend>>(emptyList()) }
@@ -47,21 +47,6 @@ fun ChatScreen(authRepository: AuthRepository, onBack: (() -> Unit)? = null, onO
         }
     }
     LaunchedEffect(Unit) { refresh() }
-
-    LaunchedEffect(selected?.id) {
-        val convId = selected?.id ?: return@LaunchedEffect
-        while (true) {
-            kotlinx.coroutines.delay(2500)
-            val after = messages.lastOrNull()?.createdAt
-            social.observeMessagesOnce(convId, after).onSuccess { newer ->
-                if (newer.isNotEmpty()) {
-                    val ids = messages.map { it.id }.toSet()
-                    messages = messages + newer.filter { it.id !in ids }
-                }
-            }
-        }
-    }
-
 
     Column(Modifier.fillMaxSize().background(Color(0xFF09090B)).statusBarsPadding()) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
