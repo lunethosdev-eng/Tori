@@ -15,6 +15,23 @@ class SocialRepository(private val auth: AuthRepository) {
     data class Friend(val id: String, val username: String, val displayName: String, val avatarUrl: String?)
     data class Conversation(val id: String, val friend: Friend, val lastMessage: String?, val lastMessageAt: String?)
     data class Message(val id: String, val senderId: String, val type: String, val body: String?, val mediaUrl: String?, val createdAt: String)
+    data class FriendLocation(
+        val userId: String,
+        val username: String?,
+        val displayName: String?,
+        val lat: Double,
+        val lng: Double,
+        val shareMusic: Boolean = false,
+        val shareBattery: Boolean = false
+    )
+    data class Story(
+        val id: String,
+        val userId: String,
+        val mediaUrl: String,
+        val mediaType: String,
+        val caption: String?,
+        val createdAt: String
+    )
 
     private fun request(path: String, method: String = "GET", body: String? = null, prefer: String? = null): String {
         val session = auth.session.value ?: throw IOException("Inicia sesión para usar Pokke Social")
@@ -80,12 +97,84 @@ class SocialRepository(private val auth: AuthRepository) {
                     id = o.optString("id"),
                     senderId = o.optString("sender_id"),
                     type = o.optString("message_type", "text"),
-                    body = o.optString("body"),
+                    body = o.optString("body").ifBlank { null },
                     mediaUrl = o.optString("media_url").ifBlank { null },
                     createdAt = o.optString("created_at")
                 )
             }
         }
     }
+
+
+    suspend fun publishStory(mediaUrl: String, mediaType: String, caption: String?): Result<Unit> = withContext(Dispatchers.IO) {
+        runCatching {
+            val uid = auth.session.value?.userId ?: throw IOException("Inicia sesión")
+            val payload = JSONArray().put(
+                JSONObject()
+                    .put("user_id", uid)
+                    .put("media_url", mediaUrl)
+                    .put("media_type", mediaType)
+                    .put("caption", caption ?: JSONObject.NULL)
+            )
+            request("/rest/v1/pokke_stories", "POST", payload.toString(), "return=minimal")
+            Unit
+        }
+    }
+
+    suspend fun friendLocations(): Result<List<FriendLocation>> = withContext(Dispatchers.IO) {
+        runCatching {
+            // Prefer RPC if exists; fallback empty list
+            try {
+                val rows = JSONArray(request("/rest/v1/rpc/pokke_friend_locations", "POST", "{}"))
+                (0 until rows.length()).map { i ->
+                    val o = rows.getJSONObject(i)
+                    FriendLocation(
+                        userId = o.optString("user_id"),
+                        username = o.optString("username").ifBlank { null },
+                        displayName = o.optString("display_name").ifBlank { null },
+                        lat = o.optDouble("lat", 0.0),
+                        lng = o.optDouble("lng", 0.0),
+                        shareMusic = o.optBoolean("share_music", false),
+                        shareBattery = o.optBoolean("share_battery", false)
+                    )
+                }
+            } catch (_: Exception) {
+                emptyList()
+            }
+        }
+    }
+
+    suspend fun stopSharingLocation(): Result<Unit> = withContext(Dispatchers.IO) {
+        runCatching {
+            val uid = auth.session.value?.userId ?: throw IOException("Inicia sesión")
+            request(
+                "/rest/v1/pokke_locations?user_id=eq.$uid",
+                "PATCH",
+                JSONObject().put("is_sharing", false).toString(),
+                "return=minimal"
+            )
+            Unit
+        }
+    }
+
+    suspend fun updateLocation(lat: Double, lng: Double, mode: String, shareMusic: Boolean, shareBattery: Boolean): Result<Unit> =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                val uid = auth.session.value?.userId ?: throw IOException("Inicia sesión")
+                val payload = JSONArray().put(
+                    JSONObject()
+                        .put("user_id", uid)
+                        .put("lat", lat)
+                        .put("lng", lng)
+                        .put("share_mode", mode)
+                        .put("share_music", shareMusic)
+                        .put("share_battery", shareBattery)
+                        .put("is_sharing", mode != "none")
+                        .put("updated_at", java.time.Instant.now().toString())
+                )
+                request("/rest/v1/pokke_locations", "POST", payload.toString(), "resolution=merge-duplicates,return=minimal")
+                Unit
+            }
+        }
 
 }
