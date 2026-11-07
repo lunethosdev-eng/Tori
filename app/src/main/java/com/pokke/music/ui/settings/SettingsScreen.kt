@@ -36,7 +36,6 @@ fun SettingsScreen(
     val prefs = remember(context) { UserPreferences(context) }
     val scope = rememberCoroutineScope()
     val glass by prefs.liquidGlassEnabled.collectAsState(initial = false)
-    val appBackdrop = LocalAppBackdrop.current
     val blur by prefs.blurPlayerBackground.collectAsState(initial = true)
     val accent by prefs.accentColor.collectAsState(initial = "white")
     val theme by prefs.appTheme.collectAsState(initial = "dark")
@@ -224,6 +223,7 @@ private fun LiquidOrMaterialToggle(
     glass: Boolean,
     onChange: (Boolean) -> Unit
 ) {
+    val appBackdrop = LocalAppBackdrop.current
     Row(
         Modifier
             .fillMaxWidth()
