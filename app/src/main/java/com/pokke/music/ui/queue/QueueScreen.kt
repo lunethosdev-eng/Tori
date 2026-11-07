@@ -83,7 +83,11 @@ fun QueueScreen(onBack: () -> Unit) {
                 )
             }
 
-            Text("A CONTINUACIÓN", color = Color.White.copy(alpha = 0.55f), fontSize = 11.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp))
+            Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text("A CONTINUACIÓN", color = Color.White.copy(alpha = 0.62f), fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                Spacer(Modifier.width(8.dp))
+                Text("${upcoming.size}", color = Color.White.copy(alpha = 0.42f), fontSize = 11.sp)
+            }
 
             LazyColumn(modifier = Modifier.weight(1f)) {
                 if (upcoming.isEmpty()) {
@@ -110,7 +114,7 @@ fun QueueScreen(onBack: () -> Unit) {
             }
 
             Row(
-                modifier = Modifier.fillMaxWidth().background(Color(0xEE111111)).padding(horizontal = 24.dp, vertical = 14.dp),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 10.dp),
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically
             ) {
