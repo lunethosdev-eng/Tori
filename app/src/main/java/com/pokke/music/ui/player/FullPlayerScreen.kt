@@ -381,13 +381,14 @@ fun FullPlayerScreen(
     }
 
     if (showAudioOutput) {
-        ModalBottomSheet(onDismissRequest = { showAudioOutput = false }, containerColor = if (liquidGlassEnabled) Color(0xE62A292D) else Color(0xFF1C1C1C)) {
-            AudioOutputSheet(onDismiss = { showAudioOutput = false })
+        ModalBottomSheet(onDismissRequest = { showAudioOutput = false }, containerColor = if (liquidGlassEnabled) Color(0xB31C1C22) else Color(0xFF0A0A0A)) {
+            AudioOutputSheet(onDismiss = { showAudioOutput = false }, glass = liquidGlassEnabled)
         }
     }
     if (showOverflow) {
-        ModalBottomSheet(onDismissRequest = { showOverflow = false }, containerColor = if (liquidGlassEnabled) Color(0xE62A292D) else Color(0xFF1C1C1C)) {
             OverflowMenuSheet(
+                glass = liquidGlassEnabled,
+
                 onDismiss = { showOverflow = false },
                 onShareSong = {
                     showOverflow = false
@@ -436,7 +437,6 @@ fun FullPlayerScreen(
                 onRemoveFromQueue = { PlayerController.removeQueueItem(PlayerController.currentIndex.value); showOverflow = false },
                 onSongInfo = { showOverflow = false; showSongInfo = true }
             )
-        }
     }
     if (showPlaylistPicker) {
         AlertDialog(
