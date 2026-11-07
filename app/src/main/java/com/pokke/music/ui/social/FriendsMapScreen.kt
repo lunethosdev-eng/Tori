@@ -1,8 +1,10 @@
 package com.pokke.music.ui.social
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.content.pm.PackageManager
-import android.graphics.Color as AColor
+import android.webkit.WebView
+import android.webkit.WebViewClient
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -27,18 +29,13 @@ import com.pokke.music.data.repository.AuthRepository
 import com.pokke.music.data.repository.SocialRepository
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import org.maplibre.android.MapLibre
-import org.maplibre.android.camera.CameraPosition
-import org.maplibre.android.geometry.LatLng
-import org.maplibre.android.maps.MapView
-import org.maplibre.android.maps.Style
-import org.maplibre.android.annotations.MarkerOptions
 
 /**
- * Free/open map via MapLibre (no Google API key / no card).
- * Default style: MapLibre demotiles (works offline-demo style JSON).
- * Location share is OFF until the user picks a mode + grants OS permission.
+ * Free open map via Leaflet + OSM tiles inside WebView.
+ * No Google / no MapLibre native SDK (avoids crash if SDK not initialized).
+ * Location share is OFF until the user grants permission AND picks a mode.
  */
+@SuppressLint("SetJavaScriptEnabled")
 @Composable
 fun FriendsMapScreen(authRepository: AuthRepository, onBack: () -> Unit) {
     val context = LocalContext.current
@@ -49,27 +46,81 @@ fun FriendsMapScreen(authRepository: AuthRepository, onBack: () -> Unit) {
     var shareMusic by remember { mutableStateOf(false) }
     var shareBattery by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
-    var mapReady by remember { mutableStateOf(false) }
+    var webView by remember { mutableStateOf<WebView?>(null) }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
-    ) { /* user response; publish only if granted and mode != none */ }
+    ) { granted ->
+        val ok = granted[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
+            granted[Manifest.permission.ACCESS_COARSE_LOCATION] == true
+        if (!ok) {
+            shareMode = "none"
+            error = "Necesitas permiso de ubicación para compartir"
+        }
+    }
+
+    fun hasLocationPermission(): Boolean {
+        val fine = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION)
+        val coarse = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION)
+        return fine == PackageManager.PERMISSION_GRANTED || coarse == PackageManager.PERMISSION_GRANTED
+    }
 
     fun refresh() {
         scope.launch {
             social.friendLocations()
-                .onSuccess { locations = it }
+                .onSuccess {
+                    locations = it
+                    // push markers to leaflet
+                    val js = buildString {
+                        append("if(window.clearMarkers)clearMarkers();")
+                        it.forEach { loc ->
+                            if (loc.lat != 0.0 || loc.lng != 0.0) {
+                                val name = (loc.displayName ?: loc.username ?: "Amigo")
+                                    .replace("'", "\\'")
+                                append("if(window.addFriendMarker)addFriendMarker(${loc.lat},${loc.lng},'$name');")
+                            }
+                        }
+                    }
+                    webView?.evaluateJavascript(js, null)
+                }
                 .onFailure { error = it.message }
         }
     }
 
     LaunchedEffect(Unit) {
-        runCatching { MapLibre.getInstance(context) }
         refresh()
         while (true) {
             delay(20_000)
             refresh()
         }
+    }
+
+    val html = remember {
+        """
+        <!DOCTYPE html><html><head>
+        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+        <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+        <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+        <style>html,body,#map{margin:0;height:100%;background:#111} .leaflet-control-attribution{font-size:9px;opacity:.6}</style>
+        </head><body>
+        <div id="map"></div>
+        <script>
+          var map = L.map('map', {zoomControl:true}).setView([13.6929,-89.2182], 12);
+          L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '© OpenStreetMap'
+          }).addTo(map);
+          var markers = [];
+          function clearMarkers(){ markers.forEach(m=>map.removeLayer(m)); markers=[]; }
+          function addFriendMarker(lat,lng,name){
+            var m = L.marker([lat,lng]).addTo(map).bindPopup(name);
+            markers.push(m);
+          }
+          window.clearMarkers = clearMarkers;
+          window.addFriendMarker = addFriendMarker;
+        </script>
+        </body></html>
+        """.trimIndent()
     }
 
     Column(
@@ -84,67 +135,29 @@ fun FriendsMapScreen(authRepository: AuthRepository, onBack: () -> Unit) {
             }
             Column(Modifier.weight(1f)) {
                 Text("Mapas con amigos", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 20.sp)
-                Text("MapLibre · sin Google · ubicación off por defecto", color = Color.White.copy(.5f), fontSize = 12.sp)
+                Text("OpenStreetMap · gratis · ubicación off por defecto", color = Color.White.copy(.5f), fontSize = 12.sp)
             }
         }
 
-        // Visual map (free tiles)
         Box(
             Modifier
                 .fillMaxWidth()
-                .height(280.dp)
+                .height(300.dp)
                 .padding(horizontal = 12.dp)
                 .background(Color(0xFF121218), RoundedCornerShape(16.dp))
         ) {
             AndroidView(
                 modifier = Modifier.fillMaxSize(),
                 factory = { ctx ->
-                    MapView(ctx).apply {
-                        onCreate(null)
-                        getMapAsync { map ->
-                            map.setStyle(
-                                Style.Builder().fromUri("https://demotiles.maplibre.org/style.json")
-                            ) {
-                                map.cameraPosition = CameraPosition.Builder()
-                                    .target(LatLng(13.6929, -89.2182)) // San Salvador default
-                                    .zoom(11.0)
-                                    .tilt(45.0) // 3D-ish pitch
-                                    .build()
-                                mapReady = true
-                                locations.forEach { loc ->
-                                    map.addMarker(
-                                        MarkerOptions()
-                                            .position(LatLng(loc.lat, loc.lng))
-                                            .title(loc.displayName ?: loc.username ?: "Amigo")
-                                    )
-                                }
-                            }
-                        }
-                        onStart(); onResume()
-                    }
-                },
-                update = { view ->
-                    view.getMapAsync { map ->
-                        map.clear()
-                        locations.forEach { loc ->
-                            if (loc.lat != 0.0 || loc.lng != 0.0) {
-                                map.addMarker(
-                                    MarkerOptions()
-                                        .position(LatLng(loc.lat, loc.lng))
-                                        .title(loc.displayName ?: loc.username ?: "Amigo")
-                                )
-                            }
-                        }
+                    WebView(ctx).apply {
+                        settings.javaScriptEnabled = true
+                        settings.domStorageEnabled = true
+                        webViewClient = WebViewClient()
+                        loadDataWithBaseURL("https://unpkg.com/", html, "text/html", "UTF-8", null)
+                        webView = this
                     }
                 }
             )
-            if (!mapReady) {
-                Text(
-                    "Cargando mapa abierto…",
-                    color = Color.White.copy(.6f),
-                    modifier = Modifier.align(Alignment.Center)
-                )
-            }
         }
 
         Card(
@@ -163,20 +176,17 @@ fun FriendsMapScreen(authRepository: AuthRepository, onBack: () -> Unit) {
                         RadioButton(
                             selected = shareMode == id,
                             onClick = {
+                                if (id != "none" && !hasLocationPermission()) {
+                                    permissionLauncher.launch(
+                                        arrayOf(
+                                            Manifest.permission.ACCESS_FINE_LOCATION,
+                                            Manifest.permission.ACCESS_COARSE_LOCATION
+                                        )
+                                    )
+                                }
                                 shareMode = id
                                 scope.launch {
                                     if (id == "none") social.stopSharingLocation()
-                                    else {
-                                        val fine = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION)
-                                        if (fine != PackageManager.PERMISSION_GRANTED) {
-                                            permissionLauncher.launch(
-                                                arrayOf(
-                                                    Manifest.permission.ACCESS_FINE_LOCATION,
-                                                    Manifest.permission.ACCESS_COARSE_LOCATION
-                                                )
-                                            )
-                                        }
-                                    }
                                 }
                             },
                             colors = RadioButtonDefaults.colors(selectedColor = Color(0xFFE5C17A))
@@ -198,7 +208,6 @@ fun FriendsMapScreen(authRepository: AuthRepository, onBack: () -> Unit) {
         error?.let {
             Text(it, color = Color(0xFFFF8A80), fontSize = 12.sp, modifier = Modifier.padding(horizontal = 16.dp))
         }
-
         Text(
             "Amigos visibles (${locations.size})",
             color = Color.White.copy(.65f),
