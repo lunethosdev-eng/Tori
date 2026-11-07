@@ -1,5 +1,7 @@
 package com.pokke.music.ui.player
 
+import androidx.compose.animation.AnimatedVisibilityScope
+import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
@@ -56,19 +58,23 @@ import com.pokke.music.ui.sheets.AudioOutputSheet
 import com.pokke.music.ui.sheets.OverflowMenuSheet
 import com.pokke.music.ui.liquid.LiquidSlider
 import com.kyant.backdrop.backdrops.rememberLayerBackdrop
+import androidx.compose.animation.sharedElement
+import com.pokke.music.ui.player.LocalPlayerSharedTransitionScope
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class)
 @Composable
 fun FullPlayerScreen(
     onBack: () -> Unit,
     onOpenQueue: () -> Unit,
     onOpenLyrics: () -> Unit,
     authRepository: AuthRepository,
-    onRequireLogin: () -> Unit
+    onRequireLogin: () -> Unit,
+    animatedVisibilityScope: AnimatedVisibilityScope
 ) {
     val context = LocalContext.current
     val preferences = remember(context) { UserPreferences(context) }
     val blurPlayerBackground by preferences.blurPlayerBackground.collectAsState(false)
+    val animatedCovers by preferences.autoAnimatedCovers.collectAsState(initial = true)
     val liquidGlassEnabled by preferences.liquidGlassEnabled.collectAsState(false)
     val liquidSliderEnabled by preferences.liquidSliderEnabled.collectAsState(true)
     val sharedPlayerBackdrop = rememberLayerBackdrop()
@@ -80,6 +86,13 @@ fun FullPlayerScreen(
     val playbackError by PlayerController.playbackError.collectAsState()
 
     val cover = current?.displayCoverUrl
+    val sharedTransitionScope = LocalPlayerSharedTransitionScope.current
+    val coverSharedModifier = if (sharedTransitionScope != null && current != null) with(sharedTransitionScope) {
+        Modifier.sharedElement(
+            rememberSharedContentState(key = "player-cover-${current!!.id}"),
+            animatedVisibilityScope = animatedVisibilityScope
+        )
+    } else Modifier
 
     val audioManager = remember(context) { context.getSystemService(android.content.Context.AUDIO_SERVICE) as AudioManager }
     val maxMusicVolume = remember(audioManager) { audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC).coerceAtLeast(1).toFloat() }
@@ -194,7 +207,22 @@ fun FullPlayerScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.weight(0.82f))
+            Box(
+                modifier = Modifier.fillMaxWidth().weight(1f),
+                contentAlignment = Alignment.Center
+            ) {
+                current?.let { song ->
+                    AnimatedCoverImage(
+                        song = song,
+                        animatedEnabled = animatedCovers,
+                        contentDescription = "Portada de ${song.title}",
+                        modifier = coverSharedModifier.fillMaxWidth(0.82f).aspectRatio(1f).clip(RoundedCornerShape(22.dp)).graphicsLayer {
+                            shadowElevation = 18.dp.toPx()
+                        },
+                        contentScale = ContentScale.Crop
+                    )
+                }
+            }
 
             Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Column(modifier = Modifier.weight(1f)) {
