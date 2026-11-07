@@ -71,6 +71,7 @@ fun FullPlayerScreen(
     val blurPlayerBackground by preferences.blurPlayerBackground.collectAsState(false)
     val liquidGlassEnabled by preferences.liquidGlassEnabled.collectAsState(false)
     val liquidSliderEnabled by preferences.liquidSliderEnabled.collectAsState(true)
+    val sharedPlayerBackdrop = rememberLayerBackdrop()
     val liquidPerformanceMode by preferences.liquidPerformanceMode.collectAsState(true)
     val current by PlayerController.currentSong.collectAsState()
     val isPlaying by PlayerController.isPlaying.collectAsState()
@@ -84,6 +85,29 @@ fun FullPlayerScreen(
     val maxMusicVolume = remember(audioManager) { audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC).coerceAtLeast(1).toFloat() }
     var volume by remember(audioManager) { mutableFloatStateOf(audioManager.getStreamVolume(AudioManager.STREAM_MUSIC).toFloat() / maxMusicVolume) }
     var showAudioOutput by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        while (true) {
+            val s = PlayerController.currentSong.value
+            val playing = PlayerController.isPlaying.value
+            val pos = PlayerController.positionMs.value
+            val dur = PlayerController.durationMs.value
+            if (s != null) {
+                authRepository.publishListening(
+                    songId = s.id,
+                    title = s.title,
+                    artist = s.artist,
+                    coverUrl = s.coverUrl,
+                    audioUrl = s.audioUrl,
+                    positionMs = pos,
+                    durationMs = dur,
+                    isPlaying = playing
+                )
+            }
+            kotlinx.coroutines.delay(8000)
+        }
+    }
+
     var showOverflow by remember { mutableStateOf(false) }
     var showSleepTimer by remember { mutableStateOf(false) }
     var showSongInfo by remember { mutableStateOf(false) }
@@ -232,13 +256,12 @@ fun FullPlayerScreen(
 
             Column {
                 if (liquidGlassEnabled && liquidSliderEnabled) {
-                    val playerBackdrop = rememberLayerBackdrop()
                     LiquidSlider(
                         value = { progress },
                         onValueChange = { PlayerController.seekToFraction(it) },
                         valueRange = 0f..1f,
                         visibilityThreshold = 0.001f,
-                        backdrop = playerBackdrop,
+                        backdrop = sharedPlayerBackdrop,
                         modifier = Modifier.fillMaxWidth().height(42.dp),
                         performanceMode = liquidPerformanceMode
                     )
@@ -304,15 +327,18 @@ fun FullPlayerScreen(
             ) {
                 Icon(Icons.Default.VolumeUp, contentDescription = null, tint = Color.White.copy(alpha = 0.6f), modifier = Modifier.size(20.dp))
                 if (liquidGlassEnabled && liquidSliderEnabled) {
-                    LiquidSlider(
-                        value = { volume },
-                        onValueChange = { volume = it; PlayerController.setVolume(it) },
-                        valueRange = 0f..1f,
-                        visibilityThreshold = 0.001f,
-                        backdrop = playerBackdrop,
-                        modifier = Modifier.weight(1f).padding(horizontal = 12.dp).height(36.dp),
-                        performanceMode = liquidPerformanceMode
-                    )
+                    // Liquid volume when experimental liquid slider is ON
+                    Box(Modifier.weight(1f).padding(horizontal = 12.dp).height(36.dp)) {
+                        LiquidSlider(
+                            value = { volume },
+                            onValueChange = { volume = it; PlayerController.setVolume(it) },
+                            valueRange = 0f..1f,
+                            visibilityThreshold = 0.001f,
+                            backdrop = sharedPlayerBackdrop,
+                            modifier = Modifier.fillMaxWidth().height(36.dp),
+                            performanceMode = liquidPerformanceMode
+                        )
+                    }
                 } else {
                     Slider(
                         value = volume,
