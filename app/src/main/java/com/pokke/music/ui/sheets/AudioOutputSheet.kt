@@ -30,7 +30,7 @@ import kotlinx.coroutines.delay
 private data class OutDevice(val id: Int, val name: String, val type: String, val isActive: Boolean)
 
 @Composable
-fun AudioOutputSheet(onDismiss: () -> Unit) {
+fun AudioOutputSheet(onDismiss: () -> Unit, glass: Boolean = true) {
     val context = LocalContext.current
     var devices by remember { mutableStateOf<List<OutDevice>>(emptyList()) }
     var activeId by remember { mutableStateOf(-1) }
