@@ -20,9 +20,6 @@ class UserPreferences(private val context: Context) {
         private val LIQUID_PERFORMANCE = booleanPreferencesKey("liquid_glass_performance_mode")
         private val EXPERIMENTAL_CHATS = booleanPreferencesKey("experimental_chats_alpha_1")
         private val EXPERIMENTAL_MAPS = booleanPreferencesKey("experimental_friend_maps_alpha_1")
-        private val EXPERIMENTAL_STORIES = booleanPreferencesKey("experimental_stories_alpha_1")
-        private val EXPERIMENTAL_PLAYER = booleanPreferencesKey("experimental_player_custom_alpha_1")
-        private val EXPERIMENTAL_PROFILE_DECOR = booleanPreferencesKey("experimental_profile_decor_alpha_1")
         private val AUTO_ANIMATED_COVERS = booleanPreferencesKey("auto_animated_covers")
         private val DYNAMIC_COLORS = booleanPreferencesKey("dynamic_colors")
         private val BLUR_PLAYER = booleanPreferencesKey("blur_player_background")
@@ -32,15 +29,13 @@ class UserPreferences(private val context: Context) {
         private val THEME = stringPreferencesKey("app_theme")
         private val SHOW_LISTENING = booleanPreferencesKey("show_listening_on_profile")
         private val SHOW_LINK_EMBEDS = booleanPreferencesKey("show_link_embeds")
+        private val PLAYER_THEME = stringPreferencesKey("player_theme") // minimal | sakura | midnight | aurora
     }
     val liquidGlassEnabled: Flow<Boolean> = context.dataStore.data.map { it[LIQUID_GLASS] ?: false }
     val liquidSliderEnabled: Flow<Boolean> = context.dataStore.data.map { it[LIQUID_SLIDER] ?: true }
     val liquidPerformanceMode: Flow<Boolean> = context.dataStore.data.map { it[LIQUID_PERFORMANCE] ?: true }
     val experimentalChatsEnabled: Flow<Boolean> = context.dataStore.data.map { it[EXPERIMENTAL_CHATS] ?: false }
     val experimentalMapsEnabled: Flow<Boolean> = context.dataStore.data.map { it[EXPERIMENTAL_MAPS] ?: false }
-    val experimentalStoriesEnabled: Flow<Boolean> = context.dataStore.data.map { it[EXPERIMENTAL_STORIES] ?: false }
-    val experimentalPlayerCustomEnabled: Flow<Boolean> = context.dataStore.data.map { it[EXPERIMENTAL_PLAYER] ?: false }
-    val experimentalProfileDecorEnabled: Flow<Boolean> = context.dataStore.data.map { it[EXPERIMENTAL_PROFILE_DECOR] ?: false }
     val autoAnimatedCovers: Flow<Boolean> = context.dataStore.data.map { it[AUTO_ANIMATED_COVERS] ?: true }
     val dynamicColors: Flow<Boolean> = context.dataStore.data.map { it[DYNAMIC_COLORS] ?: true }
     val blurPlayerBackground: Flow<Boolean> = context.dataStore.data.map { it[BLUR_PLAYER] ?: false }
@@ -52,15 +47,13 @@ class UserPreferences(private val context: Context) {
     val showListeningOnProfile: Flow<Boolean> = context.dataStore.data.map { it[SHOW_LISTENING] ?: true }
     /** Default ON: link cards expand / show rich preview when possible. */
     val showLinkEmbeds: Flow<Boolean> = context.dataStore.data.map { it[SHOW_LINK_EMBEDS] ?: true }
+    val playerTheme: Flow<String> = context.dataStore.data.map { it[PLAYER_THEME] ?: "minimal" }
 
     suspend fun setLiquidGlass(v: Boolean) = context.dataStore.edit { it[LIQUID_GLASS] = v }
     suspend fun setLiquidSlider(v: Boolean) = context.dataStore.edit { it[LIQUID_SLIDER] = v }
     suspend fun setLiquidPerformanceMode(v: Boolean) = context.dataStore.edit { it[LIQUID_PERFORMANCE] = v }
     suspend fun setExperimentalChats(v: Boolean) = context.dataStore.edit { it[EXPERIMENTAL_CHATS] = v; if (!v) it[EXPERIMENTAL_MAPS] = false }
     suspend fun setExperimentalMaps(v: Boolean) = context.dataStore.edit { it[EXPERIMENTAL_MAPS] = v }
-    suspend fun setExperimentalStories(v: Boolean) = context.dataStore.edit { it[EXPERIMENTAL_STORIES] = v }
-    suspend fun setExperimentalPlayerCustom(v: Boolean) = context.dataStore.edit { it[EXPERIMENTAL_PLAYER] = v }
-    suspend fun setExperimentalProfileDecor(v: Boolean) = context.dataStore.edit { it[EXPERIMENTAL_PROFILE_DECOR] = v }
     suspend fun setAutoAnimatedCovers(v: Boolean) = context.dataStore.edit { it[AUTO_ANIMATED_COVERS] = v }
     suspend fun setDynamicColors(v: Boolean) = context.dataStore.edit { it[DYNAMIC_COLORS] = v }
     suspend fun setBlurPlayerBackground(v: Boolean) = context.dataStore.edit { it[BLUR_PLAYER] = v }
@@ -70,4 +63,5 @@ class UserPreferences(private val context: Context) {
     suspend fun setAppTheme(v: String) = context.dataStore.edit { it[THEME] = v }
     suspend fun setShowListeningOnProfile(v: Boolean) = context.dataStore.edit { it[SHOW_LISTENING] = v }
     suspend fun setShowLinkEmbeds(v: Boolean) = context.dataStore.edit { it[SHOW_LINK_EMBEDS] = v }
+    suspend fun setPlayerTheme(v: String) = context.dataStore.edit { it[PLAYER_THEME] = v }
 }
