@@ -21,6 +21,8 @@ import androidx.compose.ui.unit.sp
 import com.pokke.music.data.preferences.UserPreferences
 import com.pokke.music.data.repository.AuthRepository
 import kotlinx.coroutines.launch
+import com.pokke.music.ui.liquid.LocalAppBackdrop
+import com.pokke.music.ui.liquid.LiquidToggle
 
 private const val OWNER_EMAIL = "lunethos.dev@gmail.com"
 
@@ -34,6 +36,7 @@ fun SettingsScreen(
     val prefs = remember(context) { UserPreferences(context) }
     val scope = rememberCoroutineScope()
     val glass by prefs.liquidGlassEnabled.collectAsState(initial = false)
+    val appBackdrop = LocalAppBackdrop.current
     val blur by prefs.blurPlayerBackground.collectAsState(initial = true)
     val accent by prefs.accentColor.collectAsState(initial = "white")
     val theme by prefs.appTheme.collectAsState(initial = "dark")
@@ -237,15 +240,19 @@ private fun LiquidOrMaterialToggle(
                 modifier = Modifier.padding(top = 3.dp)
             )
         }
-        Switch(
-            checked = checked,
-            onCheckedChange = onChange,
-            colors = SwitchDefaults.colors(
-                checkedThumbColor = Color.Black,
-                checkedTrackColor = Color.White,
-                uncheckedTrackColor = Color(0xFF333338)
+        if (glass && appBackdrop != null) {
+            LiquidToggle(selected = { checked }, onSelect = onChange, backdrop = appBackdrop, modifier = Modifier.size(width = 54.dp, height = 34.dp))
+        } else {
+            Switch(
+                checked = checked,
+                onCheckedChange = onChange,
+                colors = SwitchDefaults.colors(
+                    checkedThumbColor = Color.Black,
+                    checkedTrackColor = Color.White,
+                    uncheckedTrackColor = Color(0xFF333338)
+                )
             )
-        )
+        }
     }
 }
 
