@@ -5,8 +5,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.
-*
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -69,9 +68,9 @@ fun LyricsScreen(onBack: () -> Unit) {
     }
     LaunchedEffect(active, lines.size) { if (lines.isNotEmpty() && active in lines.indices) listState.animateScrollToItem((active - 2).coerceAtLeast(0)) }
 
-    Box(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().background(Color(0xFF160F0C))) {
+    Box(Modifier.fillMaxSize().background(Color(0xFF0A0A0A))) {
         AsyncImage(song?.displayCoverUrl, null, Modifier.fillMaxSize().blur(65.dp).graphicsLayer { alpha = .43f }, contentScale = ContentScale.Crop)
-        Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color(0x6620100A), Color(0xE6090808), Color(0xF5090808)))))
+        Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color(0x33000000), Color(0x99000000), Color(0xE6000000)))))
         Column(Modifier.fillMaxSize().statusBarsPadding()) {
             Row(Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                 AsyncImage(song?.displayCoverUrl, null, Modifier.size(48.dp).clip(RoundedCornerShape(10.dp)), contentScale = ContentScale.Crop)
