@@ -10,6 +10,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
 import com.pokke.music.player.PlayerController
 import com.pokke.music.ui.navigation.PokkeNavHost
+import com.pokke.music.ui.liquid.GlassBackdropHost
 import com.pokke.music.ui.theme.PokkeTheme
 
 class MainActivity : ComponentActivity() {
@@ -22,7 +23,7 @@ class MainActivity : ComponentActivity() {
         )
         setContent {
             PokkeTheme {
-                Surface(modifier = Modifier.fillMaxSize()) { PokkeNavHost() }
+                Surface(modifier = Modifier.fillMaxSize()) { GlassBackdropHost(enabled = true) { PokkeNavHost() } }
             }
         }
     }
