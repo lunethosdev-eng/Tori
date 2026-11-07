@@ -84,29 +84,6 @@ fun FullPlayerScreen(
     val maxMusicVolume = remember(audioManager) { audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC).coerceAtLeast(1).toFloat() }
     var volume by remember(audioManager) { mutableFloatStateOf(audioManager.getStreamVolume(AudioManager.STREAM_MUSIC).toFloat() / maxMusicVolume) }
     var showAudioOutput by remember { mutableStateOf(false) }
-
-    LaunchedEffect(Unit) {
-        while (true) {
-            val s = PlayerController.currentSong.value
-            val playing = PlayerController.isPlaying.value
-            val pos = PlayerController.positionMs.value
-            val dur = PlayerController.durationMs.value
-            if (s != null) {
-                authRepository.publishListening(
-                    songId = s.id,
-                    title = s.title,
-                    artist = s.artist,
-                    coverUrl = s.coverUrl,
-                    audioUrl = s.audioUrl,
-                    positionMs = pos,
-                    durationMs = dur,
-                    isPlaying = playing
-                )
-            }
-            kotlinx.coroutines.delay(8000)
-        }
-    }
-
     var showOverflow by remember { mutableStateOf(false) }
     var showSleepTimer by remember { mutableStateOf(false) }
     var showSongInfo by remember { mutableStateOf(false) }
@@ -327,16 +304,15 @@ fun FullPlayerScreen(
             ) {
                 Icon(Icons.Default.VolumeUp, contentDescription = null, tint = Color.White.copy(alpha = 0.6f), modifier = Modifier.size(20.dp))
                 if (liquidGlassEnabled && liquidSliderEnabled) {
-                    // Liquid volume when experimental liquid slider is ON
-                    Box(Modifier.weight(1f).padding(horizontal = 12.dp).height(36.dp)) {
-                        LiquidSlider(
-                            value = { volume },
-                            onValueChange = { volume = it; PlayerController.setVolume(it) },
-                            valueRange = 0f..1f,
-                            backdrop = rememberLayerBackdrop(),
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    }
+                    LiquidSlider(
+                        value = { volume },
+                        onValueChange = { volume = it; PlayerController.setVolume(it) },
+                        valueRange = 0f..1f,
+                        visibilityThreshold = 0.001f,
+                        backdrop = playerBackdrop,
+                        modifier = Modifier.weight(1f).padding(horizontal = 12.dp).height(36.dp),
+                        performanceMode = liquidPerformanceMode
+                    )
                 } else {
                     Slider(
                         value = volume,
