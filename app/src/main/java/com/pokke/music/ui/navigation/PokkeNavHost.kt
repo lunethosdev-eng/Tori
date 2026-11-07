@@ -126,6 +126,7 @@ fun PokkeNavHost() {
     val chatsEnabled by prefs.experimentalChatsEnabled.collectAsState(false)
     val backStack by nav.currentBackStackEntryAsState()
     val route = backStack?.destination?.route
+    var navCompact by remember { mutableStateOf(false) }
     val showNav = route in listOf(Screen.Home.route, Screen.Search.route, Screen.Library.route, Screen.Chats.route)
     val navItems = remember(chatsEnabled) { if (chatsEnabled) baseNavItems + NavItem(Screen.Chats, Icons.Filled.Forum, Icons.Outlined.Forum) else baseNavItems }
     var avatar by remember { mutableStateOf<String?>(null) }
@@ -145,7 +146,8 @@ fun PokkeNavHost() {
                     onOpenPlayer = { nav.navigate(Screen.Player.route) },
                     onOpenSettings = { nav.navigate(Screen.Settings.route) },
                     onOpenProfile = { nav.navigate(if (auth.session.value == null) Screen.Auth.route else Screen.Profile.route) },
-                    onScrollStateChanged = {}, authRepository = auth
+                    onScrollStateChanged = { navCompact = it },
+                    authRepository = auth
                 )
             }
             composable(Screen.Search.route) {
@@ -171,8 +173,14 @@ fun PokkeNavHost() {
                     onSongClick = { PlayerController.init(context); PlayerController.playSong(it); nav.navigate(Screen.Player.route) })
             }
             composable(Screen.Chats.route) {
-                if (chatsEnabled) ChatScreen(authRepository = auth)
+                if (chatsEnabled) ChatScreen(authRepository = auth, onOpenMaps = { nav.navigate(Screen.Maps.route) }, onOpenStory = { nav.navigate(Screen.StoryPublish.route) })
                 else SettingsScreen(onBack = { nav.popBackStack() }, authRepository = auth)
+            }
+            composable(Screen.Maps.route) {
+                FriendsMapScreen(authRepository = auth, onBack = { nav.popBackStack() })
+            }
+            composable(Screen.StoryPublish.route) {
+                StoryPublisherScreen(authRepository = auth, onBack = { nav.popBackStack() }, onPublished = { nav.popBackStack() })
             }
             composable(Screen.Settings.route) {
                 SettingsScreen(
@@ -191,6 +199,19 @@ fun PokkeNavHost() {
             composable(Screen.Queue.route) { QueueScreen(onBack = { nav.popBackStack() }) }
             composable(Screen.Lyrics.route) { LyricsScreen(onBack = { nav.popBackStack() }) }
         }
+
+        val currentSong by PlayerController.currentSong.collectAsState()
+        val showMini = currentSong != null && route !in listOf(Screen.Player.route, Screen.Lyrics.route, Screen.Auth.route)
+        MiniPlayerBar(
+            visible = showMini,
+            glass = glass,
+            compact = navCompact,
+            onOpenPlayer = { nav.navigate(Screen.Player.route) },
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = if (showNav) 78.dp else 16.dp)
+                .navigationBarsPadding()
+        )
 
         AnimatedVisibility(visible = showNav, modifier = Modifier.align(Alignment.BottomCenter), enter = fadeIn() + slideInVertically { it / 2 }, exit = fadeOut() + slideOutVertically { it / 2 }) {
             // Liquid Glass bottom bar (Kyant-inspired surface when toggle ON)
