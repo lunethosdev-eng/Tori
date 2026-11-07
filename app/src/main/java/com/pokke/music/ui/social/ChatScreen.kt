@@ -25,7 +25,12 @@ import com.pokke.music.data.repository.SocialRepository
 import kotlinx.coroutines.launch
 
 @Composable
-fun ChatScreen(authRepository: AuthRepository, onBack: (() -> Unit)? = null) {
+fun ChatScreen(
+    authRepository: AuthRepository,
+    onBack: (() -> Unit)? = null,
+    onOpenMaps: (() -> Unit)? = null,
+    onOpenStory: (() -> Unit)? = null
+) {
     val social = remember(authRepository) { SocialRepository(authRepository) }
     val scope = rememberCoroutineScope()
     var friends by remember { mutableStateOf<List<SocialRepository.Friend>>(emptyList()) }
@@ -54,6 +59,12 @@ fun ChatScreen(authRepository: AuthRepository, onBack: (() -> Unit)? = null) {
             Column(Modifier.weight(1f)) {
                 Text(selected?.friend?.displayName ?: "Chats", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
                 Text(if (selected == null) "Solo puedes conversar con amigos aceptados" else "Chat privado · Pokke Alfa 1.0", color = Color.White.copy(.5f), fontSize = 12.sp)
+            }
+            if (selected == null && onOpenMaps != null) {
+                TextButton(onClick = onOpenMaps) { Text("Mapa", color = Color(0xFFE5C17A)) }
+            }
+            if (selected == null && onOpenStory != null) {
+                TextButton(onClick = onOpenStory) { Text("Historia", color = Color(0xFFE5C17A)) }
             }
             IconButton(onClick = { refresh() }) { Icon(Icons.Default.Refresh, "Actualizar", tint = Color.White) }
         }
