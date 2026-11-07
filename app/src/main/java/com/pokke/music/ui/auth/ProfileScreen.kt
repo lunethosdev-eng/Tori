@@ -84,6 +84,7 @@ fun ProfileScreen(repository: AuthRepository, onBack: () -> Unit, onSignedOut: (
     var favoriteMangasJson by remember { mutableStateOf("[]") }
     var linkLabel by remember { mutableStateOf("") }
     var linkUrl by remember { mutableStateOf("") }
+    var profileLinks by remember { mutableStateOf<List<Pair<String, String>>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
     var saving by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf(false) }
@@ -158,7 +159,7 @@ fun ProfileScreen(repository: AuthRepository, onBack: () -> Unit, onSignedOut: (
             }.onSuccess { url ->
                 repository.updateProfile(
                     displayName, username, bio, avatar, banner, theme, frame, badge, pronouns, status,
-                    accent, cardStyle, badges, isPublic, linkLabel, linkUrl, showListening, null, favoriteMangasJson,
+                    accent, cardStyle, badges, isPublic, profileLinks.firstOrNull()?.first ?: linkLabel, profileLinks.firstOrNull()?.second ?: linkUrl, showListening, null, favoriteMangasJson,
                     searchCardBannerUrl = url
                 ).onSuccess { profile = it; message = "Nameplate del search actualizado" }
                     .onFailure { message = it.message }
@@ -184,6 +185,7 @@ fun ProfileScreen(repository: AuthRepository, onBack: () -> Unit, onSignedOut: (
             showListening = p?.showListening ?: true
             favoriteMangasJson = p?.favoriteMangas ?: "[]"
             linkLabel = p?.linkLabel.orEmpty(); linkUrl = p?.linkUrl.orEmpty()
+            profileLinks = if (!p?.linkUrl.isNullOrBlank()) listOf((p?.linkLabel.orEmpty().ifBlank { "Link" }) to p!!.linkUrl!!) else emptyList()
         }.onFailure { message = it.localizedMessage }
         loading = false
     }
@@ -357,6 +359,20 @@ fun ProfileScreen(repository: AuthRepository, onBack: () -> Unit, onSignedOut: (
                     Spacer(Modifier.height(10.dp))
                     ProfileField("Texto del enlace", linkLabel) { linkLabel = it }
                     ProfileField("URL del enlace", linkUrl) { linkUrl = it }
+                    if (linkLabel.isNotBlank() && linkUrl.isNotBlank()) {
+                        TextButton(onClick = {
+                            profileLinks = profileLinks + (linkLabel to linkUrl)
+                            linkLabel = ""; linkUrl = ""
+                        }) { Text("+ Agregar enlace", color = accentColor) }
+                    }
+                    profileLinks.forEachIndexed { idx, (lab, url) ->
+                        Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Text("$lab · $url", color = ProfileInk, fontSize = 12.sp, modifier = Modifier.weight(1f), maxLines = 1)
+                            TextButton(onClick = { profileLinks = profileLinks.filterIndexed { i, _ -> i != idx } }) {
+                                Text("Quitar", color = Color(0xFFFF8A80), fontSize = 12.sp)
+                            }
+                        }
+                    }
                     MangaFavoritesEditor(favoriteMangasJson, { favoriteMangasJson = it }, accentColor, ProfileInk, ProfileMuted)
                     Text("Los emblemas los otorga el Owner desde Admin (no se escriben a mano).", color = ProfileMuted, fontSize = 12.sp, modifier = Modifier.padding(bottom = 10.dp))
                     ProfileChoice("Tema", theme, listOf("midnight", "ocean", "violet", "rose", "amoled"), listOf("Noche", "Océano", "Violeta", "Rosa", "AMOLED"), accentColor) { theme = it }
@@ -388,7 +404,7 @@ fun ProfileScreen(repository: AuthRepository, onBack: () -> Unit, onSignedOut: (
                         scope.launch {
                             repository.updateProfile(
                                 displayName, username, bio, avatar, banner, theme, frame, badge, pronouns, status,
-                                accent, cardStyle, badges, isPublic, linkLabel, linkUrl, showListening, null, favoriteMangasJson,
+                                accent, cardStyle, badges, isPublic, profileLinks.firstOrNull()?.first ?: linkLabel, profileLinks.firstOrNull()?.second ?: linkUrl, showListening, null, favoriteMangasJson,
                                 primaryColor = primaryColor,
                                 secondaryColor = secondaryColor,
                                 gradientEnabled = gradientEnabled,
