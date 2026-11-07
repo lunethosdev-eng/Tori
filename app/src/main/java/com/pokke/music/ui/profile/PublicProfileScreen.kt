@@ -220,20 +220,33 @@ fun PublicProfileScreen(
                             Text(p.bio!!, color = Ink.copy(.9f), fontSize = 14.sp, lineHeight = 20.sp)
                         }
 
-                        if (!p.linkUrl.isNullOrBlank()) {
-                            Spacer(Modifier.height(14.dp))
+                        val publicLinks = buildList {
+                            if (!p.linkUrl.isNullOrBlank()) add((p.linkLabel.orEmpty().ifBlank { "Link" }) to p.linkUrl!!)
+                            runCatching {
+                                val raw = p.extraLinks.orEmpty()
+                                if (raw.trimStart().startsWith("[")) {
+                                    val arr = org.json.JSONArray(raw)
+                                    for (i in 0 until arr.length()) arr.optJSONObject(i)?.let { o ->
+                                        val url = o.optString("url").trim()
+                                        if (url.isNotBlank()) add(o.optString("label").ifBlank { "Link" } to url)
+                                    }
+                                } else raw.split(',').forEach { item ->
+                                    val parts = item.split('|', limit = 2)
+                                    if (parts.size == 2 && parts[1].isNotBlank()) add(parts[0].ifBlank { "Link" } to parts[1])
+                                }
+                            }
+                        }.distinctBy { it.second }
+                        publicLinks.forEach { (label, url) ->
+                            Spacer(Modifier.height(10.dp))
                             Row(
                                 Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(cardBg).padding(12.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                LinkFavicon(p.linkUrl!!, size = 28.dp)
+                                LinkFavicon(url, size = 28.dp)
                                 Spacer(Modifier.width(12.dp))
                                 Column(Modifier.weight(1f)) {
-                                    Text(
-                                        p.linkLabel?.ifBlank { null } ?: platformLabel(p.linkUrl!!) ?: hostLabel(p.linkUrl!!),
-                                        color = Ink, fontSize = 14.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis
-                                    )
-                                    Text(hostLabel(p.linkUrl!!), color = Muted, fontSize = 12.sp, maxLines = 1)
+                                    Text(label.ifBlank { platformLabel(url) ?: hostLabel(url) }, color = Ink, fontSize = 14.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    Text(hostLabel(url), color = Muted, fontSize = 12.sp, maxLines = 1)
                                 }
                             }
                         }
