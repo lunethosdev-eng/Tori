@@ -159,7 +159,8 @@ fun ProfileScreen(repository: AuthRepository, onBack: () -> Unit, onSignedOut: (
             }.onSuccess { url ->
                 repository.updateProfile(
                     displayName, username, bio, avatar, banner, theme, frame, badge, pronouns, status,
-                    accent, cardStyle, badges, isPublic, profileLinks.firstOrNull()?.first ?: linkLabel, profileLinks.firstOrNull()?.second ?: linkUrl, showListening, null, favoriteMangasJson,
+                    accent, cardStyle, badges, isPublic, profileLinks.firstOrNull()?.first ?: linkLabel, profileLinks.firstOrNull()?.second ?: linkUrl, showListening,
+                    org.json.JSONArray().apply { profileLinks.drop(1).forEach { (label, url) -> put(org.json.JSONObject().put("label", label).put("url", url)) } }.toString(), favoriteMangasJson,
                     searchCardBannerUrl = url
                 ).onSuccess { profile = it; message = "Nameplate del search actualizado" }
                     .onFailure { message = it.message }
@@ -185,7 +186,21 @@ fun ProfileScreen(repository: AuthRepository, onBack: () -> Unit, onSignedOut: (
             showListening = p?.showListening ?: true
             favoriteMangasJson = p?.favoriteMangas ?: "[]"
             linkLabel = p?.linkLabel.orEmpty(); linkUrl = p?.linkUrl.orEmpty()
-            profileLinks = if (!p?.linkUrl.isNullOrBlank()) listOf((p?.linkLabel.orEmpty().ifBlank { "Link" }) to p!!.linkUrl!!) else emptyList()
+            val primaryLinks = if (!p?.linkUrl.isNullOrBlank()) listOf((p?.linkLabel.orEmpty().ifBlank { "Link" }) to p!!.linkUrl!!) else emptyList()
+            val savedExtraLinks = runCatching {
+                val raw = p?.extraLinks.orEmpty()
+                if (raw.trimStart().startsWith("[")) {
+                    val arr = org.json.JSONArray(raw)
+                    (0 until arr.length()).mapNotNull { i -> arr.optJSONObject(i)?.let { o ->
+                        val label = o.optString("label").trim(); val url = o.optString("url").trim()
+                        if (url.isNotBlank()) (label.ifBlank { "Link" }) to url else null
+                    } }
+                } else raw.split(',').mapNotNull { item ->
+                    val parts = item.split('|', limit = 2)
+                    if (parts.size == 2 && parts[1].isNotBlank()) parts[0].ifBlank { "Link" } to parts[1] else null
+                }
+            }.getOrDefault(emptyList())
+            profileLinks = (primaryLinks + savedExtraLinks).distinctBy { it.second }
         }.onFailure { message = it.localizedMessage }
         loading = false
     }
@@ -210,13 +225,15 @@ fun ProfileScreen(repository: AuthRepository, onBack: () -> Unit, onSignedOut: (
                 Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.45f)))
             } else if (banner.isNotBlank()) {
                 AsyncImage(banner, "Banner del perfil", Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
-            } else if (gradientEnabled) {
+            } else if (!gradientEnabled) {
+                Box(Modifier.fillMaxSize().background(Brush.linearGradient(listOf(accentColor.copy(.78f), Color(0xFF20243B), pageBackground))))
+            }
+            if (gradientEnabled) {
                 val pCol = try { Color(android.graphics.Color.parseColor(primaryColor)) } catch (_: Exception) { Color(0xFFAAA0FF) }
                 val sCol = try { Color(android.graphics.Color.parseColor(secondaryColor)) } catch (_: Exception) { Color(0xFF1A1C26) }
-                Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(pCol.copy(alpha=0.55f), sCol, Color.Black))))
+                Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(pCol.copy(alpha = if (bg.isNotBlank()) 0.38f else 0.62f), sCol.copy(alpha = 0.72f), Color.Black.copy(alpha = 0.82f)))))
             }
-            else Box(Modifier.fillMaxSize().background(Brush.linearGradient(listOf(accentColor.copy(.78f), Color(0xFF20243B), pageBackground))))
-            Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color.Black.copy(.10f), Color.Black.copy(.55f)))))
+            Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color.Black.copy(.08f), Color.Black.copy(.42f)))))
             Row(Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 12.dp, vertical = 8.dp), horizontalArrangement = Arrangement.SpaceBetween) {
                 ProfileTopButton(onClick = { if (editing) editing = false else onBack() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Volver", tint = Color.White) }
                 ProfileTopButton(onClick = { scope.launch { repository.signOut(); onSignedOut() } }) { Icon(Icons.Default.Logout, "Cerrar sesión", tint = Color.White) }
@@ -404,7 +421,8 @@ fun ProfileScreen(repository: AuthRepository, onBack: () -> Unit, onSignedOut: (
                         scope.launch {
                             repository.updateProfile(
                                 displayName, username, bio, avatar, banner, theme, frame, badge, pronouns, status,
-                                accent, cardStyle, badges, isPublic, profileLinks.firstOrNull()?.first ?: linkLabel, profileLinks.firstOrNull()?.second ?: linkUrl, showListening, null, favoriteMangasJson,
+                                accent, cardStyle, badges, isPublic, profileLinks.firstOrNull()?.first ?: linkLabel, profileLinks.firstOrNull()?.second ?: linkUrl, showListening,
+                                org.json.JSONArray().apply { profileLinks.drop(1).forEach { (label, url) -> put(org.json.JSONObject().put("label", label).put("url", url)) } }.toString(), favoriteMangasJson,
                                 primaryColor = primaryColor,
                                 secondaryColor = secondaryColor,
                                 gradientEnabled = gradientEnabled,
