@@ -23,7 +23,26 @@ fun PokkeTheme(content: @Composable () -> Unit) {
         "green" -> Color(0xFF9DDBB2)
         else -> Color.White
     }
-    val scheme = if (selectedTheme == "light") lightColorScheme(primary = primary, onPrimary = Color.Black, background = Color(0xFFF5F5F7), onBackground = Color(0xFF151515), surface = Color.White, onSurface = Color(0xFF151515))
-    else darkColorScheme(primary = primary, onPrimary = Color.Black, secondary = primary.copy(.8f), onSecondary = Color.Black, background = Color.Black, onBackground = Color.White, surface = if (selectedTheme == "amoled") Color.Black else Color(0xFF121214), onSurface = Color.White, surfaceVariant = Color(0xFF242428), onSurfaceVariant = Color(0xFFB9B9BE), outline = Color(0xFF45454A))
+    val secondary = when (accent) {
+        "violet" -> Color(0xFF8B72D8)
+        "blue" -> Color(0xFF3979C9)
+        "pink" -> Color(0xFFD66C9F)
+        "green" -> Color(0xFF438A61)
+        else -> Color(0xFF77777D)
+    }
+    val scheme = if (selectedTheme == "light") lightColorScheme(
+        primary = primary, onPrimary = Color(0xFF17171B), secondary = secondary, onSecondary = Color.White,
+        background = Color(0xFFF5F5F7), onBackground = Color(0xFF17171B),
+        surface = Color.White, onSurface = Color(0xFF17171B),
+        surfaceVariant = Color(0xFFE8E8ED), onSurfaceVariant = Color(0xFF55555D),
+        outline = Color(0xFFB8B8C0)
+    ) else darkColorScheme(
+        primary = primary, onPrimary = Color(0xFF111114), secondary = secondary, onSecondary = Color.White,
+        background = if (selectedTheme == "amoled") Color.Black else Color(0xFF09090B),
+        onBackground = Color.White,
+        surface = if (selectedTheme == "amoled") Color.Black else Color(0xFF17171B),
+        onSurface = Color.White, surfaceVariant = Color(0xFF29292F),
+        onSurfaceVariant = Color(0xFFB9B9C2), outline = Color(0xFF484850)
+    )
     MaterialTheme(colorScheme = scheme, typography = PokkeTypography, content = content)
 }
