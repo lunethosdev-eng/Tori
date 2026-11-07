@@ -25,6 +25,11 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.pokke.music.ui.liquid.LocalAppBackdrop
+import com.kyant.backdrop.drawBackdrop
+import com.kyant.backdrop.effects.blur
+import com.kyant.backdrop.effects.lens
+import com.kyant.backdrop.effects.vibrancy
 import kotlinx.coroutines.delay
 
 private data class OutDevice(val id: Int, val name: String, val type: String, val isActive: Boolean)
@@ -32,6 +37,7 @@ private data class OutDevice(val id: Int, val name: String, val type: String, va
 @Composable
 fun AudioOutputSheet(onDismiss: () -> Unit, glass: Boolean = true) {
     val context = LocalContext.current
+    val backdrop = LocalAppBackdrop.current
     var devices by remember { mutableStateOf<List<OutDevice>>(emptyList()) }
     var activeId by remember { mutableStateOf(-1) }
 
@@ -80,6 +86,12 @@ fun AudioOutputSheet(onDismiss: () -> Unit, glass: Boolean = true) {
     Column(
         Modifier
             .fillMaxWidth()
+            .then(if (glass && backdrop != null) Modifier.drawBackdrop(
+                backdrop = backdrop,
+                shape = { RoundedCornerShape(28.dp) },
+                effects = { vibrancy(); blur(22f.dp.toPx()); lens(18f.dp.toPx(), 24f.dp.toPx()) },
+                onDrawSurface = { drawRect(Color(0xB31A1A1D)) }
+            ) else Modifier.background(Color(0xFF17171B), RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)))
             .padding(horizontal = 20.dp, vertical = 12.dp)
             .navigationBarsPadding()
     ) {
@@ -92,7 +104,7 @@ fun AudioOutputSheet(onDismiss: () -> Unit, glass: Boolean = true) {
                 Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(14.dp))
-                    .background(if (selected) Color.White.copy(.12f) else Color.Transparent)
+                    .background(if (selected) (if (glass) Color.White.copy(.16f) else Color(0xFF303037)) else Color.Transparent)
                     .clickable { activeId = d.id }
                     .padding(horizontal = 14.dp, vertical = 14.dp),
                 verticalAlignment = Alignment.CenterVertically
