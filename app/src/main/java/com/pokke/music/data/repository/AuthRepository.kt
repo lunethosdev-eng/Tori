@@ -204,6 +204,131 @@ class AuthRepository(context: Context) {
     }
 
     /** Public lookup by username (only returns is_public = true profiles unless it's your own). */
+    
+    data class ListeningPresence(
+        val userId: String,
+        val songId: String?,
+        val title: String?,
+        val artist: String?,
+        val coverUrl: String?,
+        val audioUrl: String?,
+        val positionMs: Long,
+        val durationMs: Long,
+        val isPlaying: Boolean
+    )
+
+    suspend fun publishListening(
+        songId: String?,
+        title: String?,
+        artist: String?,
+        coverUrl: String?,
+        audioUrl: String?,
+        positionMs: Long,
+        durationMs: Long,
+        isPlaying: Boolean
+    ): Result<Unit> = withContext(Dispatchers.IO) {
+        runCatching {
+            val s = session.value ?: return@runCatching
+            val obj = JSONObject()
+                .put("user_id", s.userId)
+                .put("song_id", songId ?: JSONObject.NULL)
+                .put("title", title ?: JSONObject.NULL)
+                .put("artist", artist ?: JSONObject.NULL)
+                .put("cover_url", coverUrl ?: JSONObject.NULL)
+                .put("audio_url", audioUrl ?: JSONObject.NULL)
+                .put("position_ms", positionMs)
+                .put("duration_ms", durationMs)
+                .put("is_playing", isPlaying)
+                .put("updated_at", java.time.Instant.now().toString())
+            request(
+                "/rest/v1/pokke_listening_presence",
+                "POST",
+                s,
+                body = JSONArray().put(obj).toString(),
+                prefer = "resolution=merge-duplicates,return=minimal"
+            )
+            Unit
+        }
+    }
+
+    suspend fun getListeningForUser(userId: String): Result<ListeningPresence?> = withContext(Dispatchers.IO) {
+        runCatching {
+            val s = session.value
+            val body = if (s != null) {
+                request(
+                    "/rest/v1/pokke_listening_presence",
+                    "GET",
+                    s,
+                    params = mapOf(
+                        "user_id" to "eq.$userId",
+                        "select" to "*",
+                        "order" to "updated_at.desc",
+                        "limit" to "1"
+                    )
+                )
+            } else {
+                http(
+                    "/rest/v1/pokke_listening_presence",
+                    "GET",
+                    params = mapOf(
+                        "user_id" to "eq.$userId",
+                        "select" to "*",
+                        "order" to "updated_at.desc",
+                        "limit" to "1"
+                    )
+                )
+            }
+            val arr = JSONArray(body)
+            if (arr.length() == 0) null
+            else {
+                val o = arr.getJSONObject(0)
+                ListeningPresence(
+                    userId = o.optString("user_id"),
+                    songId = o.optString("song_id").takeIf { it.isNotBlank() && it != "null" },
+                    title = o.optString("title").takeIf { it.isNotBlank() && it != "null" },
+                    artist = o.optString("artist").takeIf { it.isNotBlank() && it != "null" },
+                    coverUrl = o.optString("cover_url").takeIf { it.isNotBlank() && it != "null" },
+                    audioUrl = o.optString("audio_url").takeIf { it.isNotBlank() && it != "null" },
+                    positionMs = o.optLong("position_ms"),
+                    durationMs = o.optLong("duration_ms"),
+                    isPlaying = o.optBoolean("is_playing", true)
+                ).takeIf { it.isPlaying && !it.title.isNullOrBlank() }
+            }
+        }
+    }
+
+    suspend fun getPublicFavorites(username: String): Result<List<com.pokke.music.data.model.Song>> = withContext(Dispatchers.IO) {
+        runCatching {
+            val s = session.value
+            val body = if (s != null) {
+                request(
+                    "/rest/v1/rpc/pokke_public_favorites",
+                    "POST",
+                    s,
+                    body = JSONObject().put("p_username", username).toString()
+                )
+            } else {
+                http(
+                    "/rest/v1/rpc/pokke_public_favorites",
+                    "POST",
+                    body = JSONObject().put("p_username", username).toString()
+                )
+            }
+            val arr = JSONArray(body)
+            (0 until arr.length()).map { i ->
+                val o = arr.getJSONObject(i)
+                com.pokke.music.data.model.Song(
+                    id = o.optString("id"),
+                    title = o.optString("title"),
+                    artist = o.optString("artist"),
+                    coverUrl = o.optString("cover_url").takeIf { it.isNotBlank() && it != "null" },
+                    audioUrl = o.optString("audio_url").takeIf { it.isNotBlank() && it != "null" }
+                )
+            }
+        }
+    }
+
+
     suspend fun getProfileByUsername(username: String): Result<UserProfile?> = withContext(Dispatchers.IO) {
         runCatching {
             val clean = username.trim().lowercase().removePrefix("@")
