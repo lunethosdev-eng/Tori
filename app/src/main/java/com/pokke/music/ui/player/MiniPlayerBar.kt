@@ -15,7 +15,9 @@ import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialThemeButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -31,6 +33,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.pokke.music.player.PlayerController
+import com.pokke.music.ui.liquid.LocalAppBackdrop
+import com.kyant.backdrop.drawBackdrop
+import com.kyant.backdrop.effects.blur
+import com.kyant.backdrop.effects.lens
+import com.kyant.backdrop.effects.vibrancy
 
 /**
  * Floating pill mini-player (Apple Music style).
@@ -45,6 +52,7 @@ fun MiniPlayerBar(
     compact: Boolean = false,
     modifier: Modifier = Modifier
 ) {
+    val backdrop = LocalAppBackdrop.current
     val song by PlayerController.currentSong.collectAsState()
     val playing by PlayerController.isPlaying.collectAsState()
     val position by PlayerController.positionMs.collectAsState()
@@ -54,8 +62,8 @@ fun MiniPlayerBar(
 
     AnimatedVisibility(
         visible = visible && song != null,
-        enter = slideInVertically(spring()) { it / 2 } + fadeIn(),
-        exit = slideOutVertically(spring()) { it / 2 } + fadeOut(),
+        enter = slideInVertically(androidx.compose.animation.core.tween(180)) { it / 3 } + fadeIn(androidx.compose.animation.core.tween(140)),
+        exit = slideOutVertically(androidx.compose.animation.core.tween(130)) { it / 3 } + fadeOut(androidx.compose.animation.core.tween(110)),
         modifier = modifier
     ) {
         val s = song ?: return@AnimatedVisibility
@@ -66,10 +74,13 @@ fun MiniPlayerBar(
                 .shadow(if (glass) 18.dp else 8.dp, RoundedCornerShape(28.dp), clip = false)
                 .clip(RoundedCornerShape(28.dp))
                 .then(
-                    if (glass) Modifier
-                        .background(Color(0xB31C1C1E))
-                        .border(0.6.dp, Color.White.copy(0.18f), RoundedCornerShape(28.dp))
-                    else Modifier.background(Color(0xF21A1A1F))
+                    if (glass && backdrop != null) Modifier.drawBackdrop(
+                        backdrop = backdrop,
+                        shape = { RoundedCornerShape(28.dp) },
+                        effects = { vibrancy(); blur(20f.dp.toPx()); lens(18f.dp.toPx(), 26f.dp.toPx()) },
+                        onDrawSurface = { drawRect(MaterialTheme.colorScheme.surface.copy(alpha = 0.76f)) }
+                    ).border(0.7.dp, Color.White.copy(0.24f), RoundedCornerShape(28.dp))
+                    else Modifier.background(MaterialTheme.colorScheme.surface)
                 )
                 .clickable(onClick = onOpenPlayer)
                 .padding(horizontal = 10.dp, vertical = if (compact) 8.dp else 10.dp)
@@ -87,7 +98,7 @@ fun MiniPlayerBar(
                 Column(Modifier.weight(1f)) {
                     Text(
                         s.title,
-                        color = Color.White,
+                        color = MaterialTheme.colorScheme.onSurface,
                         fontWeight = FontWeight.SemiBold,
                         fontSize = if (compact) 13.sp else 14.sp,
                         maxLines = 1,
@@ -96,7 +107,7 @@ fun MiniPlayerBar(
                     if (!compact) {
                         Text(
                             s.artist,
-                            color = Color.White.copy(.55f),
+                            color = MaterialTheme.colorScheme.onSurface.copy(.62f),
                             fontSize = 12.sp,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
@@ -109,15 +120,15 @@ fun MiniPlayerBar(
                             .fillMaxWidth()
                             .height(2.dp)
                             .clip(RoundedCornerShape(1.dp))
-                            .background(Color.White.copy(.15f))
+                            .background(MaterialTheme.colorScheme.onSurface.copy(.18f))
                     ) {
                         Box(
                             Modifier
                                 .fillMaxWidth(progress)
                                 .fillMaxHeight()
                                 .background(
-                                    if (glass) Brush.horizontalGradient(listOf(Color.White.copy(.9f), Color.White.copy(.5f)))
-                                    else Brush.horizontalGradient(listOf(Color.White, Color.White.copy(.7f)))
+                                    if (glass) Brush.horizontalGradient(listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.primary.copy(.55f)))
+                                    else Brush.horizontalGradient(listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.primary.copy(.7f)))
                                 )
                         )
                     }
@@ -125,12 +136,12 @@ fun MiniPlayerBar(
                 IconButton(onClick = { PlayerController.togglePlayPause() }, Modifier.size(40.dp)) {
                     Icon(
                         if (playing) Icons.Default.Pause else Icons.Default.PlayArrow,
-                        null, tint = Color.White, modifier = Modifier.size(22.dp)
+                        null, tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(22.dp)
                     )
                 }
                 if (!compact) {
                     IconButton(onClick = { PlayerController.playNext() }, Modifier.size(40.dp)) {
-                        Icon(Icons.Default.SkipNext, null, tint = Color.White, modifier = Modifier.size(22.dp))
+                        Icon(Icons.Default.SkipNext, null, tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(22.dp))
                     }
                 }
             }
