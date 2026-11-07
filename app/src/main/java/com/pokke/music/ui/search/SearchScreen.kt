@@ -63,6 +63,7 @@ fun SearchScreen(
     val scope = rememberCoroutineScope()
     var favoriteIds by remember { mutableStateOf<Set<String>>(emptySet()) }
     var query by remember { mutableStateOf("") }
+    var searchExpanded by remember { mutableStateOf(false) }
     var kind by remember { mutableStateOf(SearchKind.SONGS) }
     var songs by remember { mutableStateOf<List<Song>>(emptyList()) }
     var artists by remember { mutableStateOf<List<Artist>>(emptyList()) }
