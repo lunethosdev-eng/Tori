@@ -57,6 +57,19 @@
             </intent-filter>
         </activity>
 
+    
+        <activity
+            android:name=".ui.pairing.PairDeviceActivity"
+            android:exported="true"
+            android:theme="@style/Theme.Pokke">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="pokke" android:host="pair" />
+            </intent-filter>
+        </activity>
+
     </application>
 
 </manifest>
