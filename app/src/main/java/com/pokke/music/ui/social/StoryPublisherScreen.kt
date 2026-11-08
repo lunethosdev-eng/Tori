@@ -9,6 +9,7 @@ import android.provider.MediaStore
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -29,6 +30,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
@@ -54,7 +56,9 @@ private data class GalleryItem(val uri: Uri, val isVideo: Boolean, val durationS
 private data class StoryText(
     val text: String,
     val offset: Offset = Offset.Zero,
-    val style: Int = 0 // 0 classic bold, 1 classic, 2 typewriter
+    val style: Int = 0, // 0 classic bold, 1 classic, 2 typewriter
+    val isGif: Boolean = false,
+    val gifUrl: String? = null
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -178,7 +182,7 @@ fun StoryPublisherScreen(
                     append("[music_only] ")
                     append("${currentSong!!.title} – ${currentSong!!.artist}")
                     if (caption.isNotBlank()) append("\n$caption")
-                    storyTexts.forEach { append("\n${it.text}") }
+                    storyTexts.filter { !it.isGif }.forEach { append("\n${it.text}") }
                 }
                 // Use cover as media if available
                 val cover = currentSong!!.coverUrl
@@ -202,7 +206,7 @@ fun StoryPublisherScreen(
                         if (audience == "friends") append("[friends] ")
                         if (selected.size > 1) append("[slide ${index + 1}/${selected.size}] ")
                         append(caption)
-                        storyTexts.forEach { append("\n${it.text}") }
+                        storyTexts.filter { !it.isGif }.forEach { append("\n${it.text}") }
                         append(musicMeta)
                     }.trim().ifBlank { null }
                     social.publishStory(url, if (isVideo) "video" else "image", cap).getOrThrow()
@@ -422,100 +426,56 @@ fun StoryPublisherScreen(
 
                 // Draggable texts
                 storyTexts.forEachIndexed { idx, st ->
-                    var offset by remember(st) { mutableStateOf(st.offset) }
-                    Text(
-                        st.text,
-                        color = Color.White,
-                        fontSize = when (st.style) { 0 -> 32.sp; 1 -> 28.sp; else -> 22.sp },
-                        fontWeight = if (st.style == 0) FontWeight.Black else FontWeight.Medium,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier
-                            .offset { IntOffset(offset.x.roundToInt(), offset.y.roundToInt()) }
-                            .pointerInput(idx) {
-                                detectDragGestures { change, drag ->
-                                    change.consume()
-                                    offset += drag
-                                }
-                            }
-                            .padding(8.dp)
-                    )
-                }
-
-                // Top bar
-                Row(
-                    Modifier
-                        .fillMaxWidth()
-                        .statusBarsPadding()
-                        .padding(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    TextButton(onClick = { phase = "gallery"; musicOnly = false }) {
-                        Text("Cancelar", color = Color.White)
-                    }
-                    Spacer(Modifier.weight(1f))
-                    if (attachMusic && currentSong != null) {
-                        Row(
+                    key(st.gifUrl ?: st.text, idx) {
+                        var offset by remember(st) { mutableStateOf(st.offset) }
+                        var dragY by remember { mutableStateOf(0f) }
+                        val alpha by animateFloatAsState(if (dragY > 180f) 0.35f else 1f, label = "delA")
+                        Box(
                             Modifier
-                                .clip(RoundedCornerShape(20.dp))
-                                .background(Color.Black.copy(.45f))
-                                .padding(horizontal = 10.dp, vertical = 6.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                                .offset { IntOffset(offset.x.roundToInt(), (offset.y + dragY).roundToInt()) }
+                                .graphicsLayer { this.alpha = alpha }
+                                .pointerInput(idx) {
+                                    detectDragGestures(
+                                        onDragEnd = {
+                                            if (dragY > 220f) {
+                                                storyTexts = storyTexts.filterIndexed { i, _ -> i != idx }
+                                            }
+                                            dragY = 0f
+                                        },
+                                        onDrag = { change, amount ->
+                                            change.consume()
+                                            offset = Offset(offset.x + amount.x, offset.y + amount.y)
+                                            dragY += amount.y
+                                            // persist soft
+                                            storyTexts = storyTexts.mapIndexed { i, s ->
+                                                if (i == idx) s.copy(offset = offset) else s
+                                            }
+                                        }
+                                    )
+                                }
                         ) {
-                            AsyncImage(currentSong!!.coverUrl, null, Modifier.size(22.dp).clip(CircleShape))
-                            Spacer(Modifier.width(6.dp))
-                            Text(currentSong!!.title.take(18), color = Color.White, fontSize = 12.sp)
+                            if (st.isGif && !st.gifUrl.isNullOrBlank()) {
+                                AsyncImage(
+                                    st.gifUrl, "GIF",
+                                    Modifier.size(140.dp).clip(RoundedCornerShape(12.dp)),
+                                    contentScale = ContentScale.Crop
+                                )
+                            } else {
+                                Text(
+                                    st.text,
+                                    color = Color.White,
+                                    fontSize = if (st.style == 0) 28.sp else 22.sp,
+                                    fontWeight = if (st.style == 0) FontWeight.Black else FontWeight.Medium,
+                                    modifier = Modifier
+                                        .background(Color.Black.copy(0.35f), RoundedCornerShape(8.dp))
+                                        .padding(horizontal = 10.dp, vertical = 6.dp)
+                                )
+                            }
                         }
                     }
-                    Spacer(Modifier.width(8.dp))
-                    TextButton(onClick = { showPublishSheet = true }) {
-                        Text("Listo", color = Color.White, fontWeight = FontWeight.Bold)
-                    }
                 }
 
-                // Right tools
-                Column(
-                    Modifier
-                        .align(Alignment.CenterEnd)
-                        .padding(end = 10.dp)
-                        .statusBarsPadding()
-                        .padding(top = 48.dp),
-                    verticalArrangement = Arrangement.spacedBy(14.dp)
-                ) {
-                    listOf(
-                        Icons.Default.TextFields to { showTextEditor = true },
-                        Icons.Default.EmojiEmotions to { stickerOpen = true },
-                        Icons.Default.MusicNote to { phase = "music" },
-                        Icons.Default.Brush to { }
-                    ).forEach { (icon, act) ->
-                        IconButton(
-                            onClick = act,
-                            modifier = Modifier.size(44.dp).background(Color.Black.copy(.35f), CircleShape)
-                        ) {
-                            Icon(icon, null, tint = Color.White)
-                        }
-                    }
-                }
-
-                // Bottom music waveform strip style hint
-                if (attachMusic && currentSong != null) {
-                    Row(
-                        Modifier
-                            .align(Alignment.BottomCenter)
-                            .navigationBarsPadding()
-                            .padding(bottom = 24.dp)
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(Color.Black.copy(.5f))
-                            .padding(horizontal = 14.dp, vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(Icons.Default.GraphicEq, null, tint = Color(0xFFFF5C8A), modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(8.dp))
-                        Text("${currentSong!!.title} · ${currentSong!!.artist}", color = Color.White, fontSize = 12.sp)
-                    }
-                }
-            }
-
-            if (showTextEditor) {
+                if (showTextEditor) {
                 ModalBottomSheet(onDismissRequest = { showTextEditor = false }, containerColor = Color(0xFF1C1C1E)) {
                     Column(Modifier.padding(16.dp)) {
                         OutlinedTextField(
@@ -612,7 +572,7 @@ fun StoryPublisherScreen(
                                         g.previewUrl, null,
                                         Modifier.aspectRatio(1f).clip(RoundedCornerShape(8.dp)).clickable {
                                             selectedGif = g
-                                            storyTexts = storyTexts + StoryText("GIF:${g.fullUrl}", Offset(40f, 200f), 1)
+                                            storyTexts = storyTexts + StoryText(text = "GIF", offset = Offset(40f, 200f), style = 1, isGif = true, gifUrl = g.fullUrl)
                                             stickerOpen = false
                                         },
                                         contentScale = ContentScale.Crop
@@ -658,4 +618,5 @@ fun StoryPublisherScreen(
             )
         }
     }
+}
 }
