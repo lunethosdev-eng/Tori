@@ -116,7 +116,7 @@ fun HomeScreen(
                                 .drawBackdrop(
                                     backdrop = backdrop,
                                     shape = { RoundedCornerShape(22.dp) },
-                                    effects = { vibrancy(); blur(22f.dp.toPx()); lens(18f.dp.toPx(), 24f.dp.toPx()) },
+                                    effects = { blur(16f.dp.toPx()) },
                                     onDrawSurface = { drawRect(headerSurfaceColor.copy(alpha = 0.78f)) }
                                 )
                                 .border(0.7.dp, headerOutlineColor, RoundedCornerShape(22.dp))
