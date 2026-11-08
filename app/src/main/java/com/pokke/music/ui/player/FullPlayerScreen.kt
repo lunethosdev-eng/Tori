@@ -85,13 +85,8 @@ fun FullPlayerScreen(
     val playbackError by PlayerController.playbackError.collectAsState()
 
     val cover = current?.displayCoverUrl
-    val sharedTransitionScope = LocalPlayerSharedTransitionScope.current
-    val coverSharedModifier = if (sharedTransitionScope != null && current != null) with(sharedTransitionScope) {
-        Modifier.sharedElement(
-            rememberSharedContentState(key = "player-cover-${current!!.id}"),
-            animatedVisibilityScope = animatedVisibilityScope
-        )
-    } else Modifier
+    // sharedElement disabled: runtime NoSuchMethodError on BOM 2024.10 SharedTransition API
+    val coverSharedModifier = Modifier
 
     val audioManager = remember(context) { context.getSystemService(android.content.Context.AUDIO_SERVICE) as AudioManager }
     val maxMusicVolume = remember(audioManager) { audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC).coerceAtLeast(1).toFloat() }
