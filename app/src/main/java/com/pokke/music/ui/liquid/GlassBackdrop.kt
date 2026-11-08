@@ -12,7 +12,8 @@ import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 
 /**
  * Provides a layer [Backdrop] captured from [content] so liquid controls
- * (toggle/button/tabs/slider) can refract the real background like iOS glass.
+ * can refract the real background like iOS glass.
+ * When [enabled] is false, no capture runs (avoids crashes / GPU cost).
  */
 val LocalAppBackdrop = staticCompositionLocalOf<Backdrop?> { null }
 
