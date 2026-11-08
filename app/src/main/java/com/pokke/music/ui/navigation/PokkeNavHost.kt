@@ -244,7 +244,7 @@ fun PokkeNavHost() {
                     .then(if (glass && appBackdrop != null) Modifier.drawBackdrop(
                         backdrop = appBackdrop,
                         shape = { Capsule() },
-                        effects = { vibrancy(); blur(24f.dp.toPx()); lens(22f.dp.toPx(), 28f.dp.toPx()) },
+                        effects = { blur(18f.dp.toPx()) },
                         onDrawSurface = { drawRect(Color(0x7F292930)) }
                     ) else Modifier.clip(RoundedCornerShape(40.dp)).background(Color(0xFF19191E)))
                     .padding(horizontal = if (navCompact) 6.dp else 9.dp, vertical = if (navCompact) 5.dp else 8.dp),
