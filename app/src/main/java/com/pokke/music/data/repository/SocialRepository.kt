@@ -109,14 +109,26 @@ class SocialRepository(private val auth: AuthRepository) {
     suspend fun publishStory(mediaUrl: String, mediaType: String, caption: String?): Result<Unit> = withContext(Dispatchers.IO) {
         runCatching {
             val uid = auth.session.value?.userId ?: throw IOException("Inicia sesión")
-            val payload = JSONArray().put(
-                JSONObject()
+            // Support both schemas: media_url/media_type OR url/type OR image_url
+            val base = JSONObject()
+                .put("user_id", uid)
+                .put("caption", caption ?: JSONObject.NULL)
+                .put("media_url", mediaUrl)
+                .put("media_type", mediaType)
+                .put("url", mediaUrl)
+                .put("type", mediaType)
+                .put("image_url", mediaUrl)
+            try {
+                request("/rest/v1/pokke_stories", "POST", JSONArray().put(base).toString(), "return=minimal")
+            } catch (e: Exception) {
+                // Retry with minimal known-good columns after migration
+                val minimal = JSONObject()
                     .put("user_id", uid)
                     .put("media_url", mediaUrl)
                     .put("media_type", mediaType)
-                    .put("caption", caption ?: JSONObject.NULL)
-            )
-            request("/rest/v1/pokke_stories", "POST", payload.toString(), "return=minimal")
+                if (!caption.isNullOrBlank()) minimal.put("caption", caption)
+                request("/rest/v1/pokke_stories", "POST", JSONArray().put(minimal).toString(), "return=minimal")
+            }
             Unit
         }
     }
