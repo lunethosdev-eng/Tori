@@ -89,7 +89,7 @@ fun AudioOutputSheet(onDismiss: () -> Unit, glass: Boolean = true) {
             .then(if (glass && backdrop != null) Modifier.drawBackdrop(
                 backdrop = backdrop,
                 shape = { RoundedCornerShape(28.dp) },
-                effects = { vibrancy(); blur(22f.dp.toPx()); lens(18f.dp.toPx(), 24f.dp.toPx()) },
+                effects = { blur(16f.dp.toPx()) },
                 onDrawSurface = { drawRect(Color(0xB31A1A1D)) }
             ) else Modifier.background(Color(0xFF17171B), RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)))
             .padding(horizontal = 20.dp, vertical = 12.dp)
