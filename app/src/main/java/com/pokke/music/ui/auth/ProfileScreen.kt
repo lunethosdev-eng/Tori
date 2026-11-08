@@ -217,23 +217,37 @@ fun ProfileScreen(repository: AuthRepository, onBack: () -> Unit, onSignedOut: (
         "solid" -> Color(0xFF252A3D); "outline" -> pageBackground.copy(alpha = .55f); else -> Color(0xCC252A40)
     }
 
-    Column(Modifier.fillMaxSize().background(pageBackground).verticalScroll(rememberScrollState())) {
+    val pageBrush = if (gradientEnabled) {
+        val pCol = try { Color(android.graphics.Color.parseColor(primaryColor)) } catch (_: Exception) { Color(0xFFAAA0FF) }
+        val sCol = try { Color(android.graphics.Color.parseColor(secondaryColor)) } catch (_: Exception) { Color(0xFF1A1C26) }
+        Brush.verticalGradient(listOf(sCol.copy(alpha=0.9f), pageBackground, Color(0xFF0A0A0C)))
+    } else null
+    Column(Modifier.fillMaxSize().then(
+        if (customBg.ifBlank { profile?.customBgUrl.orEmpty() }.isNotBlank()) Modifier.background(Color(0xFF0A0A0C))
+        else if (pageBrush != null) Modifier.background(pageBrush)
+        else Modifier.background(pageBackground)
+    ).verticalScroll(rememberScrollState())) {
+        // Full-page custom background sits behind everything when set
+        val bgFull = customBg.ifBlank { profile?.customBgUrl.orEmpty() }
+        if (bgFull.isNotBlank()) {
+            // drawn in outer box via parent - header uses banner separately
+        }
         Box(Modifier.fillMaxWidth().height(236.dp)) {
-            val bg = customBg.ifBlank { profile?.customBgUrl.orEmpty() }
-            if (bg.isNotBlank()) {
-                AsyncImage(bg, "Fondo custom", Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
-                Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.45f)))
-            } else if (banner.isNotBlank()) {
+            // Banner is ONLY the header strip (not the same as custom bg)
+            if (banner.isNotBlank()) {
                 AsyncImage(banner, "Banner del perfil", Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
-            } else if (!gradientEnabled) {
+            } else if (bgFull.isNotBlank()) {
+                AsyncImage(bgFull, "Fondo custom (header)", Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+            } else {
                 Box(Modifier.fillMaxSize().background(Brush.linearGradient(listOf(accentColor.copy(.78f), Color(0xFF20243B), pageBackground))))
             }
+            // Primary/secondary gradient always on top when enabled
             if (gradientEnabled) {
                 val pCol = try { Color(android.graphics.Color.parseColor(primaryColor)) } catch (_: Exception) { Color(0xFFAAA0FF) }
                 val sCol = try { Color(android.graphics.Color.parseColor(secondaryColor)) } catch (_: Exception) { Color(0xFF1A1C26) }
-                Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(pCol.copy(alpha = if (bg.isNotBlank()) 0.38f else 0.62f), sCol.copy(alpha = 0.72f), Color.Black.copy(alpha = 0.82f)))))
+                Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(pCol.copy(alpha = 0.55f), sCol.copy(alpha = 0.45f), Color.Black.copy(alpha = 0.55f)))))
             }
-            Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color.Black.copy(.08f), Color.Black.copy(.42f)))))
+            Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color.Black.copy(.05f), Color.Black.copy(.35f)))))
             Row(Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 12.dp, vertical = 8.dp), horizontalArrangement = Arrangement.SpaceBetween) {
                 ProfileTopButton(onClick = { if (editing) editing = false else onBack() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Volver", tint = Color.White) }
                 ProfileTopButton(onClick = { scope.launch { repository.signOut(); onSignedOut() } }) { Icon(Icons.Default.Logout, "Cerrar sesión", tint = Color.White) }
