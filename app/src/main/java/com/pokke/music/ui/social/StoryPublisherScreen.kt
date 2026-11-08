@@ -598,8 +598,7 @@ fun StoryPublisherScreen(
                                     horizontalArrangement = Arrangement.spacedBy(4.dp),
                                     verticalArrangement = Arrangement.spacedBy(4.dp)
                                 ) {
-                                    gridItems(giphyResults.size) { i ->
-                                        val g = giphyResults[i]
+                                    gridItems(giphyResults, key = { it.id }) { g ->
                                         AsyncImage(
                                             g.previewUrl, null,
                                             Modifier
