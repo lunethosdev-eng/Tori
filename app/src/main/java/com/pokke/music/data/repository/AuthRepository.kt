@@ -403,7 +403,7 @@ class AuthRepository(context: Context) {
             val pattern = "*$term*"
             val s = _session.value
             val params = mapOf(
-                "select" to "id,display_name,username,avatar_url,banner_url,bio,theme,frame,is_public,badge,pronouns,status_text,accent_color,card_style,badges,link_label,link_url,show_listening,extra_links,favorite_mangas,search_card_style,search_card_color,search_card_effect,primary_color,secondary_color,gradient_enabled,profile_gifs,about_extra,is_owner",
+                "select" to "id,display_name,username,avatar_url,banner_url,custom_bg_url,bio,theme,frame,is_public,badge,pronouns,status_text,accent_color,card_style,badges,link_label,link_url,show_listening,extra_links,favorite_mangas,search_card_style,search_card_color,search_card_effect,primary_color,secondary_color,gradient_enabled,profile_gifs,about_extra,is_owner",
                 "or" to "(username.ilike.$pattern,display_name.ilike.$pattern)",
                 "is_public" to "eq.true",
                 "order" to "username.asc",
