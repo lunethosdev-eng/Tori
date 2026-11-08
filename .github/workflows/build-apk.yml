@@ -37,27 +37,25 @@ jobs:
           fi
 
           yes | "$SDKMANAGER" --licenses >/dev/null 2>&1 || true
-
-          # API 37 is published by sdkmanager under the package name android-37.0.
           "$SDKMANAGER" --channel=3 --install "platform-tools" "platforms;android-37.0" "build-tools;36.0.0"
-
-          # AGP requests the platform folder as android-37; provide the expected alias.
           if [ -d "$SDK_ROOT/platforms/android-37.0" ] && [ ! -e "$SDK_ROOT/platforms/android-37" ]; then
             ln -s android-37.0 "$SDK_ROOT/platforms/android-37"
           fi
-
           test -f "$SDK_ROOT/platforms/android-37/android.jar"
 
       - name: Make gradlew executable
         run: chmod +x ./gradlew
 
-      - name: Build Debug APK
-        run: ./gradlew assembleDebug --stacktrace --no-daemon
+      # productFlavors phone/tv → APK under apk/phone/debug or apk/tv/debug
+      - name: Build Phone Debug APK
+        run: ./gradlew assemblePhoneDebug --stacktrace --no-daemon
 
-      - name: Upload APK
+      - name: Upload Phone APK
         uses: actions/upload-artifact@v4
         with:
-          name: Pokke-debug
-          path: app/build/outputs/apk/debug/*.apk
+          name: Pokke-phone-debug
+          path: |
+            app/build/outputs/apk/phone/debug/*.apk
+            app/build/outputs/apk/debug/*.apk
           retention-days: 14
           if-no-files-found: error
