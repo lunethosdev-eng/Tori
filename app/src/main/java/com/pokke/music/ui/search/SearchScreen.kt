@@ -99,7 +99,7 @@ fun SearchScreen(
         }
     }
 
-    LaunchedEffect(query, kind) {
+        LaunchedEffect(query) {
         detail = null
         if (query.isBlank()) {
             songs = emptyList(); artists = emptyList(); albums = emptyList(); users = emptyList()
@@ -109,27 +109,13 @@ fun SearchScreen(
         delay(320)
         loading = true
         error = null
-        when (kind) {
-            SearchKind.SONGS -> {
-                val multi = multiRepo.searchAll(query)
-                if (multi.isSuccess) {
-                    songs = multi.getOrDefault(emptyList())
-                } else {
-                    repo.searchSongs(query)
-                        .onSuccess { songs = it }
-                        .onFailure { error = it.localizedMessage ?: "No se pudo buscar"; songs = emptyList() }
-                }
-            }
-            SearchKind.ARTISTS -> repo.searchArtists(query)
-                .onSuccess { artists = it }
-                .onFailure { error = it.localizedMessage ?: "No se pudieron buscar artistas"; artists = emptyList() }
-            SearchKind.ALBUMS -> repo.searchAlbums(query)
-                .onSuccess { albums = it }
-                .onFailure { error = it.localizedMessage ?: "No se pudieron buscar álbumes"; albums = emptyList() }
-            SearchKind.USERS -> authRepository.searchUsers(query)
-                .onSuccess { users = it }
-                .onFailure { error = it.localizedMessage ?: "No se pudieron buscar usuarios"; users = emptyList() }
-        }
+        // Unified: always load songs + users + artists together
+        val multi = multiRepo.searchAll(query)
+        if (multi.isSuccess) songs = multi.getOrDefault(emptyList())
+        else repo.searchSongs(query).onSuccess { songs = it }.onFailure { songs = emptyList() }
+        repo.searchArtists(query).onSuccess { artists = it }.onFailure { artists = emptyList() }
+        repo.searchAlbums(query).onSuccess { albums = it }.onFailure { albums = emptyList() }
+        authRepository.searchUsers(query).onSuccess { users = it }.onFailure { users = emptyList() }
         loading = false
     }
 
@@ -184,33 +170,33 @@ fun SearchScreen(
                 }
             }
             query.isBlank() -> EmptyMessage("Busca canciones, artistas, álbumes o usuarios")
-            kind == SearchKind.SONGS -> {
-                if (songs.isEmpty()) EmptyMessage("No se encontraron canciones")
-                else LazyColumn(contentPadding = PaddingValues(bottom = 112.dp)) {
-                    itemsIndexed(songs, key = { _, song -> song.id }) { index, song -> SongRow(song, favoriteIds.contains(song.id), { toggleFavorite(song) }) { onPlayQueue(songs, index) } }
-                }
-            }
-            kind == SearchKind.ARTISTS -> {
-                if (artists.isEmpty()) EmptyMessage("No se encontraron artistas")
-                else LazyColumn(contentPadding = PaddingValues(bottom = 112.dp)) {
-                    itemsIndexed(artists, key = { _, artist -> artist.id.ifBlank { artist.name } }) { _, artist ->
-                        ArtistRow(artist) { detail = SearchDetail(artist.name, isArtist = true) }
-                    }
-                }
-            }
-            kind == SearchKind.USERS -> {
-                if (users.isEmpty()) EmptyMessage("No se encontraron usuarios públicos")
-                else LazyColumn(contentPadding = PaddingValues(bottom = 112.dp)) {
-                    itemsIndexed(users, key = { _, u -> u.id }) { _, user ->
-                        UserRow(user) { user.username?.let(onUserClick) }
-                    }
-                }
-            }
+            songs.isEmpty() && artists.isEmpty() && albums.isEmpty() && users.isEmpty() ->
+                EmptyMessage("Sin resultados para \"$query\"")
             else -> {
-                if (albums.isEmpty()) EmptyMessage("No se encontraron álbumes")
-                else LazyColumn(contentPadding = PaddingValues(bottom = 112.dp)) {
-                    itemsIndexed(albums, key = { _, album -> "${album.name}-${album.artist}" }) { _, album ->
-                        AlbumRow(album) { detail = SearchDetail(album.name, album.artist, isArtist = false) }
+                LazyColumn(contentPadding = PaddingValues(bottom = 112.dp)) {
+                    if (users.isNotEmpty()) {
+                        item { Text("USUARIOS", color = Color.White.copy(.5f), fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) }
+                        itemsIndexed(users, key = { _, u -> "u-${u.id}" }) { _, user ->
+                            UserRow(user) { user.username?.let(onUserClick) }
+                        }
+                    }
+                    if (artists.isNotEmpty()) {
+                        item { Text("ARTISTAS", color = Color.White.copy(.5f), fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) }
+                        itemsIndexed(artists, key = { _, a -> "a-${a.id.ifBlank { a.name }}" }) { _, artist ->
+                            ArtistRow(artist) { detail = SearchDetail(artist.name, isArtist = true) }
+                        }
+                    }
+                    if (albums.isNotEmpty()) {
+                        item { Text("ÁLBUMES", color = Color.White.copy(.5f), fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) }
+                        itemsIndexed(albums, key = { _, al -> "al-${al.name}-${al.artist}" }) { _, album ->
+                            AlbumRow(album) { detail = SearchDetail(album.name, album.artist, isArtist = false) }
+                        }
+                    }
+                    if (songs.isNotEmpty()) {
+                        item { Text("CANCIONES", color = Color.White.copy(.5f), fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) }
+                        itemsIndexed(songs, key = { _, song -> song.id }) { index, song ->
+                            SongRow(song, favoriteIds.contains(song.id), { toggleFavorite(song) }) { onPlayQueue(songs, index) }
+                        }
                     }
                 }
             }
