@@ -109,26 +109,21 @@ class SocialRepository(private val auth: AuthRepository) {
     suspend fun publishStory(mediaUrl: String, mediaType: String, caption: String?): Result<Unit> = withContext(Dispatchers.IO) {
         runCatching {
             val uid = auth.session.value?.userId ?: throw IOException("Inicia sesión")
-            // Support both schemas: media_url/media_type OR url/type OR image_url
-            val base = JSONObject()
-                .put("user_id", uid)
-                .put("caption", caption ?: JSONObject.NULL)
-                .put("media_url", mediaUrl)
-                .put("media_type", mediaType)
-                .put("url", mediaUrl)
-                .put("type", mediaType)
-                .put("image_url", mediaUrl)
-            try {
-                request("/rest/v1/pokke_stories", "POST", JSONArray().put(base).toString(), "return=minimal")
-            } catch (e: Exception) {
-                // Retry with minimal known-good columns after migration
-                val minimal = JSONObject()
+            // Real schema (Pokke Users): media_path NOT NULL, duration_seconds NOT NULL, audience NOT NULL
+            val path = mediaUrl.substringAfter("/storage/v1/object/public/").ifBlank { mediaUrl }
+            val isFriends = caption?.startsWith("[friends]") == true
+            val payload = JSONArray().put(
+                JSONObject()
                     .put("user_id", uid)
                     .put("media_url", mediaUrl)
-                    .put("media_type", mediaType)
-                if (!caption.isNullOrBlank()) minimal.put("caption", caption)
-                request("/rest/v1/pokke_stories", "POST", JSONArray().put(minimal).toString(), "return=minimal")
-            }
+                    .put("media_path", path)
+                    .put("media_type", if (mediaType.contains("video")) "video" else "image")
+                    .put("caption", caption ?: JSONObject.NULL)
+                    .put("duration_seconds", if (mediaType.contains("video")) 15 else 5)
+                    .put("audience", if (isFriends) "friends" else "public")
+                    .put("visibility", if (isFriends) "friends" else "public")
+            )
+            request("/rest/v1/pokke_stories", "POST", payload.toString(), "return=minimal")
             Unit
         }
     }
