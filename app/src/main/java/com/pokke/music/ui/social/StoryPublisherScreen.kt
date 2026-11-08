@@ -44,6 +44,8 @@ import androidx.core.content.ContextCompat
 import coil.compose.AsyncImage
 import com.pokke.music.data.repository.AuthRepository
 import com.pokke.music.data.repository.SocialRepository
+import com.pokke.music.data.model.Song
+import com.pokke.music.data.repository.MultiMusicRepository
 import com.pokke.music.player.PlayerController
 import com.pokke.music.data.remote.GiphyClient
 import com.pokke.music.data.remote.GiphyGif
@@ -87,6 +89,11 @@ fun StoryPublisherScreen(
     var showPublishSheet by remember { mutableStateOf(false) }
     var attachMusic by remember { mutableStateOf(true) }
     var musicOnly by remember { mutableStateOf(false) }
+    var selectedStorySong by remember { mutableStateOf<Song?>(null) }
+    var musicQuery by remember { mutableStateOf("") }
+    var musicResults by remember { mutableStateOf<List<Song>>(emptyList()) }
+    var musicLoading by remember { mutableStateOf(false) }
+    val multiMusic = remember { MultiMusicRepository() }
     var stickerOpen by remember { mutableStateOf(false) }
     var giphyQuery by remember { mutableStateOf("") }
     var giphyResults by remember { mutableStateOf<List<GiphyGif>>(emptyList()) }
@@ -172,20 +179,19 @@ fun StoryPublisherScreen(
         busy = true
         message = null
         runCatching {
-            val musicMeta = if (attachMusic && currentSong != null) {
-                " ♪ ${currentSong!!.title} – ${currentSong!!.artist}"
+            val storySong = selectedStorySong ?: currentSong
+            val musicMeta = if (attachMusic && storySong != null) {
+                " ♪ ${storySong.title} – ${storySong.artist}"
             } else ""
-            if (musicOnly && currentSong != null) {
-                // music-only story card as image-less entry with caption
+            if (musicOnly && storySong != null) {
                 val cap = buildString {
                     if (audience == "friends") append("[friends] ")
                     append("[music_only] ")
-                    append("${currentSong!!.title} – ${currentSong!!.artist}")
+                    append("${storySong.title} – ${storySong.artist}")
                     if (caption.isNotBlank()) append("\n$caption")
                     storyTexts.filter { !it.isGif }.forEach { append("\n${it.text}") }
                 }
-                // Use cover as media if available
-                val cover = currentSong!!.coverUrl
+                val cover = storySong.coverUrl
                 if (!cover.isNullOrBlank()) {
                     social.publishStory(cover, "image", cap).getOrThrow()
                 } else error("Sin carátula para historia de solo música")
@@ -364,40 +370,92 @@ fun StoryPublisherScreen(
         }
 
         "music" -> {
+            // Independent catalog search (not tied to now-playing)
+            LaunchedEffect(musicQuery) {
+                if (musicQuery.isBlank()) {
+                    musicResults = emptyList()
+                    return@LaunchedEffect
+                }
+                musicLoading = true
+                multiMusic.searchAll(musicQuery)
+                    .onSuccess { musicResults = it.take(40) }
+                    .onFailure { musicResults = emptyList() }
+                musicLoading = false
+            }
             Column(Modifier.fillMaxSize().background(Color(0xFF0B0B0D)).statusBarsPadding()) {
                 Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
                     IconButton(onClick = { phase = "gallery" }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = Color.White)
                     }
-                    Text("Música", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                    Text("Música para la historia", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp)
                 }
-                Text("Audio sugerido", color = Color.White.copy(.5f), modifier = Modifier.padding(horizontal = 16.dp))
-                currentSong?.let { song ->
+                OutlinedTextField(
+                    value = musicQuery,
+                    onValueChange = { musicQuery = it },
+                    placeholder = { Text("Buscar canción o artista…", color = Color.White.copy(.4f)) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = Color.White,
+                        unfocusedTextColor = Color.White,
+                        focusedBorderColor = Color(0xFF3797F0),
+                        unfocusedBorderColor = Color.White.copy(.2f)
+                    )
+                )
+                Spacer(Modifier.height(8.dp))
+                selectedStorySong?.let { song ->
                     Row(
-                        Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp)
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(Color(0xFF1C1C1E))
-                            .clickable { attachMusic = true; if (selected.isEmpty()) { musicOnly = true; phase = "editor" } else phase = "editor" }
-                            .padding(12.dp),
+                        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)
+                            .clip(RoundedCornerShape(14.dp)).background(Color(0xFF1C2A3A)).padding(12.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        AsyncImage(song.coverUrl, null, Modifier.size(56.dp).clip(RoundedCornerShape(8.dp)), contentScale = ContentScale.Crop)
-                        Spacer(Modifier.width(12.dp))
+                        AsyncImage(song.coverUrl, null, Modifier.size(48.dp).clip(RoundedCornerShape(8.dp)), contentScale = ContentScale.Crop)
+                        Spacer(Modifier.width(10.dp))
                         Column(Modifier.weight(1f)) {
-                            Text(song.title, color = Color.White, fontWeight = FontWeight.SemiBold)
-                            Text(song.artist, color = Color.White.copy(.6f), fontSize = 13.sp)
+                            Text("Seleccionada", color = Color(0xFF3797F0), fontSize = 11.sp)
+                            Text(song.title, color = Color.White, fontWeight = FontWeight.SemiBold, maxLines = 1)
+                            Text(song.artist, color = Color.White.copy(.6f), fontSize = 12.sp, maxLines = 1)
                         }
-                        Icon(Icons.Default.GraphicEq, null, tint = Color(0xFF3797F0))
+                        TextButton(onClick = { selectedStorySong = null }) { Text("Quitar", color = Color(0xFFFF8A80)) }
                     }
-                } ?: Text("Reproduce una canción en Pokke para usarla", color = Color.White.copy(.5f), modifier = Modifier.padding(16.dp))
-                Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Switch(attachMusic, { attachMusic = it })
-                    Text("Adjuntar a la historia", color = Color.White, modifier = Modifier.padding(start = 8.dp))
                 }
-                TextButton(onClick = { musicOnly = true; attachMusic = true; phase = "editor" }) {
-                    Text("Solo música (sin foto)", color = Color(0xFF3797F0))
+                if (musicLoading) {
+                    Box(Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(color = Color.White)
+                    }
+                }
+                LazyColumn(Modifier.fillMaxSize().padding(horizontal = 12.dp), contentPadding = PaddingValues(bottom = 100.dp)) {
+                    items(musicResults, key = { it.id }) { song ->
+                        Row(
+                            Modifier.fillMaxWidth().clickable {
+                                selectedStorySong = song
+                                attachMusic = true
+                            }.padding(vertical = 8.dp, horizontal = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            AsyncImage(song.coverUrl, null, Modifier.size(52.dp).clip(RoundedCornerShape(8.dp)).background(Color(0xFF222)), contentScale = ContentScale.Crop)
+                            Spacer(Modifier.width(12.dp))
+                            Column(Modifier.weight(1f)) {
+                                Text(song.title, color = Color.White, maxLines = 1)
+                                Text(song.artist, color = Color.White.copy(.55f), fontSize = 13.sp, maxLines = 1)
+                            }
+                            if (selectedStorySong?.id == song.id) {
+                                Text("✓", color = Color(0xFF3797F0), fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                }
+                Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    OutlinedButton(
+                        onClick = { musicOnly = true; attachMusic = true; phase = "editor" },
+                        enabled = selectedStorySong != null,
+                        modifier = Modifier.weight(1f)
+                    ) { Text("Solo música", color = Color.White) }
+                    Button(
+                        onClick = { attachMusic = selectedStorySong != null; phase = if (selected.isEmpty()) "gallery" else "editor" },
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF3797F0))
+                    ) { Text("Usar", fontWeight = FontWeight.Bold) }
                 }
             }
         }
@@ -408,18 +466,19 @@ fun StoryPublisherScreen(
             Box(Modifier.fillMaxSize().background(Color.Black)) {
                 if (previewUri != null) {
                     AsyncImage(previewUri, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
-                } else if (musicOnly && currentSong != null) {
+                } else if (musicOnly && (selectedStorySong ?: currentSong) != null) {
                     // music-only visual
+                    val ms = selectedStorySong ?: currentSong
                     Box(Modifier.fillMaxSize().background(Color(0xFF121218)), contentAlignment = Alignment.Center) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             AsyncImage(
-                                currentSong!!.coverUrl, null,
+                                ms!!.coverUrl, null,
                                 Modifier.size(200.dp).clip(CircleShape).border(6.dp, Color.White.copy(.15f), CircleShape),
                                 contentScale = ContentScale.Crop
                             )
                             Spacer(Modifier.height(16.dp))
-                            Text(currentSong!!.title, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                            Text(currentSong!!.artist, color = Color.White.copy(.7f))
+                            Text(ms.title, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                            Text(ms.artist, color = Color.White.copy(.7f))
                         }
                     }
                 }
