@@ -19,6 +19,20 @@ android {
             useSupportLibrary = true
         }
     }
+    // phone = mobile APK (default); tv = Android TV / leanback APK (pokke-tv)
+    flavorDimensions += "device"
+    productFlavors {
+        create("phone") {
+            dimension = "device"
+            applicationId = "com.pokke.music"
+        }
+        create("tv") {
+            dimension = "device"
+            applicationId = "com.pokke.music.tv"
+            versionNameSuffix = "-tv"
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
