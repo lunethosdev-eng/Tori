@@ -46,6 +46,7 @@ fun FriendsMapScreen(authRepository: AuthRepository, onBack: () -> Unit) {
     var shareMusic by remember { mutableStateOf(false) }
     var shareBattery by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
+    var privacyExpanded by remember { mutableStateOf(false) }
     var webView by remember { mutableStateOf<WebView?>(null) }
 
     val permissionLauncher = rememberLauncherForActivityResult(
@@ -88,6 +89,14 @@ fun FriendsMapScreen(authRepository: AuthRepository, onBack: () -> Unit) {
     }
 
     LaunchedEffect(Unit) {
+        if (!hasLocationPermission()) {
+            permissionLauncher.launch(
+                arrayOf(
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.ACCESS_COARSE_LOCATION
+                )
+            )
+        }
         refresh()
         while (true) {
             delay(20_000)
@@ -166,7 +175,25 @@ fun FriendsMapScreen(authRepository: AuthRepository, onBack: () -> Unit) {
             shape = RoundedCornerShape(16.dp)
         ) {
             Column(Modifier.padding(14.dp)) {
-                Text("Privacidad", color = Color.White, fontWeight = FontWeight.SemiBold)
+                Row(
+            Modifier
+                .fillMaxWidth()
+                .clickable { privacyExpanded = !privacyExpanded }
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("Privacidad", color = Color.White, fontWeight = FontWeight.SemiBold)
+            Text(if (privacyExpanded) "Ocultar" else "Mostrar", color = Color.White.copy(.5f), fontSize = 12.sp)
+        }
+        if (privacyExpanded) {
+            Column(
+                Modifier
+                    .padding(horizontal = 16.dp)
+                    .fillMaxWidth()
+                    .background(Color(0xFF1C1C22), RoundedCornerShape(16.dp))
+                    .padding(14.dp)
+            ) {
                 listOf(
                     "none" to "No compartir",
                     "all_friends" to "Todos mis amigos",
@@ -228,4 +255,6 @@ fun FriendsMapScreen(authRepository: AuthRepository, onBack: () -> Unit) {
             }
         }
     }
+}
+}
 }
