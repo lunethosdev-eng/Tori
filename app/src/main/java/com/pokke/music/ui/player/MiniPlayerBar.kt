@@ -1,7 +1,6 @@
 package com.pokke.music.ui.player
 
 import androidx.compose.animation.*
-import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
@@ -44,7 +43,6 @@ import com.kyant.backdrop.effects.vibrancy
  * glass=true → liquid glass look; glass=false → Material Expressive solid.
  * compact=true shrinks on scroll.
  */
-@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 fun MiniPlayerBar(
     visible: Boolean,
@@ -70,14 +68,8 @@ fun MiniPlayerBar(
         modifier = modifier
     ) {
         val s = song ?: return@AnimatedVisibility
-        val sharedCoverModifier = if (sharedTransitionScope != null) {
-            with(sharedTransitionScope) {
-                Modifier.sharedElement(
-                    rememberSharedContentState(key = "player-cover-${s.id}"),
-                    animatedVisibilityScope = this@AnimatedVisibility
-                )
-            }
-        } else Modifier
+        // sharedElement disabled (NoSuchMethodError on device)
+        val sharedCoverModifier = Modifier
         Box(
             Modifier
                 .fillMaxWidth()
@@ -88,7 +80,7 @@ fun MiniPlayerBar(
                     if (glass && backdrop != null) Modifier.drawBackdrop(
                         backdrop = backdrop,
                         shape = { RoundedCornerShape(28.dp) },
-                        effects = { vibrancy(); blur(20f.dp.toPx()); lens(18f.dp.toPx(), 26f.dp.toPx()) },
+                        effects = { blur(16f.dp.toPx()) },
                         onDrawSurface = { drawRect(surfaceColor.copy(alpha = 0.76f)) }
                     ).border(0.7.dp, Color.White.copy(0.24f), RoundedCornerShape(28.dp))
                     else Modifier.background(MaterialTheme.colorScheme.surface)
