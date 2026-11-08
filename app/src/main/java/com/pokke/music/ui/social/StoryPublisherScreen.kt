@@ -15,9 +15,11 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -319,7 +321,7 @@ fun StoryPublisherScreen(
                                 Icon(Icons.Default.PhotoCamera, null, tint = Color.White, modifier = Modifier.size(32.dp))
                             }
                         }
-                        items(items, key = { it.uri.toString() }) { item ->
+                        gridItems(items, key = { it.uri.toString() }) { item ->
                             val isSelected = selected.contains(item.uri)
                             Box(Modifier.aspectRatio(1f).clickable { toggle(item.uri) }) {
                                 AsyncImage(item.uri, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
@@ -625,7 +627,7 @@ fun StoryPublisherScreen(
                                 horizontalArrangement = Arrangement.spacedBy(4.dp),
                                 verticalArrangement = Arrangement.spacedBy(4.dp)
                             ) {
-                                items(giphyResults.size) { i ->
+                                gridItems(giphyResults.size) { i ->
                                     val g = giphyResults[i]
                                     AsyncImage(
                                         g.previewUrl, null,
