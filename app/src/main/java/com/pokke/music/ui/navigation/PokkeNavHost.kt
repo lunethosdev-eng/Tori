@@ -1,8 +1,6 @@
 package com.pokke.music.ui.navigation
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.ExperimentalSharedTransitionApi
-import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
@@ -54,7 +52,6 @@ import com.pokke.music.ui.settings.SettingsScreen
 import com.pokke.music.ui.admin.AdminPanelScreen
 import com.pokke.music.ui.social.ChatScreen
 import com.pokke.music.ui.player.MiniPlayerBar
-import com.pokke.music.ui.player.LocalPlayerSharedTransitionScope
 import com.pokke.music.ui.social.StoryPublisherScreen
 import com.pokke.music.ui.social.FriendsMapScreen
 import com.pokke.music.ui.liquid.LocalAppBackdrop
@@ -98,7 +95,6 @@ private val baseNavItems = listOf(
     NavItem(Screen.Search, Icons.Filled.Search, Icons.Outlined.Search)
 )
 
-@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 fun PokkeNavHost() {
     val nav = rememberNavController()
@@ -146,8 +142,8 @@ fun PokkeNavHost() {
     LaunchedEffect(route) { auth.getProfile().onSuccess { avatar = it?.avatarUrl } }
 
     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-        SharedTransitionLayout {
-            CompositionLocalProvider(LocalPlayerSharedTransitionScope provides this) {
+        // SharedTransition removed — caused NoSuchMethodError on FullPlayer
+            Box(Modifier.fillMaxSize()) {
                 NavHost(navController = nav, startDestination = Screen.Home.route, modifier = Modifier.fillMaxSize()) {
             composable(Screen.Auth.route) {
                 LoginScreen(repository = auth, onContinueAsGuest = { nav.popBackStack() }, onLoginSuccess = { nav.popBackStack() })
@@ -213,8 +209,7 @@ fun PokkeNavHost() {
                     onOpenQueue = { nav.navigate(Screen.Queue.route) },
                     onOpenLyrics = { nav.navigate(Screen.Lyrics.route) },
                     authRepository = auth,
-                    onRequireLogin = { nav.navigate(Screen.Auth.route) },
-                    animatedVisibilityScope = this
+                    onRequireLogin = { nav.navigate(Screen.Auth.route) }
                 )
             }
             composable(Screen.Queue.route) { QueueScreen(onBack = { nav.popBackStack() }) }
@@ -241,12 +236,9 @@ fun PokkeNavHost() {
             Row(
                 modifier = Modifier.padding(bottom = 10.dp).navigationBarsPadding()
                     .animateContentSize(androidx.compose.animation.core.tween(190))
-                    .then(if (glass && appBackdrop != null) Modifier.drawBackdrop(
-                        backdrop = appBackdrop,
-                        shape = { Capsule() },
-                        effects = { blur(18f.dp.toPx()) },
-                        onDrawSurface = { drawRect(Color(0x7F292930)) }
-                    ) else Modifier.clip(RoundedCornerShape(40.dp)).background(Color(0xFF19191E)))
+                    .clip(RoundedCornerShape(40.dp)).background(
+                        if (glass) Color(0xCC292930) else Color(0xFF19191E)
+                    )
                     .padding(horizontal = if (navCompact) 6.dp else 9.dp, vertical = if (navCompact) 5.dp else 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(7.dp)
@@ -265,4 +257,3 @@ fun PokkeNavHost() {
             }
         }
     }
-}
