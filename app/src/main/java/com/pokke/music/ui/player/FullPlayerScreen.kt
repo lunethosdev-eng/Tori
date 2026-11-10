@@ -1,7 +1,6 @@
 package com.pokke.music.ui.player
 
 import androidx.compose.animation.AnimatedVisibilityScope
-import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
@@ -58,17 +57,15 @@ import com.pokke.music.ui.sheets.AudioOutputSheet
 import com.pokke.music.ui.sheets.OverflowMenuSheet
 import com.pokke.music.ui.liquid.LiquidSlider
 import com.kyant.backdrop.backdrops.rememberLayerBackdrop
-import com.pokke.music.ui.player.LocalPlayerSharedTransitionScope
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FullPlayerScreen(
     onBack: () -> Unit,
     onOpenQueue: () -> Unit,
     onOpenLyrics: () -> Unit,
     authRepository: AuthRepository,
-    onRequireLogin: () -> Unit,
-    animatedVisibilityScope: AnimatedVisibilityScope
+    onRequireLogin: () -> Unit
 ) {
     val context = LocalContext.current
     val preferences = remember(context) { UserPreferences(context) }
