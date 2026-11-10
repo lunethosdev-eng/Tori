@@ -82,7 +82,6 @@ dependencies {
     // Image loading
     implementation("io.coil-kt:coil-compose:2.7.0")
     implementation("io.coil-kt:coil-gif:2.7.0")
-    implementation("com.google.zxing:core:3.5.3")
 
     // Palette for dynamic color extraction from album art
     implementation("androidx.palette:palette-ktx:1.0.0")
