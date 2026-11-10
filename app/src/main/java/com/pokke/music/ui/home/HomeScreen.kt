@@ -112,17 +112,9 @@ fun HomeScreen(
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp, vertical = 10.dp)
                         .then(
-                            if (glass && backdrop != null) Modifier
-                                .drawBackdrop(
-                                    backdrop = backdrop,
-                                    shape = { RoundedCornerShape(22.dp) },
-                                    effects = { blur(16f.dp.toPx()) },
-                                    onDrawSurface = { drawRect(headerSurfaceColor.copy(alpha = 0.78f)) }
-                                )
-                                .border(0.7.dp, headerOutlineColor, RoundedCornerShape(22.dp))
-                            else Modifier
+                            Modifier
                                 .clip(RoundedCornerShape(22.dp))
-                                .background(MaterialTheme.colorScheme.surface)
+                                .background(MaterialTheme.colorScheme.surface.copy(alpha = if (glass) 0.88f else 1f))
                         )
                         .padding(horizontal = 12.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically
