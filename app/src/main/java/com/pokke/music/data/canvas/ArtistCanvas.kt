@@ -11,6 +11,9 @@ object ArtistCanvas {
         "depresión sonora" to "depresion_sonora",
         "depresion sonora" to "depresion_sonora",
         "depresión" to "depresion_sonora",
+        "mon laferte" to "mon_laferte",
+        "laferte" to "mon_laferte",
+        "laufey" to "laufey",
     )
 
     fun resolveFolder(artist: String?): String? {
