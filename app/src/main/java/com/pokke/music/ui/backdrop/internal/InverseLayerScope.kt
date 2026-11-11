@@ -52,6 +52,10 @@ internal class InverseLayerScope : GraphicsLayerScope {
     override var clip: Boolean = false
     override var renderEffect: RenderEffect? = null
     override var compositingStrategy: CompositingStrategy = CompositingStrategy.Auto
+    // These are part of the newer GraphicsLayerScope API. Keep local values on
+    // the vendored implementation so it also compiles against the app's BOM.
+    var blendMode: BlendMode = BlendMode.SrcOver
+    var colorFilter: ColorFilter? = null
 
     private var matrix: Matrix? = null
 
