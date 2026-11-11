@@ -69,5 +69,13 @@ class ExternalAuthStore(context: Context) {
 
     companion object {
         private const val KEY = "sessions_json"
+        private val API_SID_NAMES = setOf("SAPISID", "__Secure-3PAPISID", "__Secure-1PAPISID")
+
+        /** True only when the cookie header contains a usable Innertube signing secret. */
+        fun hasApiSid(cookieHeader: String): Boolean = cookieHeader.split(';').any { entry ->
+            val name = entry.substringBefore('=').trim()
+            val value = entry.substringAfter('=', "").trim()
+            name in API_SID_NAMES && value.isNotEmpty()
+        }
     }
 }
