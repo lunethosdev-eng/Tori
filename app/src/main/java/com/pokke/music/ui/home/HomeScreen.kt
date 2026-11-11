@@ -40,10 +40,10 @@ import androidx.compose.ui.platform.LocalContext
 import java.util.Calendar
 import kotlinx.coroutines.delay
 import com.pokke.music.ui.liquid.LocalAppBackdrop
-import com.kyant.backdrop.drawBackdrop
-import com.kyant.backdrop.effects.blur
-import com.kyant.backdrop.effects.lens
-import com.kyant.backdrop.effects.vibrancy
+import com.pokke.music.ui.backdrop.drawBackdrop
+import com.pokke.music.ui.backdrop.effects.blur
+import com.pokke.music.ui.backdrop.effects.lens
+import com.pokke.music.ui.backdrop.effects.vibrancy
 
 @Composable
 fun HomeScreen(
