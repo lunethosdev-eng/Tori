@@ -55,11 +55,11 @@ import com.pokke.music.ui.player.MiniPlayerBar
 import com.pokke.music.ui.social.StoryPublisherScreen
 import com.pokke.music.ui.social.FriendsMapScreen
 import com.pokke.music.ui.liquid.LocalAppBackdrop
-import com.kyant.backdrop.drawBackdrop
-import com.kyant.backdrop.effects.blur
-import com.kyant.backdrop.effects.lens
-import com.kyant.backdrop.effects.vibrancy
-import com.kyant.shapes.Capsule
+import com.pokke.music.ui.backdrop.drawBackdrop
+import com.pokke.music.ui.backdrop.effects.blur
+import com.pokke.music.ui.backdrop.effects.lens
+import com.pokke.music.ui.backdrop.effects.vibrancy
+import com.pokke.music.ui.shapes.Capsule
 import com.pokke.music.data.remote.UpdateChecker
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.TextButton
@@ -214,8 +214,9 @@ fun PokkeNavHost() {
             }
             composable(Screen.Queue.route) { QueueScreen(onBack = { nav.popBackStack() }) }
             composable(Screen.Lyrics.route) { LyricsScreen(onBack = { nav.popBackStack() }) }
-                } // NavHost
-            } // inner Box
+                }
+            }
+        }
 
         val currentSong by PlayerController.currentSong.collectAsState()
         val showMini = currentSong != null && route !in listOf(Screen.Player.route, Screen.Lyrics.route, Screen.Auth.route)
@@ -255,5 +256,4 @@ fun PokkeNavHost() {
                 }
             }
         }
-    }
     }
