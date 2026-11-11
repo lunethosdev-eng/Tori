@@ -14,7 +14,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
-import com.kyant.shapes.Capsule
+import com.pokke.music.ui.shapes.Capsule
 
 internal val LocalLiquidBottomTabScale =
     staticCompositionLocalOf { { 1f } }
