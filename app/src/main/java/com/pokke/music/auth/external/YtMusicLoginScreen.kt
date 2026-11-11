@@ -145,7 +145,7 @@ private fun captureFrom(
     view.evaluateJavascript(YTCFG_PROBE) { raw ->
         val config = raw.parseConfig()
         val loggedIn = config?.get("loggedIn").let {
-            it is JsonPrimitive && it.content == "true"
+            it is JsonPrimitive && it.contentOrNull == "true"
         }
         if (config == null || !loggedIn) {
             Log.w(TAG, "confirmation requested before the page exposed a signed-in identity")
