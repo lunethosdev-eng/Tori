@@ -56,7 +56,7 @@ import com.pokke.music.player.PlayerController
 import com.pokke.music.ui.sheets.AudioOutputSheet
 import com.pokke.music.ui.sheets.OverflowMenuSheet
 import com.pokke.music.ui.liquid.LiquidSlider
-import com.kyant.backdrop.backdrops.rememberLayerBackdrop
+import com.pokke.music.ui.backdrop.backdrops.rememberLayerBackdrop
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
