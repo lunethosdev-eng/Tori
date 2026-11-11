@@ -19,6 +19,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.pokke.music.data.preferences.UserPreferences
+import com.pokke.music.ui.settings.ExternalAccountsSection
 import com.pokke.music.data.repository.AuthRepository
 import kotlinx.coroutines.launch
 import com.pokke.music.ui.liquid.LocalAppBackdrop
@@ -68,7 +69,7 @@ fun SettingsScreen(
             Column {
                 Text("Ajustes", color = Color.White, fontSize = 23.sp, fontWeight = FontWeight.Bold)
                 Text(
-                    if (glass) "Liquid Glass activo · controles Kyant Backdrop" else "Preferencias del dispositivo",
+                    if (glass) "Liquid Glass activo · Backdrop vendored" else "Preferencias del dispositivo",
                     color = Color.White.copy(.5f),
                     fontSize = 12.sp
                 )
@@ -78,7 +79,7 @@ fun SettingsScreen(
         Section("APARIENCIA")
         LiquidOrMaterialToggle(
             title = "Liquid Glass",
-            subtitle = "Efecto tipo iOS (refracción, blur, lente). Usa io.github.kyant0:backdrop. Apagado por defecto.",
+            subtitle = "Backdrop liquid glass (código fuente vendored, sin AAR). Apagado por defecto.",
             checked = glass,
             glass = false,
             onChange = { scope.launch { prefs.setLiquidGlass(it) } }
@@ -115,6 +116,9 @@ fun SettingsScreen(
             )
             Text("El modo rendimiento evita mantener capturas y efectos de cristal en pantallas que no están visibles.", color = Color.White.copy(.42f), fontSize = 11.sp, modifier = Modifier.padding(horizontal = 22.dp, vertical = 4.dp))
         }
+
+        Section("CUENTAS EXTERNAS")
+        ExternalAccountsSection(prefs)
 
         Text(
             "Tema",
