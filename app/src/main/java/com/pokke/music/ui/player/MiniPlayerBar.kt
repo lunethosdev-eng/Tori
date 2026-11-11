@@ -46,8 +46,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
-import com.kyant.backdrop.drawBackdrop
-import com.kyant.backdrop.effects.blur
+import com.pokke.music.ui.backdrop.drawBackdrop
+import com.pokke.music.ui.backdrop.effects.blur
 import com.pokke.music.player.PlayerController
 import com.pokke.music.ui.liquid.LocalAppBackdrop
 
