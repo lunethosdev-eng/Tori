@@ -52,6 +52,10 @@ import com.pokke.music.ui.settings.SettingsScreen
 import com.pokke.music.ui.admin.AdminPanelScreen
 import com.pokke.music.ui.social.ChatScreen
 import com.pokke.music.ui.player.MiniPlayerBar
+import com.pokke.music.ui.player.PlayerDock
+import com.pokke.music.ui.player.LocalPlayerDock
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.SideEffect
 import com.pokke.music.ui.social.StoryPublisherScreen
 import com.pokke.music.ui.social.FriendsMapScreen
 import com.pokke.music.ui.liquid.LocalAppBackdrop
@@ -141,7 +145,10 @@ fun PokkeNavHost() {
     var avatar by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(route) { auth.getProfile().onSuccess { avatar = it?.avatarUrl } }
 
+    val playerDock = remember { PlayerDock() }
+    SideEffect { playerDock.attached = route == Screen.Player.route }
     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+        CompositionLocalProvider(LocalPlayerDock provides playerDock) {
         // SharedTransition removed — caused NoSuchMethodError on FullPlayer
             Box(Modifier.fillMaxSize()) {
                 NavHost(navController = nav, startDestination = Screen.Home.route, modifier = Modifier.fillMaxSize()) {
@@ -254,6 +261,7 @@ fun PokkeNavHost() {
                     else Icon(Icons.Default.Person, "Perfil", tint = Color.White, modifier = Modifier.size(23.dp))
                 }
             }
+        }
         }
     }
 }
