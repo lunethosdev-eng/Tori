@@ -26,10 +26,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.pokke.music.ui.liquid.LocalAppBackdrop
-import com.kyant.backdrop.drawBackdrop
-import com.kyant.backdrop.effects.blur
-import com.kyant.backdrop.effects.lens
-import com.kyant.backdrop.effects.vibrancy
+import com.pokke.music.ui.backdrop.drawBackdrop
+import com.pokke.music.ui.backdrop.effects.blur
+import com.pokke.music.ui.backdrop.effects.lens
+import com.pokke.music.ui.backdrop.effects.vibrancy
 import kotlinx.coroutines.delay
 
 private data class OutDevice(val id: Int, val name: String, val type: String, val isActive: Boolean)
@@ -89,7 +89,7 @@ fun AudioOutputSheet(onDismiss: () -> Unit, glass: Boolean = true) {
             .then(if (glass && backdrop != null) Modifier.drawBackdrop(
                 backdrop = backdrop,
                 shape = { RoundedCornerShape(28.dp) },
-                effects = { blur(16f.dp.toPx()) },
+                effects = { vibrancy(); blur(22f.dp.toPx()); lens(18f.dp.toPx(), 24f.dp.toPx()) },
                 onDrawSurface = { drawRect(Color(0xB31A1A1D)) }
             ) else Modifier.background(Color(0xFF17171B), RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)))
             .padding(horizontal = 20.dp, vertical = 12.dp)
