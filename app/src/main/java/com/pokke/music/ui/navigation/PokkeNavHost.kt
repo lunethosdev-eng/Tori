@@ -214,9 +214,8 @@ fun PokkeNavHost() {
             }
             composable(Screen.Queue.route) { QueueScreen(onBack = { nav.popBackStack() }) }
             composable(Screen.Lyrics.route) { LyricsScreen(onBack = { nav.popBackStack() }) }
-                }
-            }
-        }
+                } // NavHost
+            } // inner Box
 
         val currentSong by PlayerController.currentSong.collectAsState()
         val showMini = currentSong != null && route !in listOf(Screen.Player.route, Screen.Lyrics.route, Screen.Auth.route)
@@ -256,4 +255,5 @@ fun PokkeNavHost() {
                 }
             }
         }
+    }
     }
