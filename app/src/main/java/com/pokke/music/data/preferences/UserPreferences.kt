@@ -15,7 +15,14 @@ val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "po
 
 class UserPreferences(private val context: Context) {
     companion object {
-        private val LIQUID_GLASS = booleanPreferencesKey("liquid_glass_enabled")
+        
+    private val EXTERNAL_ACCOUNTS = booleanPreferencesKey("external_accounts_enabled")
+    private val SPOTIFY_LOGIN = booleanPreferencesKey("spotify_login_enabled")
+    private val DISCORD_LOGIN = booleanPreferencesKey("discord_login_enabled")
+    private val YTMUSIC_LOGIN = booleanPreferencesKey("ytmusic_login_enabled")
+    private val VENDORED_GLASS = booleanPreferencesKey("vendored_backdrop_glass")
+
+    private val LIQUID_GLASS = booleanPreferencesKey("liquid_glass_enabled")
         private val LIQUID_SLIDER = booleanPreferencesKey("liquid_slider_enabled")
         private val LIQUID_PERFORMANCE = booleanPreferencesKey("liquid_glass_performance_mode")
         private val EXPERIMENTAL_CHATS = booleanPreferencesKey("experimental_chats_alpha_1")
@@ -31,6 +38,19 @@ class UserPreferences(private val context: Context) {
         private val SHOW_LINK_EMBEDS = booleanPreferencesKey("show_link_embeds")
         private val PLAYER_THEME = stringPreferencesKey("player_theme") // minimal | sakura | midnight | aurora
     }
+    
+    val externalAccountsEnabled: Flow<Boolean> = context.dataStore.data.map { it[EXTERNAL_ACCOUNTS] ?: false }
+    val spotifyLoginEnabled: Flow<Boolean> = context.dataStore.data.map { it[SPOTIFY_LOGIN] ?: false }
+    val discordLoginEnabled: Flow<Boolean> = context.dataStore.data.map { it[DISCORD_LOGIN] ?: false }
+    val ytMusicLoginEnabled: Flow<Boolean> = context.dataStore.data.map { it[YTMUSIC_LOGIN] ?: false }
+    val vendoredBackdropGlass: Flow<Boolean> = context.dataStore.data.map { it[VENDORED_GLASS] ?: true }
+
+    suspend fun setExternalAccountsEnabled(v: Boolean) { context.dataStore.edit { it[EXTERNAL_ACCOUNTS] = v } }
+    suspend fun setSpotifyLoginEnabled(v: Boolean) { context.dataStore.edit { it[SPOTIFY_LOGIN] = v } }
+    suspend fun setDiscordLoginEnabled(v: Boolean) { context.dataStore.edit { it[DISCORD_LOGIN] = v } }
+    suspend fun setYtMusicLoginEnabled(v: Boolean) { context.dataStore.edit { it[YTMUSIC_LOGIN] = v } }
+    suspend fun setVendoredBackdropGlass(v: Boolean) { context.dataStore.edit { it[VENDORED_GLASS] = v } }
+
     val liquidGlassEnabled: Flow<Boolean> = context.dataStore.data.map { it[LIQUID_GLASS] ?: false }
     val liquidSliderEnabled: Flow<Boolean> = context.dataStore.data.map { it[LIQUID_SLIDER] ?: true }
     val liquidPerformanceMode: Flow<Boolean> = context.dataStore.data.map { it[LIQUID_PERFORMANCE] ?: true }
