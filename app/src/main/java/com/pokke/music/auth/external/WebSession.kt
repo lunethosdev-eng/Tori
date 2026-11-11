@@ -146,3 +146,11 @@ object BrowserSession {
         "https://youtube.com",
     )
 }
+
+/** Normalizes YouTube's DATASYNC_ID into the active delegated identity. */
+internal fun normalizeDataSyncId(raw: String?): String? {
+    val value = raw?.takeIf { it.isNotBlank() } ?: return null
+    if (!value.contains("||")) return value
+    return value.substringAfter("||").takeIf { it.isNotBlank() }
+        ?: value.substringBefore("||").takeIf { it.isNotBlank() }
+}
