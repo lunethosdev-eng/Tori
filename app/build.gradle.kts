@@ -70,8 +70,8 @@ dependencies {
     implementation("androidx.compose.ui:ui-graphics")
     implementation("androidx.compose.ui:ui-tooling-preview")
     // Kyant Liquid Glass (Backdrop) — iOS-like refraction
-    implementation("io.github.kyant0:backdrop:2.0.1")
-    implementation("io.github.kyant0:shapes:1.2.1")
+    // vendored backdrop: com.pokke.music.ui.backdrop
+    // local Capsule: com.pokke.music.ui.shapes
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-extended")
@@ -82,7 +82,6 @@ dependencies {
     // Image loading
     implementation("io.coil-kt:coil-compose:2.7.0")
     implementation("io.coil-kt:coil-gif:2.7.0")
-    // implementation("com.google.zxing:core:3.5.3") // optional real QR
 
     // Palette for dynamic color extraction from album art
     implementation("androidx.palette:palette-ktx:1.0.0")
@@ -93,6 +92,7 @@ dependencies {
     implementation("androidx.media3:media3-ui:1.4.1")
     // Preferences (Liquid Glass toggle, animated covers, auth state)
     implementation("androidx.datastore:datastore-preferences:1.1.1")
+    implementation("androidx.security:security-crypto:1.1.0-alpha06")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
