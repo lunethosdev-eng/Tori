@@ -41,6 +41,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -65,6 +66,7 @@ fun MiniPlayerBar(
     modifier: Modifier = Modifier
 ) {
     val backdrop = LocalAppBackdrop.current
+    val playerDock = LocalPlayerDock.current
     val surfaceColor = MaterialTheme.colorScheme.surface
     val song by PlayerController.currentSong.collectAsState()
     val playing by PlayerController.isPlaying.collectAsState()
@@ -114,7 +116,10 @@ fun MiniPlayerBar(
                     modifier = Modifier
                         .size(coverSize.dp)
                         .clip(RoundedCornerShape(10.dp))
-                        .background(Color(0xFF2A2A30)),
+                        .background(Color(0xFF2A2A30))
+                        .onGloballyPositioned { coordinates ->
+                            playerDock?.reportMiniArt(coordinates, 10.dp)
+                        },
                     contentScale = ContentScale.Crop
                 )
                 Spacer(Modifier.width(10.dp))
