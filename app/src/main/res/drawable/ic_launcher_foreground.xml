@@ -1,4 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
-<bitmap xmlns:android="http://schemas.android.com/apk/res/android"
-    android:src="@drawable/ic_launcher_foreground_image"
-    android:gravity="center" />
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Safe zone ~66dp center -->
+    <path
+        android:fillColor="#F5F5F7"
+        android:pathData="M48,32 L48,68 C48,74 43,78 37,78 C31,78 26,73 26,67 C26,61 31,56 37,56 C40,56 43,57 45,59 L45,40 L66,34 L66,58 C66,64 61,68 55,68 C49,68 44,63 44,57 C44,51 49,46 55,46 C58,46 61,47 63,49 L63,28 Z"/>
+</vector>
