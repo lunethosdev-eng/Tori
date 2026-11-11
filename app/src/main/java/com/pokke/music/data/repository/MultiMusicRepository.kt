@@ -21,6 +21,23 @@ class MultiMusicRepository {
     private val songSelect =
         "id,title,artist,album,cover_url,animated_cover_url,audio_url,duration_seconds,lyrics_text,lyrics_url,genre,youtube_id"
 
+    
+    /** searchAll + optional YouTube Music catalog (Settings toggle). */
+    suspend fun searchAll(
+        query: String,
+        limit: Int = 40,
+        includeYoutube: Boolean
+    ): Result<List<Song>> = withContext(Dispatchers.IO) {
+        runCatching {
+            val base = searchAll(query, limit).getOrDefault(emptyList())
+            if (!includeYoutube) return@runCatching base
+            val yt = com.pokke.music.data.youtube.YouTubeCatalogRepository()
+                .search(query, limit = limit / 2)
+                .getOrDefault(emptyList())
+            (base + yt).distinctBy { it.id.ifBlank { it.title + "|" + it.artist } }.take(limit)
+        }
+    }
+
     suspend fun searchAll(query: String, limit: Int = 40): Result<List<Song>> = withContext(Dispatchers.IO) {
         runCatching {
             val sources = MusicSourcesConfig.enabled().ifEmpty {
