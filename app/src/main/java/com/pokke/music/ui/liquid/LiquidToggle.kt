@@ -29,19 +29,19 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.fastCoerceIn
 import androidx.compose.ui.util.lerp
-import com.kyant.backdrop.Backdrop
-import com.kyant.backdrop.backdrops.layerBackdrop
-import com.kyant.backdrop.backdrops.rememberBackdrop
-import com.kyant.backdrop.backdrops.rememberCombinedBackdrop
-import com.kyant.backdrop.backdrops.rememberLayerBackdrop
+import com.pokke.music.ui.backdrop.Backdrop
+import com.pokke.music.ui.backdrop.backdrops.layerBackdrop
+import com.pokke.music.ui.backdrop.backdrops.rememberBackdrop
+import com.pokke.music.ui.backdrop.backdrops.rememberCombinedBackdrop
+import com.pokke.music.ui.backdrop.backdrops.rememberLayerBackdrop
 import com.pokke.music.ui.liquid.DampedDragAnimation
-import com.kyant.backdrop.drawBackdrop
-import com.kyant.backdrop.effects.blur
-import com.kyant.backdrop.effects.lens
-import com.kyant.backdrop.highlight.Highlight
-import com.kyant.backdrop.shadow.InnerShadow
-import com.kyant.backdrop.shadow.Shadow
-import com.kyant.shapes.Capsule
+import com.pokke.music.ui.backdrop.drawBackdrop
+import com.pokke.music.ui.backdrop.effects.blur
+import com.pokke.music.ui.backdrop.effects.lens
+import com.pokke.music.ui.backdrop.highlight.Highlight
+import com.pokke.music.ui.backdrop.shadow.InnerShadow
+import com.pokke.music.ui.backdrop.shadow.Shadow
+import com.pokke.music.ui.shapes.Capsule
 import kotlinx.coroutines.flow.collectLatest
 
 @Composable
