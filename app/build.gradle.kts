@@ -1,5 +1,8 @@
 plugins {
     id("com.android.application")
+    // CRITICAL: android.builtInKotlin=false requires this or .kt files never reach the DEX
+    // (ClassNotFoundException: MainActivity / TvMainActivity).
+    id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
     id("org.jetbrains.kotlin.plugin.serialization")
 }
@@ -14,13 +17,14 @@ android {
         targetSdk = 36
         versionCode = 1
         versionName = "1.0.0"
+        multiDexEnabled = true
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
             useSupportLibrary = true
         }
     }
-    // phone = mobile APK (default); tv = Android TV / leanback APK (pokke-tv)
+    // phone = mobile APK; tv = Android TV / leanback APK
     flavorDimensions += "device"
     productFlavors {
         create("phone") {
@@ -59,19 +63,13 @@ android {
         }
     }
 
-    // TV sources live under src/main/tv (not the default src/tv).
-    // Without this mapping the tv flavor never picks up the TV manifest,
-    // so the launcher stays on MainActivity and the class is missing / wrong.
+    // TV code lives under src/main/tv (not the default src/tv).
     sourceSets {
-        getByName("tv") {
+        named("tv") {
             manifest.srcFile("src/main/tv/AndroidManifest.xml")
-            java.srcDirs("src/main/tv/java")
-            res.srcDirs("src/main/tv/res")
-        }
-        // Keep phone on the default main sources only (TV code stays available
-        // as library classes but is not the launcher).
-        getByName("phone") {
-            // default main is enough
+            java.srcDir("src/main/tv/java")
+            kotlin.srcDir("src/main/tv/java")
+            res.srcDir("src/main/tv/res")
         }
     }
 }
@@ -90,6 +88,7 @@ val newPipeExtractorStripped = tasks.register<org.gradle.api.tasks.bundling.Jar>
 }
 
 dependencies {
+    implementation("androidx.multidex:multidex:2.0.1")
     implementation(project(":bitchord-sharedui"))
     newPipeExtractorRaw("com.github.TeamNewPipe:NewPipeExtractor:v0.26.3")
     val composeBom = platform("androidx.compose:compose-bom:2024.10.01")
@@ -101,9 +100,6 @@ dependencies {
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-graphics")
     implementation("androidx.compose.ui:ui-tooling-preview")
-    // Kyant Liquid Glass (Backdrop) — iOS-like refraction
-    // vendored backdrop: com.pokke.music.ui.backdrop
-    // local Capsule: com.pokke.music.ui.shapes
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
     implementation("androidx.compose.material3:material3")
@@ -112,20 +108,13 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
     implementation("androidx.compose.animation:animation")
     implementation("androidx.compose.foundation:foundation")
-    // Image loading
     implementation("io.coil-kt:coil-compose:2.7.0")
     implementation("io.coil-kt:coil-gif:2.7.0")
-
-    // Palette for dynamic color extraction from album art
     implementation("androidx.palette:palette-ktx:1.0.0")
-
-    // Media
     implementation("androidx.media3:media3-exoplayer:1.4.1")
     implementation("androidx.media3:media3-session:1.4.1")
     implementation("androidx.media3:media3-ui:1.4.1")
     implementation("androidx.media3:media3-datasource-okhttp:1.4.1")
-    // NewPipe Extractor: pinned to BitChord's tested v0.26.3. Strip its Utils
-    // class before dexing to avoid duplicate utility classes in Android builds.
     implementation(files(newPipeExtractorStripped))
     implementation("com.github.TeamNewPipe:nanojson:e9d656ddb49a412a5a0a5d5ef20ca7ef09549996")
     implementation("org.jsoup:jsoup:1.22.2")
@@ -134,7 +123,6 @@ dependencies {
     implementation("com.google.protobuf:protobuf-javalite:4.35.0")
     implementation("org.mozilla:rhino:1.8.1")
     implementation("org.mozilla:rhino-engine:1.8.1")
-    // Preferences (Liquid Glass toggle, animated covers, auth state)
     implementation("androidx.datastore:datastore-preferences:1.1.1")
     implementation("androidx.security:security-crypto:1.1.0-alpha06")
 
