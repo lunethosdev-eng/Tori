@@ -8,12 +8,14 @@
     <application
         android:banner="@drawable/tv_banner"
         tools:replace="android:banner">
-        <!-- Remove phone activity completely on TV APK -->
+
+        <!-- Explicitly remove phone MainActivity from the TV APK launcher -->
         <activity
-            android:name=".MainActivity"
+            android:name="com.pokke.music.MainActivity"
             tools:node="remove" />
+
         <activity
-            android:name=".tv.TvMainActivity"
+            android:name="com.pokke.music.tv.TvMainActivity"
             android:exported="true"
             android:banner="@drawable/tv_banner"
             android:theme="@style/Theme.PokkeTv"
