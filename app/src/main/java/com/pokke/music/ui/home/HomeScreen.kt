@@ -45,10 +45,6 @@ import androidx.compose.ui.platform.LocalContext
 import java.util.Calendar
 import kotlinx.coroutines.delay
 import com.pokke.music.ui.liquid.LocalAppBackdrop
-import com.pokke.music.ui.backdrop.drawBackdrop
-import com.pokke.music.ui.backdrop.effects.blur
-import com.pokke.music.ui.backdrop.effects.lens
-import com.pokke.music.ui.backdrop.effects.vibrancy
 
 /**
  * Rediseño del Home de Pokke.
