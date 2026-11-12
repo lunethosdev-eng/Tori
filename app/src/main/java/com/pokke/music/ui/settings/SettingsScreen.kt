@@ -117,6 +117,111 @@ fun SettingsScreen(
             Text("El modo rendimiento evita mantener capturas y efectos de cristal en pantallas que no están visibles.", color = Color.White.copy(.42f), fontSize = 11.sp, modifier = Modifier.padding(horizontal = 22.dp, vertical = 4.dp))
         }
 
+
+        Section("PERSONALIZAR INICIO")
+        Text(
+            "Controla qué secciones aparecen en la pantalla principal y su densidad. Los cambios se guardan y se aplican al volver a Inicio.",
+            color = Color.White.copy(.5f),
+            fontSize = 12.sp,
+            modifier = Modifier.padding(horizontal = 22.dp, vertical = 6.dp)
+        )
+        val showNowPlaying by prefs.homeShowNowPlaying.collectAsState(initial = true)
+        val showQuick by prefs.homeShowQuickAccess.collectAsState(initial = true)
+        val showRecent by prefs.homeShowRecent.collectAsState(initial = true)
+        val showReco by prefs.homeShowRecommendations.collectAsState(initial = true)
+        val showLib by prefs.homeShowLibraryShortcuts.collectAsState(initial = true)
+        val homeLayout by prefs.homeLayout.collectAsState(initial = "comfortable")
+        val homeDensity by prefs.homeDensity.collectAsState(initial = "medium")
+
+        LiquidOrMaterialToggle(
+            title = "Mostrar «Reproduciendo»",
+            subtitle = "Tarjeta de la canción actual en el Home.",
+            checked = showNowPlaying,
+            glass = false,
+            onChange = { scope.launch { prefs.setHomeShowNowPlaying(it) } }
+        )
+        LiquidOrMaterialToggle(
+            title = "Accesos rápidos",
+            subtitle = "Chips de aleatorio, favoritos, biblioteca y búsqueda.",
+            checked = showQuick,
+            glass = false,
+            onChange = { scope.launch { prefs.setHomeShowQuickAccess(it) } }
+        )
+        LiquidOrMaterialToggle(
+            title = "Recientes",
+            subtitle = "Fila horizontal de canciones recientes.",
+            checked = showRecent,
+            glass = false,
+            onChange = { scope.launch { prefs.setHomeShowRecent(it) } }
+        )
+        LiquidOrMaterialToggle(
+            title = "Para ti / recomendaciones",
+            subtitle = "Lista de sugerencias basada en recientes.",
+            checked = showReco,
+            glass = false,
+            onChange = { scope.launch { prefs.setHomeShowRecommendations(it) } }
+        )
+        LiquidOrMaterialToggle(
+            title = "Atajos de biblioteca",
+            subtitle = "Accesos a me gusta, playlists y recientes.",
+            checked = showLib,
+            glass = false,
+            onChange = { scope.launch { prefs.setHomeShowLibraryShortcuts(it) } }
+        )
+
+        // Layout density
+        Text("Distribución del Home", color = Color.White.copy(.7f), fontSize = 13.sp, fontWeight = FontWeight.Medium,
+            modifier = Modifier.padding(start = 22.dp, top = 12.dp, bottom = 6.dp))
+        Row(Modifier.padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            listOf("compact" to "Compacta", "comfortable" to "Cómoda", "dense" to "Densa").forEach { (id, label) ->
+                val selected = homeLayout == id
+                Text(
+                    label,
+                    color = if (selected) Color.Black else Color.White,
+                    fontSize = 12.sp,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(if (selected) Color.White else Color.White.copy(0.12f))
+                        .clickable { scope.launch { prefs.setHomeLayout(id) } }
+                        .padding(horizontal = 12.dp, vertical = 8.dp)
+                )
+            }
+        }
+        Text("Tamaño de carátulas", color = Color.White.copy(.7f), fontSize = 13.sp, fontWeight = FontWeight.Medium,
+            modifier = Modifier.padding(start = 22.dp, top = 12.dp, bottom = 6.dp))
+        Row(Modifier.padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            listOf("small" to "Pequeño", "medium" to "Medio", "large" to "Grande").forEach { (id, label) ->
+                val selected = homeDensity == id
+                Text(
+                    label,
+                    color = if (selected) Color.Black else Color.White,
+                    fontSize = 12.sp,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(if (selected) Color.White else Color.White.copy(0.12f))
+                        .clickable { scope.launch { prefs.setHomeDensity(id) } }
+                        .padding(horizontal = 12.dp, vertical = 8.dp)
+                )
+            }
+        }
+        TextButton(
+            onClick = { scope.launch { prefs.resetHomeCustomization() } },
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
+        ) {
+            Text("Restaurar distribución predeterminada")
+        }
+
+        Section("FUENTES Y CATÁLOGO")
+        val ytCatalog by prefs.youtubeCatalogEnabled.collectAsState(initial = false)
+        LiquidOrMaterialToggle(
+            title = "Catálogo YouTube Music / InnerTube",
+            subtitle = "Permite buscar y reproducir desde YouTube Music. Independiente del inicio de sesión. Si se desactiva, Pokke usa solo las demás fuentes.",
+            checked = ytCatalog,
+            glass = false,
+            onChange = { scope.launch { prefs.setYoutubeCatalogEnabled(it) } }
+        )
+
+
         Section("CUENTAS EXTERNAS")
         ExternalAccountsSection(prefs)
 
