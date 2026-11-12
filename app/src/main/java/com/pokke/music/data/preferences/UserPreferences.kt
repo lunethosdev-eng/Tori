@@ -15,14 +15,13 @@ val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "po
 
 class UserPreferences(private val context: Context) {
     companion object {
-        
-    private val EXTERNAL_ACCOUNTS = booleanPreferencesKey("external_accounts_enabled")
-    private val SPOTIFY_LOGIN = booleanPreferencesKey("spotify_login_enabled")
-    private val DISCORD_LOGIN = booleanPreferencesKey("discord_login_enabled")
-    private val YTMUSIC_LOGIN = booleanPreferencesKey("ytmusic_login_enabled")
-    private val VENDORED_GLASS = booleanPreferencesKey("vendored_backdrop_glass")
+        private val EXTERNAL_ACCOUNTS = booleanPreferencesKey("external_accounts_enabled")
+        private val SPOTIFY_LOGIN = booleanPreferencesKey("spotify_login_enabled")
+        private val DISCORD_LOGIN = booleanPreferencesKey("discord_login_enabled")
+        private val YTMUSIC_LOGIN = booleanPreferencesKey("ytmusic_login_enabled")
+        private val VENDORED_GLASS = booleanPreferencesKey("vendored_backdrop_glass")
 
-    private val LIQUID_GLASS = booleanPreferencesKey("liquid_glass_enabled")
+        private val LIQUID_GLASS = booleanPreferencesKey("liquid_glass_enabled")
         private val LIQUID_SLIDER = booleanPreferencesKey("liquid_slider_enabled")
         private val LIQUID_PERFORMANCE = booleanPreferencesKey("liquid_glass_performance_mode")
         private val EXPERIMENTAL_CHATS = booleanPreferencesKey("experimental_chats_alpha_1")
@@ -37,8 +36,24 @@ class UserPreferences(private val context: Context) {
         private val SHOW_LISTENING = booleanPreferencesKey("show_listening_on_profile")
         private val SHOW_LINK_EMBEDS = booleanPreferencesKey("show_link_embeds")
         private val PLAYER_THEME = stringPreferencesKey("player_theme") // minimal | sakura | midnight | aurora
+
+        // YouTube / external catalog (separate from login)
+        private val YOUTUBE_CATALOG = booleanPreferencesKey("youtube_catalog_enabled")
+        private val SPOTIFY_CANVAS = booleanPreferencesKey("spotify_canvas_enabled")
+        private val APPLE_CANVAS = booleanPreferencesKey("apple_canvas_enabled")
+        private val POKKE_ANIMATED_COVERS = booleanPreferencesKey("pokke_animated_covers")
+
+        // Home personalization
+        private val HOME_SHOW_RECENT = booleanPreferencesKey("home_show_recent")
+        private val HOME_SHOW_NOW_PLAYING = booleanPreferencesKey("home_show_now_playing")
+        private val HOME_SHOW_QUICK_ACCESS = booleanPreferencesKey("home_show_quick_access")
+        private val HOME_SHOW_RECOMMENDATIONS = booleanPreferencesKey("home_show_recommendations")
+        private val HOME_SHOW_LIBRARY_SHORTCUTS = booleanPreferencesKey("home_show_library_shortcuts")
+        private val HOME_SECTION_ORDER = stringPreferencesKey("home_section_order")
+        private val HOME_LAYOUT = stringPreferencesKey("home_layout") // compact | comfortable | dense
+        private val HOME_DENSITY = stringPreferencesKey("home_density") // small | medium | large
     }
-    
+
     val externalAccountsEnabled: Flow<Boolean> = context.dataStore.data.map { it[EXTERNAL_ACCOUNTS] ?: false }
     val spotifyLoginEnabled: Flow<Boolean> = context.dataStore.data.map { it[SPOTIFY_LOGIN] ?: false }
     val discordLoginEnabled: Flow<Boolean> = context.dataStore.data.map { it[DISCORD_LOGIN] ?: false }
@@ -50,12 +65,6 @@ class UserPreferences(private val context: Context) {
     suspend fun setDiscordLoginEnabled(v: Boolean) { context.dataStore.edit { it[DISCORD_LOGIN] = v } }
     suspend fun setYtMusicLoginEnabled(v: Boolean) { context.dataStore.edit { it[YTMUSIC_LOGIN] = v } }
     suspend fun setVendoredBackdropGlass(v: Boolean) { context.dataStore.edit { it[VENDORED_GLASS] = v } }
-
-    
-    private val YOUTUBE_CATALOG = booleanPreferencesKey("youtube_catalog_enabled")
-    private val SPOTIFY_CANVAS = booleanPreferencesKey("spotify_canvas_enabled")
-    private val APPLE_CANVAS = booleanPreferencesKey("apple_canvas_enabled")
-    private val POKKE_ANIMATED_COVERS = booleanPreferencesKey("pokke_animated_covers")
 
     val youtubeCatalogEnabled: Flow<Boolean> = context.dataStore.data.map { it[YOUTUBE_CATALOG] ?: false }
     val spotifyCanvasEnabled: Flow<Boolean> = context.dataStore.data.map { it[SPOTIFY_CANVAS] ?: false }
@@ -85,6 +94,18 @@ class UserPreferences(private val context: Context) {
     val showLinkEmbeds: Flow<Boolean> = context.dataStore.data.map { it[SHOW_LINK_EMBEDS] ?: true }
     val playerTheme: Flow<String> = context.dataStore.data.map { it[PLAYER_THEME] ?: "minimal" }
 
+    // Home personalization flows
+    val homeShowRecent: Flow<Boolean> = context.dataStore.data.map { it[HOME_SHOW_RECENT] ?: true }
+    val homeShowNowPlaying: Flow<Boolean> = context.dataStore.data.map { it[HOME_SHOW_NOW_PLAYING] ?: true }
+    val homeShowQuickAccess: Flow<Boolean> = context.dataStore.data.map { it[HOME_SHOW_QUICK_ACCESS] ?: true }
+    val homeShowRecommendations: Flow<Boolean> = context.dataStore.data.map { it[HOME_SHOW_RECOMMENDATIONS] ?: true }
+    val homeShowLibraryShortcuts: Flow<Boolean> = context.dataStore.data.map { it[HOME_SHOW_LIBRARY_SHORTCUTS] ?: true }
+    val homeSectionOrder: Flow<String> = context.dataStore.data.map {
+        it[HOME_SECTION_ORDER] ?: "now_playing,quick_access,recent,recommendations,library"
+    }
+    val homeLayout: Flow<String> = context.dataStore.data.map { it[HOME_LAYOUT] ?: "comfortable" }
+    val homeDensity: Flow<String> = context.dataStore.data.map { it[HOME_DENSITY] ?: "medium" }
+
     suspend fun setLiquidGlass(v: Boolean) = context.dataStore.edit { it[LIQUID_GLASS] = v }
     suspend fun setLiquidSlider(v: Boolean) = context.dataStore.edit { it[LIQUID_SLIDER] = v }
     suspend fun setLiquidPerformanceMode(v: Boolean) = context.dataStore.edit { it[LIQUID_PERFORMANCE] = v }
@@ -100,4 +121,25 @@ class UserPreferences(private val context: Context) {
     suspend fun setShowListeningOnProfile(v: Boolean) = context.dataStore.edit { it[SHOW_LISTENING] = v }
     suspend fun setShowLinkEmbeds(v: Boolean) = context.dataStore.edit { it[SHOW_LINK_EMBEDS] = v }
     suspend fun setPlayerTheme(v: String) = context.dataStore.edit { it[PLAYER_THEME] = v }
+
+    suspend fun setHomeShowRecent(v: Boolean) = context.dataStore.edit { it[HOME_SHOW_RECENT] = v }
+    suspend fun setHomeShowNowPlaying(v: Boolean) = context.dataStore.edit { it[HOME_SHOW_NOW_PLAYING] = v }
+    suspend fun setHomeShowQuickAccess(v: Boolean) = context.dataStore.edit { it[HOME_SHOW_QUICK_ACCESS] = v }
+    suspend fun setHomeShowRecommendations(v: Boolean) = context.dataStore.edit { it[HOME_SHOW_RECOMMENDATIONS] = v }
+    suspend fun setHomeShowLibraryShortcuts(v: Boolean) = context.dataStore.edit { it[HOME_SHOW_LIBRARY_SHORTCUTS] = v }
+    suspend fun setHomeSectionOrder(v: String) = context.dataStore.edit { it[HOME_SECTION_ORDER] = v }
+    suspend fun setHomeLayout(v: String) = context.dataStore.edit { it[HOME_LAYOUT] = v }
+    suspend fun setHomeDensity(v: String) = context.dataStore.edit { it[HOME_DENSITY] = v }
+
+    /** Restore default Home layout and visibility. */
+    suspend fun resetHomeCustomization() = context.dataStore.edit {
+        it[HOME_SHOW_RECENT] = true
+        it[HOME_SHOW_NOW_PLAYING] = true
+        it[HOME_SHOW_QUICK_ACCESS] = true
+        it[HOME_SHOW_RECOMMENDATIONS] = true
+        it[HOME_SHOW_LIBRARY_SHORTCUTS] = true
+        it[HOME_SECTION_ORDER] = "now_playing,quick_access,recent,recommendations,library"
+        it[HOME_LAYOUT] = "comfortable"
+        it[HOME_DENSITY] = "medium"
+    }
 }
