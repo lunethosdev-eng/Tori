@@ -15,6 +15,7 @@ import com.google.common.util.concurrent.ListenableFuture
 import com.google.common.util.concurrent.MoreExecutors
 import com.pokke.music.data.model.Song
 import com.pokke.music.data.repository.LocalLibraryStore
+import com.pokke.music.data.youtube.YouTubeStreamResolver
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -49,6 +50,10 @@ object PlayerController {
     val queue: StateFlow<List<Song>> = _queue.asStateFlow()
     private val _currentIndex = MutableStateFlow(0)
     val currentIndex: StateFlow<Int> = _currentIndex.asStateFlow()
+    private val _repeatMode = MutableStateFlow(Player.REPEAT_MODE_OFF)
+    val repeatMode: StateFlow<Int> = _repeatMode.asStateFlow()
+    private val _shuffleEnabled = MutableStateFlow(false)
+    val shuffleEnabled: StateFlow<Boolean> = _shuffleEnabled.asStateFlow()
     private val _playbackError = MutableStateFlow<String?>(null)
     private val _gaplessEnabled = MutableStateFlow(true)
     val gaplessEnabled: StateFlow<Boolean> = _gaplessEnabled.asStateFlow()
@@ -57,6 +62,14 @@ object PlayerController {
     private val listener = object : Player.Listener {
         override fun onIsPlayingChanged(isPlaying: Boolean) {
             _isPlaying.value = isPlaying
+        }
+
+        override fun onRepeatModeChanged(repeatMode: Int) {
+            _repeatMode.value = repeatMode
+        }
+
+        override fun onShuffleModeEnabledChanged(shuffleModeEnabled: Boolean) {
+            _shuffleEnabled.value = shuffleModeEnabled
         }
 
         override fun onPlaybackStateChanged(playbackState: Int) {
@@ -103,6 +116,8 @@ object PlayerController {
                 syncQueue()
                 syncCurrentItem()
                 syncPlaybackState()
+                _repeatMode.value = mediaController.repeatMode
+                _shuffleEnabled.value = mediaController.shuffleModeEnabled
                 startPositionTicker()
                 pendingQueue?.let { (songs, index) ->
                     pendingQueue = null
@@ -143,39 +158,60 @@ object PlayerController {
     fun playSong(song: Song) = playQueue(listOf(song), 0)
 
     fun playQueue(songs: List<Song>, startIndex: Int = 0) {
-        val player = controller ?: run {
-            pendingQueue = songs to startIndex
-            _playbackError.value = null
-            return
-        }
-        val playable = songs.filter { !it.audioUrl.isNullOrBlank() }
-        if (playable.isEmpty()) {
-            _playbackError.value = "Esta canción no tiene una URL de audio disponible"
-            return
-        }
-        val requested = songs.getOrNull(startIndex)
-        val safeIndex = requested?.let { playable.indexOfFirst { item -> item.id == it.id } }
-            ?.takeIf { it >= 0 } ?: 0
+        if (songs.isEmpty()) return
         _playbackError.value = null
-        _queue.value = playable
-        player.setMediaItems(playable.map(::toMediaItem), safeIndex, 0L)
-        player.prepare()
-        player.playWhenReady = true
-        player.play()
-        syncCurrentItem()
+        scope.launch {
+            val resolved = songs.map { song ->
+                val localAudio = song.audioUrl?.let { raw ->
+                    raw.startsWith("file://") || raw.startsWith("content://") || File(raw).isFile
+                } == true
+                if (song.youtubeId.isNullOrBlank() || localAudio) song
+                else runCatching {
+                    song.copy(audioUrl = YouTubeStreamResolver.resolve(song.youtubeId))
+                }.onFailure { error ->
+                    _playbackError.value = "No se pudo resolver ${song.title}: ${error.localizedMessage ?: "stream no disponible"}"
+                }.getOrDefault(song)
+            }
+            val player = controller
+            if (player == null) {
+                pendingQueue = resolved to startIndex
+                return@launch
+            }
+            val playable = resolved.filter { !it.audioUrl.isNullOrBlank() }
+            if (playable.isEmpty()) {
+                _playbackError.value = _playbackError.value ?: "No hay audio reproducible en esta selección"
+                return@launch
+            }
+            val requested = resolved.getOrNull(startIndex)
+            val safeIndex = requested?.let { playable.indexOfFirst { item -> item.id == it.id } }
+                ?.takeIf { it >= 0 } ?: 0
+            _playbackError.value = null
+            _queue.value = playable
+            player.setMediaItems(playable.map(::toMediaItem), safeIndex, 0L)
+            player.prepare()
+            player.playWhenReady = true
+            player.play()
+            syncCurrentItem()
+        }
     }
 
     fun addToQueue(song: Song, playNext: Boolean = false) {
-        val player = controller ?: return
-        if (song.audioUrl.isNullOrBlank()) return
-        val insertAt = if (playNext) {
-            (player.currentMediaItemIndex + 1).coerceIn(0, player.mediaItemCount)
-        } else {
-            player.mediaItemCount
+        scope.launch {
+            val localAudio = song.audioUrl?.let { raw -> raw.startsWith("file://") || raw.startsWith("content://") || File(raw).isFile } == true
+            val resolved = if (song.youtubeId.isNullOrBlank() || localAudio) song
+            else runCatching { song.copy(audioUrl = YouTubeStreamResolver.resolve(song.youtubeId)) }
+                .getOrElse {
+                    _playbackError.value = "No se pudo resolver el audio: ${it.localizedMessage ?: "error desconocido"}"
+                    return@launch
+                }
+            val player = controller ?: return@launch
+            val insertAt = if (playNext) {
+                (player.currentMediaItemIndex + 1).coerceIn(0, player.mediaItemCount)
+            } else player.mediaItemCount
+            player.addMediaItem(insertAt, toMediaItem(resolved))
+            val updated = _queue.value.toMutableList().apply { add(insertAt.coerceAtMost(size), resolved) }
+            _queue.value = updated
         }
-        player.addMediaItem(insertAt, toMediaItem(song))
-        val updated = _queue.value.toMutableList().apply { add(insertAt.coerceAtMost(size), song) }
-        _queue.value = updated
     }
 
     fun playQueueItem(index: Int) {
@@ -240,6 +276,23 @@ object PlayerController {
     fun seekToFraction(fraction: Float) {
         val duration = _durationMs.value
         if (duration > 0L) seekTo((fraction.coerceIn(0f, 1f) * duration).toLong())
+    }
+
+    fun cycleRepeatMode() {
+        val player = controller ?: return
+        val next = when (player.repeatMode) {
+            Player.REPEAT_MODE_OFF -> Player.REPEAT_MODE_ONE
+            Player.REPEAT_MODE_ONE -> Player.REPEAT_MODE_ALL
+            else -> Player.REPEAT_MODE_OFF
+        }
+        player.repeatMode = next
+        _repeatMode.value = next
+    }
+
+    fun toggleShuffle() {
+        val player = controller ?: return
+        player.shuffleModeEnabled = !player.shuffleModeEnabled
+        _shuffleEnabled.value = player.shuffleModeEnabled
     }
 
     fun setGapless(enabled: Boolean) {

@@ -22,7 +22,6 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.pokke.music.data.model.Song
 import com.pokke.music.data.repository.MultiMusicRepository
-import com.pokke.music.tv.ui.components.tvFocusable
 
 @Composable
 fun TvSearchScreen(onPlay: (Song) -> Unit) {
@@ -62,7 +61,6 @@ fun TvSearchScreen(onPlay: (Song) -> Unit) {
                         Modifier
                             .width(160.dp)
                             .height(100.dp)
-                            .tvFocusable(onClick = { query = cats[i].substringAfter(" ").trim() }, shape = RoundedCornerShape(16.dp))
                             .onFocusChanged { focused = it.isFocused }
                             .background(if (focused) Color(0xFF2A2A38) else Color(0xFF16161E), RoundedCornerShape(16.dp))
                             .border(if (focused) 2.dp else 0.dp, Color.White, RoundedCornerShape(16.dp))
@@ -78,14 +76,12 @@ fun TvSearchScreen(onPlay: (Song) -> Unit) {
                     var focused by remember { mutableStateOf(false) }
                     Column(
                         Modifier
-                            .tvFocusable(onClick = { onPlay(song) }, shape = RoundedCornerShape(10.dp), scaleFocused = 1.06f)
                             .onFocusChanged { focused = it.isFocused }
                             .border(if (focused) 2.dp else 0.dp, Color.White, RoundedCornerShape(10.dp))
-                            .padding(6.dp)
+                            .padding(4.dp)
                     ) {
-                        AsyncImage(song.displayCoverUrl, null, Modifier.aspectRatio(1f), contentScale = ContentScale.Crop)
-                        Text(song.title, color = Color.White, maxLines = 1, fontSize = 13.sp)
-                        Text(song.artist, color = Color(0xFF9A9AA3), maxLines = 1, fontSize = 11.sp)
+                        AsyncImage(song.coverUrl, null, Modifier.aspectRatio(1f), contentScale = ContentScale.Crop)
+                        Text(song.title, color = Color.White, maxLines = 1, fontSize = 12.sp)
                     }
                 }
             }

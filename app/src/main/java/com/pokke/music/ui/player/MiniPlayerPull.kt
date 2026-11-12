@@ -1,9 +1,11 @@
 package com.pokke.music.ui.player
 
-/** Pull contract used by BitChord's original mini-player gesture implementation. */
+import androidx.compose.runtime.staticCompositionLocalOf
+
+/** Receives the mini-player's upward pull and release velocity. */
 interface MiniPlayerPull {
-    /** Finger delta in pixels; negative values move upward. */
     fun drag(delta: Float)
-    /** Finger release velocity in pixels per second. */
     fun release(velocity: Float)
 }
+
+val LocalMiniPlayerPull = staticCompositionLocalOf<MiniPlayerPull?> { null }

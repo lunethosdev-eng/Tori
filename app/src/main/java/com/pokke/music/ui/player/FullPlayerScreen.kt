@@ -6,6 +6,8 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -45,6 +47,9 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -54,6 +59,7 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.pokke.music.player.PlayerController
 import com.pokke.music.ui.sheets.AudioOutputSheet
+import com.pokke.music.ui.player.LocalPlayerDock
 import com.pokke.music.ui.sheets.OverflowMenuSheet
 import com.pokke.music.ui.liquid.LiquidSlider
 import com.pokke.music.ui.backdrop.backdrops.rememberLayerBackdrop
@@ -68,6 +74,8 @@ fun FullPlayerScreen(
     onRequireLogin: () -> Unit
 ) {
     val context = LocalContext.current
+    val playerDock = LocalPlayerDock.current
+    var coverCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
     val preferences = remember(context) { UserPreferences(context) }
     val blurPlayerBackground by preferences.blurPlayerBackground.collectAsState(false)
     val animatedCovers by preferences.autoAnimatedCovers.collectAsState(initial = true)
@@ -199,7 +207,26 @@ fun FullPlayerScreen(
             }
 
             Box(
-                modifier = Modifier.fillMaxWidth().weight(1f),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+                    .pointerInput(current?.id) {
+                        var horizontalTravel = 0f
+                        detectHorizontalDragGestures(
+                            onDragEnd = {
+                                when {
+                                    horizontalTravel > 72.dp.toPx() -> PlayerController.playPrevious()
+                                    horizontalTravel < -72.dp.toPx() -> PlayerController.playNext()
+                                }
+                                horizontalTravel = 0f
+                            },
+                            onDragCancel = { horizontalTravel = 0f },
+                            onHorizontalDrag = { change, amount ->
+                                horizontalTravel += amount
+                                change.consume()
+                            },
+                        )
+                    },
                 contentAlignment = Alignment.Center
             ) {
                 current?.let { song ->
@@ -207,9 +234,32 @@ fun FullPlayerScreen(
                         song = song,
                         animatedEnabled = animatedCovers,
                         contentDescription = "Portada de ${song.title}",
-                        modifier = coverSharedModifier.fillMaxWidth(0.82f).aspectRatio(1f).clip(RoundedCornerShape(22.dp)).graphicsLayer {
-                            shadowElevation = 18.dp.toPx()
-                        },
+                        modifier = coverSharedModifier
+                            .fillMaxWidth(0.82f)
+                            .aspectRatio(1f)
+                            .clip(RoundedCornerShape(22.dp))
+                            .onGloballyPositioned { coverCoordinates = it }
+                            .graphicsLayer {
+                                shadowElevation = 18.dp.toPx()
+                                val dock = playerDock
+                                val coordinates = coverCoordinates
+                                val mini = if (dock?.attached == true) dock.miniArtOnScreen() else null
+                                if (dock != null && coordinates?.isAttached == true && mini != null && coordinates.size.width > 0 && coordinates.size.height > 0) {
+                                    val topLeft = coordinates.localToScreen(Offset.Zero)
+                                    val bottomRight = coordinates.localToScreen(Offset(coordinates.size.width.toFloat(), coordinates.size.height.toFloat()))
+                                    val fullWidth = (bottomRight.x - topLeft.x).coerceAtLeast(1f)
+                                    val fullHeight = (bottomRight.y - topLeft.y).coerceAtLeast(1f)
+                                    val fullCenterX = (topLeft.x + bottomRight.x) / 2f
+                                    val fullCenterY = (topLeft.y + bottomRight.y) / 2f
+                                    val open = dock.openFraction()
+                                    translationX = (mini.center.x - fullCenterX) * (1f - open)
+                                    translationY = (mini.center.y - fullCenterY) * (1f - open)
+                                    val scaleXAtMini = mini.width / fullWidth
+                                    val scaleYAtMini = mini.height / fullHeight
+                                    scaleX = scaleXAtMini + (1f - scaleXAtMini) * open
+                                    scaleY = scaleYAtMini + (1f - scaleYAtMini) * open
+                                }
+                            },
                         contentScale = ContentScale.Crop
                     )
                 }

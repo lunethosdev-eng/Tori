@@ -1,5 +1,9 @@
 package com.pokke.music.tv.ui.home
 
+import android.net.Uri
+import android.view.ViewGroup
+import android.widget.FrameLayout
+import androidx.annotation.OptIn
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
@@ -22,20 +26,31 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.media3.common.MediaItem
+import androidx.media3.common.Player
+import androidx.media3.common.util.UnstableApi
+import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.ui.AspectRatioFrameLayout
+import androidx.media3.ui.PlayerView
 import coil.compose.AsyncImage
+import com.pokke.music.data.canvas.ArtistCanvas
 import com.pokke.music.data.model.Song
 import com.pokke.music.data.repository.MultiMusicRepository
-import com.pokke.music.data.repository.LocalLibraryStore
-import kotlinx.coroutines.launch
-import android.widget.Toast
 import com.pokke.music.tv.ui.components.tvFocusable
 
+private val categories = listOf("🎸 Rock", "🎧 Pop", "🏙️ Urbano", "🎹 Lo-Fi", "⚡ Electrónica")
+private const val FALLBACK_VIDEO = "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4"
+
+@OptIn(UnstableApi::class)
 @Composable
 fun TvHomeScreen(onPlay: (Song) -> Unit, onOpenPlayer: () -> Unit) {
     val context = LocalContext.current
     val repo = remember { MultiMusicRepository() }
     var hero by remember { mutableStateOf<Song?>(null) }
     var rails by remember { mutableStateOf<List<Song>>(emptyList()) }
+    var videoOk by remember { mutableStateOf(true) }
+
     LaunchedEffect(Unit) {
         // Prefer artists that have local canvas
         repo.searchAll("bad bunny").onSuccess {
@@ -58,14 +73,46 @@ fun TvHomeScreen(onPlay: (Song) -> Unit, onOpenPlayer: () -> Unit) {
         }
     }
 
-    val scope = rememberCoroutineScope()
-    val library = remember(context) { LocalLibraryStore(context) }
+    val exo = remember {
+        ExoPlayer.Builder(context).build().apply {
+            repeatMode = Player.REPEAT_MODE_ONE
+            volume = 0f
+            playWhenReady = true
+        }
+    }
+    DisposableEffect(Unit) { onDispose { exo.release() } }
+
+    LaunchedEffect(hero?.id, hero?.artist) {
+        val local = ArtistCanvas.uriFor(context, hero?.artist, hero?.id)
+        val uri = local ?: Uri.parse(FALLBACK_VIDEO)
+        runCatching {
+            exo.setMediaItem(MediaItem.fromUri(uri))
+            exo.prepare()
+            exo.play()
+            videoOk = true
+        }.onFailure { videoOk = false }
+    }
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 40.dp, vertical = 8.dp)) {
         Text("POKKE TV", color = Color(0xFF7A7A88), fontSize = 12.sp, fontWeight = FontWeight.Bold)
         Spacer(Modifier.height(8.dp))
         Box(Modifier.fillMaxWidth().height(340.dp).clip(RoundedCornerShape(24.dp)).background(Color(0xFF101018))) {
-            hero?.displayCoverUrl?.let { AsyncImage(it, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop) }
+            if (videoOk) {
+                AndroidView(
+                    factory = { ctx ->
+                        PlayerView(ctx).apply {
+                            player = exo
+                            useController = false
+                            resizeMode = AspectRatioFrameLayout.RESIZE_MODE_ZOOM
+                            layoutParams = FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
+                        }
+                    },
+                    modifier = Modifier.fillMaxSize(),
+                    update = { it.player = exo }
+                )
+            } else {
+                hero?.coverUrl?.let { AsyncImage(it, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop) }
+            }
             Box(Modifier.fillMaxSize().background(Brush.horizontalGradient(listOf(Color.Black.copy(0.85f), Color.Black.copy(0.2f), Color.Transparent))))
             Column(Modifier.align(Alignment.CenterStart).padding(36.dp)) {
                 Text("DESTACADO", color = Color(0xFF3797F0), fontSize = 12.sp, fontWeight = FontWeight.Bold)
@@ -81,29 +128,23 @@ fun TvHomeScreen(onPlay: (Song) -> Unit, onOpenPlayer: () -> Unit) {
                         modifier = Modifier.height(48.dp).tvFocusable(onClick = { hero?.let(onPlay) }, shape = RoundedCornerShape(12.dp))
                     ) { Text("▶  Reproducir", fontWeight = FontWeight.Bold, fontSize = 16.sp) }
                     OutlinedButton(
-                        onClick = {
-                            hero?.let { selected ->
-                                scope.launch {
-                                    runCatching { library.download(selected) }
-                                        .onSuccess { Toast.makeText(context, "Añadida a descargas", Toast.LENGTH_SHORT).show() }
-                                        .onFailure { Toast.makeText(context, it.localizedMessage ?: "No se pudo añadir", Toast.LENGTH_LONG).show() }
-                                }
-                            }
-                        },
+                        onClick = {},
                         shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier.height(48.dp).tvFocusable(
-                            onClick = {
-                                hero?.let { selected ->
-                                    scope.launch {
-                                        runCatching { library.download(selected) }
-                                            .onSuccess { Toast.makeText(context, "Añadida a descargas", Toast.LENGTH_SHORT).show() }
-                                            .onFailure { Toast.makeText(context, it.localizedMessage ?: "No se pudo añadir", Toast.LENGTH_LONG).show() }
-                                    }
-                                }
-                            }, shape = RoundedCornerShape(12.dp)
-                        )
-                    ) { Text("↓ Descargar", color = Color.White, fontSize = 16.sp) }
+                        modifier = Modifier.height(48.dp).tvFocusable(onClick = {}, shape = RoundedCornerShape(12.dp))
+                    ) { Text("+ Biblioteca", color = Color.White, fontSize = 16.sp) }
                 }
+            }
+        }
+        Spacer(Modifier.height(32.dp))
+        Text("Categorías", color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 20.sp)
+        Spacer(Modifier.height(14.dp))
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+            items(categories) { cat ->
+                Box(
+                    Modifier.tvFocusable(onClick = {}, shape = RoundedCornerShape(16.dp))
+                        .background(Color(0xFF1A1A24), RoundedCornerShape(16.dp))
+                        .padding(horizontal = 28.dp, vertical = 18.dp)
+                ) { Text(cat, color = Color.White, fontSize = 17.sp) }
             }
         }
         Spacer(Modifier.height(32.dp))

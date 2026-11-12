@@ -16,3 +16,7 @@ dependencyResolutionManagement {
 
 rootProject.name = "Pokke"
 include(":app")
+
+include(":bitchord-shared", ":bitchord-sharedui")
+project(":bitchord-shared").projectDir = file("integration/bitchord/shared")
+project(":bitchord-sharedui").projectDir = file("integration/bitchord/sharedUi")

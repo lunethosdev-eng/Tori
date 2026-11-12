@@ -12,6 +12,8 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -67,6 +69,8 @@ fun MiniPlayerBar(
 ) {
     val backdrop = LocalAppBackdrop.current
     val playerDock = LocalPlayerDock.current
+    val bitChordDock = com.music.bitchord.ui.player.LocalPlayerDock.current
+    val playerPull = LocalMiniPlayerPull.current
     val surfaceColor = MaterialTheme.colorScheme.surface
     val song by PlayerController.currentSong.collectAsState()
     val playing by PlayerController.isPlaying.collectAsState()
@@ -106,6 +110,16 @@ fun MiniPlayerBar(
                         Modifier.background(MaterialTheme.colorScheme.surface)
                     }
                 )
+                .pointerInput(playerPull) {
+                    detectVerticalDragGestures(
+                        onDragEnd = { playerPull?.release(0f) },
+                        onDragCancel = { playerPull?.release(0f) },
+                        onVerticalDrag = { change, dragAmount ->
+                            change.consume()
+                            playerPull?.drag(dragAmount)
+                        },
+                    )
+                }
                 .clickable(onClick = onOpenPlayer)
                 .padding(horizontal = 10.dp, vertical = if (compact) 8.dp else 10.dp)
         ) {
@@ -119,6 +133,7 @@ fun MiniPlayerBar(
                         .background(Color(0xFF2A2A30))
                         .onGloballyPositioned { coordinates ->
                             playerDock?.reportMiniArt(coordinates, 10.dp)
+                            bitChordDock?.reportMiniArt(coordinates, 10.dp)
                         },
                     contentScale = ContentScale.Crop
                 )

@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
 import com.pokke.music.player.PlayerController
+import com.pokke.music.player.PokkeAndroidPlayerHost
 import com.pokke.music.ui.navigation.PokkeNavHost
 import com.pokke.music.ui.liquid.GlassBackdropHost
 import com.pokke.music.data.preferences.UserPreferences
@@ -21,6 +22,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         PlayerController.init(this)
+        PokkeAndroidPlayerHost.install(applicationContext)
         enableEdgeToEdge(
             statusBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
             navigationBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT)

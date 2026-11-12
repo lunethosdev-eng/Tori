@@ -42,7 +42,7 @@ class LocalLibraryStore(private val context: Context) {
         parseSongs(prefs[DOWNLOADS]).mapNotNull { song ->
             val id = ids.optLong(song.id, -1L)
             val path = paths.optString(song.id).takeIf { it.isNotBlank() }
-            if (id > 0L && path != null && isDownloadComplete(id)) song.copy(audioUrl = path) else null
+            if (id > 0L && path != null && File(path).isFile && File(path).length() > 0L) song.copy(audioUrl = path) else null
         }
     }
     val playlists: Flow<List<Playlist>> = context.dataStore.data.map { parsePlaylists(it[PLAYLISTS]) }
@@ -56,38 +56,39 @@ class LocalLibraryStore(private val context: Context) {
     }
 
     suspend fun download(song: Song): Long {
-        val source = song.audioUrl?.takeIf { it.startsWith("https://") || it.startsWith("http://") }
-            ?: error("Esta canción no tiene una URL descargable")
+        val resolvedSong = if (!song.youtubeId.isNullOrBlank() || !song.audioUrl.isNullOrBlank()) song
+            else song
         val dir = context.getExternalFilesDir(Environment.DIRECTORY_MUSIC) ?: error("Almacenamiento no disponible")
         if (!dir.exists()) dir.mkdirs()
         val safeName = song.title.replace(Regex("[^A-Za-z0-9._-]"), "_").take(70).ifBlank { "track" }
-        val target = File(dir, "${song.id.hashCode()}_$safeName.mp3")
-        val request = DownloadManager.Request(Uri.parse(source))
-            .setTitle(song.title)
-            .setDescription("${song.artist} · Pokke")
-            .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
-            .setAllowedOverMetered(true)
-            .setAllowedOverRoaming(false)
-            .setDestinationInExternalFilesDir(context, Environment.DIRECTORY_MUSIC, target.name)
-        val id = dm.enqueue(request)
+        val extension = if (!resolvedSong.youtubeId.isNullOrBlank()) "m4a" else {
+            val candidate = runCatching { Uri.parse(resolvedSong.audioUrl).lastPathSegment.orEmpty().substringAfterLast('.', "mp3") }.getOrDefault("mp3").lowercase()
+            candidate.takeIf { it in setOf("mp3", "m4a", "aac", "flac", "ogg", "wav", "webm") } ?: "mp3"
+        }
+        val target = File(dir, "${song.id.hashCode()}_$safeName.$extension")
+        val taskId = DownloadQueueManager.get(context).enqueue(resolvedSong, target)
         context.dataStore.edit { prefs ->
             val current = parseSongs(prefs[DOWNLOADS]).filterNot { it.id == song.id }
-            prefs[DOWNLOADS] = songsJson(listOf(song) + current)
+            prefs[DOWNLOADS] = songsJson(listOf(resolvedSong) + current)
             val ids = runCatching { JSONObject(prefs[DOWNLOAD_IDS] ?: "{}") }.getOrDefault(JSONObject())
-            ids.put(song.id, id)
+            ids.put(song.id, taskId)
             prefs[DOWNLOAD_IDS] = ids.toString()
             val paths = runCatching { JSONObject(prefs[DOWNLOAD_PATHS] ?: "{}") }.getOrDefault(JSONObject())
             paths.put(song.id, target.absolutePath)
             prefs[DOWNLOAD_PATHS] = paths.toString()
         }
-        return id
+        return taskId
     }
 
     suspend fun removeDownload(song: Song) {
         val prefsNow = context.dataStore.data.first()
         val ids = runCatching { JSONObject(prefsNow[DOWNLOAD_IDS] ?: "{}") }.getOrDefault(JSONObject())
         val downloadId = ids.optLong(song.id, -1L)
-        if (downloadId > 0L) runCatching { dm.remove(downloadId) }
+        if (downloadId > 0L) {
+            val engine = DownloadQueueManager.get(context)
+            if (engine.tasks.value.containsKey(downloadId)) engine.cancel(downloadId)
+            else runCatching { dm.remove(downloadId) } // migration: older DownloadManager-backed entries
+        }
         val paths = runCatching { JSONObject(prefsNow[DOWNLOAD_PATHS] ?: "{}") }.getOrDefault(JSONObject())
         paths.optString(song.id).takeIf { it.isNotBlank() }?.let { runCatching { File(it).delete() } }
         context.dataStore.edit { prefs ->

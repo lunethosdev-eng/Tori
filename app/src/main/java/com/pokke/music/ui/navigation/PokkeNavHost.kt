@@ -45,6 +45,7 @@ import com.pokke.music.ui.auth.ProfileScreen
 import com.pokke.music.ui.home.HomeScreen
 import com.pokke.music.ui.library.LibraryScreen
 import com.pokke.music.ui.player.FullPlayerScreen
+import com.pokke.music.ui.player.BitChordNowPlayingHost
 import com.pokke.music.ui.player.LyricsScreen
 import com.pokke.music.ui.queue.QueueScreen
 import com.pokke.music.ui.search.SearchScreen
@@ -53,6 +54,9 @@ import com.pokke.music.ui.admin.AdminPanelScreen
 import com.pokke.music.ui.social.ChatScreen
 import com.pokke.music.ui.player.MiniPlayerBar
 import com.pokke.music.ui.player.PlayerDock
+import com.pokke.music.ui.player.PlayerMotionSheet
+import com.pokke.music.ui.player.PlayerSheetMotion
+import com.pokke.music.ui.player.LocalMiniPlayerPull
 import com.pokke.music.ui.player.LocalPlayerDock
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
@@ -146,9 +150,35 @@ fun PokkeNavHost() {
     LaunchedEffect(route) { auth.getProfile().onSuccess { avatar = it?.avatarUrl } }
 
     val playerDock = remember { PlayerDock() }
-    SideEffect { playerDock.attached = route == Screen.Player.route }
+    val bitChordDock = remember { com.music.bitchord.ui.player.PlayerDock() }
+    val playerMotionScope = rememberCoroutineScope()
+    val routeState = rememberUpdatedState(route)
+    val playerSheetMotion = remember(playerDock) {
+        PlayerSheetMotion(
+            scope = playerMotionScope,
+            dock = playerDock,
+            shown = { routeState.value == Screen.Player.route },
+            setShown = { next ->
+                if (next && routeState.value != Screen.Player.route) nav.navigate(Screen.Player.route)
+                else if (!next && routeState.value == Screen.Player.route) nav.popBackStack()
+            },
+        )
+    }
+    val playerWindowInfo = androidx.compose.ui.platform.LocalWindowInfo.current
+    playerSheetMotion.windowInfo = playerWindowInfo
+    SideEffect {
+        val travel = playerWindowInfo.containerSize.height.toFloat()
+        playerDock.sheetTravel = travel
+        bitChordDock.sheetTravel = travel
+        playerDock.attached = route == Screen.Player.route
+        bitChordDock.sheetOffset = { playerSheetMotion.position() }
+    }
     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-        CompositionLocalProvider(LocalPlayerDock provides playerDock) {
+        CompositionLocalProvider(
+            LocalPlayerDock provides playerDock,
+            LocalMiniPlayerPull provides playerSheetMotion,
+            com.music.bitchord.ui.player.LocalPlayerDock provides bitChordDock,
+        ) {
         // SharedTransition removed — caused NoSuchMethodError on FullPlayer
             Box(Modifier.fillMaxSize()) {
                 NavHost(navController = nav, startDestination = Screen.Home.route, modifier = Modifier.fillMaxSize()) {
@@ -160,8 +190,8 @@ fun PokkeNavHost() {
             }
             composable(Screen.Home.route) {
                 HomeScreen(
-                    onSongClick = { PlayerController.init(context); PlayerController.playSong(it); nav.navigate(Screen.Player.route) },
-                    onOpenPlayer = { nav.navigate(Screen.Player.route) },
+                    onSongClick = { PlayerController.init(context); PlayerController.playSong(it); playerSheetMotion.open() },
+                    onOpenPlayer = { playerSheetMotion.open() },
                     onOpenSettings = { nav.navigate(Screen.Settings.route) },
                     onOpenProfile = { nav.navigate(if (auth.session.value == null) Screen.Auth.route else Screen.Profile.route) },
                     onScrollStateChanged = { navCompact = it },
@@ -172,8 +202,8 @@ fun PokkeNavHost() {
                 SearchScreen(
                     authRepository = auth,
                     isVisible = route == Screen.Search.route,
-                    onSongClick = { PlayerController.init(context); PlayerController.playSong(it); nav.navigate(Screen.Player.route) },
-                    onPlayQueue = { songs, index -> PlayerController.init(context); PlayerController.playQueue(songs, index); nav.navigate(Screen.Player.route) },
+                    onSongClick = { PlayerController.init(context); PlayerController.playSong(it); playerSheetMotion.open() },
+                    onPlayQueue = { songs, index -> PlayerController.init(context); PlayerController.playQueue(songs, index); playerSheetMotion.open() },
                     onUserClick = { username -> nav.navigate(Screen.PublicProfile.create(username)) }
                 )
             }
@@ -188,7 +218,7 @@ fun PokkeNavHost() {
             composable(Screen.Library.route) {
                 LibraryScreen(repository = auth, isVisible = route == Screen.Library.route,
                     onLoginRequired = { nav.navigate(Screen.Auth.route) },
-                    onSongClick = { PlayerController.init(context); PlayerController.playSong(it); nav.navigate(Screen.Player.route) })
+                    onSongClick = { PlayerController.init(context); PlayerController.playSong(it); playerSheetMotion.open() })
             }
             composable(Screen.Chats.route) {
                 if (chatsEnabled) ChatScreen(authRepository = auth, onOpenMaps = { nav.navigate(Screen.Maps.route) }, onOpenStory = { nav.navigate(Screen.StoryPublish.route) })
@@ -211,13 +241,18 @@ fun PokkeNavHost() {
                 AdminPanelScreen(repository = auth, onBack = { nav.popBackStack() })
             }
             composable(Screen.Player.route) {
-                FullPlayerScreen(
-                    onBack = { nav.popBackStack() },
-                    onOpenQueue = { nav.navigate(Screen.Queue.route) },
-                    onOpenLyrics = { nav.navigate(Screen.Lyrics.route) },
-                    authRepository = auth,
-                    onRequireLogin = { nav.navigate(Screen.Auth.route) }
-                )
+                PlayerMotionSheet(
+                    dock = playerDock,
+                    motion = playerSheetMotion,
+                ) { closePlayer ->
+                    BitChordNowPlayingHost(
+                        authRepository = auth,
+                        onClose = closePlayer,
+                        onOpenQueue = { nav.navigate(Screen.Queue.route) },
+                        onOpenLyrics = { nav.navigate(Screen.Lyrics.route) },
+                        onRequireLogin = { nav.navigate(Screen.Auth.route) },
+                    )
+                }
             }
             composable(Screen.Queue.route) { QueueScreen(onBack = { nav.popBackStack() }) }
             composable(Screen.Lyrics.route) { LyricsScreen(onBack = { nav.popBackStack() }) }
@@ -225,12 +260,12 @@ fun PokkeNavHost() {
             }
 
         val currentSong by PlayerController.currentSong.collectAsState()
-        val showMini = currentSong != null && route !in listOf(Screen.Player.route, Screen.Lyrics.route, Screen.Auth.route)
+        val showMini = currentSong != null && route !in listOf(Screen.Lyrics.route, Screen.Auth.route)
         MiniPlayerBar(
             visible = showMini,
             glass = glass,
             compact = navCompact,
-            onOpenPlayer = { nav.navigate(Screen.Player.route) },
+            onOpenPlayer = { playerSheetMotion.open() },
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .padding(bottom = if (showNav) 78.dp else 16.dp)

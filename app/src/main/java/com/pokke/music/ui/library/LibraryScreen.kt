@@ -30,6 +30,7 @@ import com.pokke.music.data.model.Playlist
 import com.pokke.music.data.model.Song
 import com.pokke.music.data.repository.AuthRepository
 import com.pokke.music.data.repository.LocalLibraryStore
+import com.pokke.music.data.repository.DownloadQueueManager
 import com.pokke.music.ui.theme.PokkeBlack
 import kotlinx.coroutines.launch
 import java.io.File
@@ -49,6 +50,7 @@ fun LibraryScreen(
     val scope = rememberCoroutineScope()
     val session by repository.session.collectAsState()
     val downloads by localStore.downloads.collectAsState(initial = emptyList())
+    val downloadTasks by DownloadQueueManager.get(context.applicationContext).tasks.collectAsState()
     val history by localStore.history.collectAsState(initial = emptyList())
     var favorites by remember { mutableStateOf<List<Song>>(emptyList()) }
     var playlists by remember { mutableStateOf<List<Playlist>>(emptyList()) }
@@ -163,6 +165,58 @@ fun LibraryScreen(
             item {
                 Spacer(Modifier.height(18.dp))
                 Text(when (tab) { LibraryTab.DOWNLOADS -> "Descargas"; LibraryTab.FAVORITES -> "Favoritos de Kokoro"; LibraryTab.HISTORY -> "Recién escuchadas" }, color = Color.White, fontSize = 19.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp))
+            }
+            if (tab == LibraryTab.DOWNLOADS) {
+                val activeTasks = downloadTasks.values.filter { it.status in setOf(
+                    DownloadQueueManager.Status.QUEUED,
+                    DownloadQueueManager.Status.RUNNING,
+                    DownloadQueueManager.Status.PAUSED,
+                    DownloadQueueManager.Status.FAILED,
+                ) }.sortedBy { it.id }
+                items(activeTasks, key = { "download_task_${it.id}" }) { task ->
+                    Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 7.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Column(Modifier.weight(1f)) {
+                                Text(task.song.title, color = Color.White, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Text(
+                                    when (task.status) {
+                                        DownloadQueueManager.Status.QUEUED -> "En cola"
+                                        DownloadQueueManager.Status.RUNNING -> if (task.totalBytes > 0) "Descargando · ${(task.progress * 100).toInt()}%" else "Descargando…"
+                                        DownloadQueueManager.Status.PAUSED -> "Pausada"
+                                        DownloadQueueManager.Status.FAILED -> task.error ?: "Error de descarga"
+                                        else -> ""
+                                    },
+                                    color = if (task.status == DownloadQueueManager.Status.FAILED) Color(0xFFFF8A80) else Color.White.copy(.6f),
+                                    fontSize = 12.sp,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                            if (task.status == DownloadQueueManager.Status.RUNNING || task.status == DownloadQueueManager.Status.QUEUED) {
+                                TextButton(onClick = { DownloadQueueManager.get(context).pause(task.id) }) { Text("Pausar") }
+                            } else if (task.status == DownloadQueueManager.Status.PAUSED || task.status == DownloadQueueManager.Status.FAILED) {
+                                TextButton(onClick = { DownloadQueueManager.get(context).resume(task.id) }) { Text("Reanudar") }
+                            }
+                            TextButton(onClick = { DownloadQueueManager.get(context).cancel(task.id) }) { Text("Cancelar") }
+                        }
+                        if (task.status == DownloadQueueManager.Status.RUNNING) {
+                            if (task.totalBytes > 0) {
+                                LinearProgressIndicator(
+                                    progress = task.progress,
+                                    modifier = Modifier.fillMaxWidth().padding(top = 5.dp),
+                                    color = Color.White,
+                                    trackColor = Color.White.copy(.14f),
+                                )
+                            } else {
+                                LinearProgressIndicator(
+                                    modifier = Modifier.fillMaxWidth().padding(top = 5.dp),
+                                    color = Color.White,
+                                    trackColor = Color.White.copy(.14f),
+                                )
+                            }
+                        }
+                    }
+                }
             }
             if (tab == LibraryTab.FAVORITES && session == null) {
                 item {
