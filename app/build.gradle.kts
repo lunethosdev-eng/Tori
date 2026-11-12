@@ -58,6 +58,22 @@ android {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
     }
+
+    // TV sources live under src/main/tv (not the default src/tv).
+    // Without this mapping the tv flavor never picks up the TV manifest,
+    // so the launcher stays on MainActivity and the class is missing / wrong.
+    sourceSets {
+        getByName("tv") {
+            manifest.srcFile("src/main/tv/AndroidManifest.xml")
+            java.srcDirs("src/main/tv/java")
+            res.srcDirs("src/main/tv/res")
+        }
+        // Keep phone on the default main sources only (TV code stays available
+        // as library classes but is not the launcher).
+        getByName("phone") {
+            // default main is enough
+        }
+    }
 }
 
 val newPipeExtractorRaw: Configuration by configurations.creating {
