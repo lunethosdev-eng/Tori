@@ -38,7 +38,7 @@
         tools:targetApi="35">
 
         <service
-            android:name=".player.PlaybackService"
+            android:name="com.pokke.music.player.PlaybackService"
             android:exported="true"
             android:foregroundServiceType="mediaPlayback">
             <intent-filter>
@@ -47,7 +47,7 @@
         </service>
 
         <activity
-            android:name=".MainActivity"
+            android:name="com.pokke.music.MainActivity"
             android:exported="true"
             android:theme="@style/Theme.Pokke"
             android:windowSoftInputMode="adjustResize"
