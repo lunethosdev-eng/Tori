@@ -47,6 +47,7 @@ import com.pokke.music.data.model.Song
 import com.pokke.music.data.repository.MusicRepository
 import com.pokke.music.data.repository.MultiMusicRepository
 import com.pokke.music.data.repository.AuthRepository
+import com.pokke.music.data.preferences.UserPreferences
 import kotlinx.coroutines.launch
 import com.pokke.music.ui.theme.PokkeBlack
 import kotlinx.coroutines.delay
@@ -66,6 +67,9 @@ fun SearchScreen(
 ) {
     val repo = remember { MusicRepository() }
     val multiRepo = remember { MultiMusicRepository() }
+    val context = LocalContext.current
+    val prefs = remember { UserPreferences(context) }
+    val ytCatalogEnabled by prefs.youtubeCatalogEnabled.collectAsState(initial = false)
     val session by authRepository.session.collectAsState()
     val scope = rememberCoroutineScope()
     var favoriteIds by remember { mutableStateOf<Set<String>>(emptySet()) }
@@ -99,7 +103,7 @@ fun SearchScreen(
         }
     }
 
-        LaunchedEffect(query) {
+        LaunchedEffect(query, ytCatalogEnabled) {
         detail = null
         if (query.isBlank()) {
             songs = emptyList(); artists = emptyList(); albums = emptyList(); users = emptyList()
@@ -110,7 +114,7 @@ fun SearchScreen(
         loading = true
         error = null
         // Unified: always load songs + users + artists together
-        val multi = multiRepo.searchAll(query)
+        val multi = multiRepo.searchAll(query, includeYoutube = ytCatalogEnabled)
         if (multi.isSuccess) songs = multi.getOrDefault(emptyList())
         else repo.searchSongs(query).onSuccess { songs = it }.onFailure { songs = emptyList() }
         repo.searchArtists(query).onSuccess { artists = it }.onFailure { artists = emptyList() }
