@@ -47,6 +47,7 @@ fun SettingsScreen(
     val animated by prefs.autoAnimatedCovers.collectAsState(initial = true)
     val localCanvas by prefs.pokkeAnimatedCoversEnabled.collectAsState(initial = true)
     val externalCanvas by prefs.externalCanvasEnabled.collectAsState(initial = true)
+    val spotifyCanvas by prefs.spotifyCanvasEnabled.collectAsState(initial = false)
     val liquidSlider by prefs.liquidSliderEnabled.collectAsState(initial = true)
     val performance by prefs.liquidPerformanceMode.collectAsState(initial = true)
     val chatsEnabled by prefs.experimentalChatsEnabled.collectAsState(initial = false)
@@ -83,7 +84,7 @@ fun SettingsScreen(
         Section("APARIENCIA")
         LiquidOrMaterialToggle(
             title = "Liquid Glass",
-            subtitle = "Backdrop liquid glass (código fuente vendored, sin AAR). Apagado por defecto.",
+            subtitle = "Vidrio dinámico con desenfoque, refracción, reflejos y respuesta táctil. Usa una captura compartida del contenido.",
             checked = glass,
             glass = false,
             onChange = { scope.launch { prefs.setLiquidGlass(it) } }
@@ -115,6 +116,13 @@ fun SettingsScreen(
             checked = externalCanvas,
             glass = false,
             onChange = { scope.launch { prefs.setExternalCanvasEnabled(it) } }
+        )
+        LiquidOrMaterialToggle(
+            title = "Spotify Canvas",
+            subtitle = "Usa la sesión de Spotify que conectaste en Cuentas externas. Depende de endpoints privados de Spotify y puede dejar de funcionar si cambian.",
+            checked = spotifyCanvas,
+            glass = false,
+            onChange = { scope.launch { prefs.setSpotifyCanvasEnabled(it) } }
         )
         LiquidOrMaterialToggle(
             title = "Liquid Slider",
