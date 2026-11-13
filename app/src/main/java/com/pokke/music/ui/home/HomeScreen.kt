@@ -5,6 +5,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -45,6 +46,7 @@ import androidx.compose.ui.platform.LocalContext
 import java.util.Calendar
 import kotlinx.coroutines.delay
 import com.pokke.music.ui.liquid.LocalAppBackdrop
+import com.pokke.music.ui.liquid.pokkePressMotion
 
 /**
  * Rediseño del Home de Pokke.
@@ -137,7 +139,7 @@ fun HomeScreen(
         sectionOrder.split(",").map { it.trim() }.filter { it.isNotEmpty() }
     }
 
-    Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+    Box(Modifier.fillMaxSize().animateContentSize().background(MaterialTheme.colorScheme.background)) {
         LazyColumn(
             state = listState,
             modifier = Modifier.fillMaxSize().statusBarsPadding(),
@@ -403,7 +405,8 @@ private fun QuickChip(
 
 @Composable
 private fun SongCoverCard(song: Song, coverSize: Dp, onClick: () -> Unit) {
-    Column(Modifier.width(coverSize).clickable(onClick = onClick)) {
+    val interaction = remember { MutableInteractionSource() }
+    Column(Modifier.width(coverSize).pokkePressMotion(interaction).clickable(interactionSource = interaction, indication = null, onClick = onClick)) {
         AsyncImage(
             song.displayCoverUrl ?: song.coverUrl, null,
             Modifier.size(coverSize).clip(RoundedCornerShape(14.dp)).background(MaterialTheme.colorScheme.surface),
@@ -417,10 +420,12 @@ private fun SongCoverCard(song: Song, coverSize: Dp, onClick: () -> Unit) {
 
 @Composable
 private fun SongListRow(song: Song, onClick: () -> Unit) {
+    val interaction = remember { MutableInteractionSource() }
     Row(
         Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
+            .pokkePressMotion(interaction)
+            .clickable(interactionSource = interaction, indication = null, onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
