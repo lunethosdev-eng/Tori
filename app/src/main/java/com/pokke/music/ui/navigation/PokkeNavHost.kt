@@ -6,8 +6,12 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -27,6 +31,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
@@ -63,6 +68,8 @@ import androidx.compose.runtime.SideEffect
 import com.pokke.music.ui.social.StoryPublisherScreen
 import com.pokke.music.ui.social.FriendsMapScreen
 import com.pokke.music.ui.liquid.LocalAppBackdrop
+import com.pokke.music.ui.liquid.pokkePressMotion
+import com.pokke.music.ui.liquid.LocalGlassPerformanceMode
 import com.pokke.music.ui.backdrop.drawBackdrop
 import com.pokke.music.ui.backdrop.effects.blur
 import com.pokke.music.ui.backdrop.effects.lens
@@ -140,6 +147,7 @@ fun PokkeNavHost() {
     LaunchedEffect(auth) { auth.restoreSession() }
     val glass by prefs.liquidGlassEnabled.collectAsState(false)
     val appBackdrop = LocalAppBackdrop.current
+    val performanceMode = LocalGlassPerformanceMode.current
     val chatsEnabled by prefs.experimentalChatsEnabled.collectAsState(false)
     val backStack by nav.currentBackStackEntryAsState()
     val route = backStack?.destination?.route
@@ -181,7 +189,15 @@ fun PokkeNavHost() {
         ) {
         // SharedTransition removed — caused NoSuchMethodError on FullPlayer
             Box(Modifier.fillMaxSize()) {
-                NavHost(navController = nav, startDestination = Screen.Home.route, modifier = Modifier.fillMaxSize()) {
+                NavHost(
+                    navController = nav,
+                    startDestination = Screen.Home.route,
+                    modifier = Modifier.fillMaxSize(),
+                    enterTransition = { fadeIn(tween(220)) + slideInVertically(tween(300)) { it / 18 } },
+                    exitTransition = { fadeOut(tween(150)) + slideOutVertically(tween(180)) { -it / 24 } },
+                    popEnterTransition = { fadeIn(tween(220)) + slideInVertically(tween(300)) { -it / 20 } },
+                    popExitTransition = { fadeOut(tween(150)) + slideOutVertically(tween(180)) { it / 24 } }
+                ) {
             composable(Screen.Auth.route) {
                 LoginScreen(repository = auth, onContinueAsGuest = { nav.popBackStack() }, onLoginSuccess = { nav.popBackStack() })
             }
@@ -279,8 +295,14 @@ fun PokkeNavHost() {
             Row(
                 modifier = Modifier.padding(bottom = 10.dp).navigationBarsPadding()
                     .animateContentSize(androidx.compose.animation.core.tween(190))
-                    .clip(RoundedCornerShape(40.dp)).background(
-                        if (glass) Color(0xCC292930) else Color(0xFF19191E)
+                    .clip(RoundedCornerShape(40.dp))
+                    .then(
+                        if (glass && appBackdrop != null) Modifier.drawBackdrop(
+                            backdrop = appBackdrop,
+                            shape = { Capsule() },
+                            effects = { vibrancy(); blur((if (performanceMode) 8f else 14f).dp.toPx()); lens((if (performanceMode) 8f else 12f).dp.toPx(), (if (performanceMode) 14f else 22f).dp.toPx()) },
+                            onDrawSurface = { drawRect(Color(0xB31B1B23)) }
+                        ) else Modifier.background(if (glass) Color(0xCC292930) else Color(0xFF19191E))
                     )
                     .padding(horizontal = if (navCompact) 6.dp else 9.dp, vertical = if (navCompact) 5.dp else 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -288,14 +310,29 @@ fun PokkeNavHost() {
             ) {
                 (if (navCompact) baseNavItems else navItems).forEach { item ->
                     val selected = route == item.screen.route
-                    Box(Modifier.size(if (navCompact) 44.dp else 50.dp).clip(CircleShape).background(if (selected) Color.White.copy(if (glass) .20f else .12f) else Color.Transparent)
-                        .clickable { nav.navigate(item.screen.route) { popUpTo(nav.graph.findStartDestination().id) { saveState = true }; launchSingleTop = true; restoreState = true } }, contentAlignment = Alignment.Center) {
-                        Icon(if (selected) item.selected else item.normal, item.screen.route, tint = if (selected) Color.White else Color(0xFF929297), modifier = Modifier.size(24.dp))
+                    val interaction = remember(item.screen.route) { MutableInteractionSource() }
+                    val iconScale by animateFloatAsState(if (selected) 1.08f else 1f, spring(dampingRatio = 0.62f, stiffness = 420f), label = "nav-icon-${item.screen.route}")
+                    Box(
+                        Modifier.size(if (navCompact) 44.dp else 50.dp)
+                            .clip(CircleShape)
+                            .background(if (selected) Color.White.copy(if (glass) .22f else .14f) else Color.Transparent)
+                            .pokkePressMotion(interaction, pressedScale = 0.88f)
+                            .clickable(interactionSource = interaction, indication = null) {
+                                nav.navigate(item.screen.route) { popUpTo(nav.graph.findStartDestination().id) { saveState = true }; launchSingleTop = true; restoreState = true }
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(if (selected) item.selected else item.normal, item.screen.route, tint = if (selected) Color.White else Color(0xFF929297), modifier = Modifier.size(24.dp).graphicsLayer { scaleX = iconScale; scaleY = iconScale })
                     }
                 }
-                if (!navCompact) Box(Modifier.size(if (navCompact) 44.dp else 50.dp).clip(CircleShape).background(Color(0xFF29292E)).clickable { nav.navigate(if (auth.session.value == null) Screen.Auth.route else Screen.Profile.route) }, contentAlignment = Alignment.Center) {
+                if (!navCompact) {
+                    val profileInteraction = remember { MutableInteractionSource() }
+                    Box(Modifier.size(50.dp).clip(CircleShape).background(Color(0xFF29292E))
+                        .pokkePressMotion(profileInteraction, pressedScale = 0.90f)
+                        .clickable(interactionSource = profileInteraction, indication = null) { nav.navigate(if (auth.session.value == null) Screen.Auth.route else Screen.Profile.route) }, contentAlignment = Alignment.Center) {
                     if (!avatar.isNullOrBlank()) AsyncImage(avatar, "Perfil", Modifier.fillMaxSize().clip(CircleShape))
                     else Icon(Icons.Default.Person, "Perfil", tint = Color.White, modifier = Modifier.size(23.dp))
+                    }
                 }
             }
         }
