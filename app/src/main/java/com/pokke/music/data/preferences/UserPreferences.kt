@@ -39,6 +39,11 @@ class UserPreferences(private val context: Context) {
 
         // YouTube / external catalog (separate from login)
         private val YOUTUBE_CATALOG = booleanPreferencesKey("youtube_catalog_enabled")
+        private val LYRICS_TARGET_LANG = stringPreferencesKey("lyrics_target_lang")
+        private val LYRICS_COLOR_MODE = stringPreferencesKey("lyrics_color_mode")
+        private val LYRICS_ANIM_INTENSITY = floatPreferencesKey("lyrics_anim_intensity")
+        private val HOME_CUSTOM_BG = stringPreferencesKey("home_custom_bg_url")
+        private val APP_ACCENT = stringPreferencesKey("app_accent_theme")
         private val SPOTIFY_CANVAS = booleanPreferencesKey("spotify_canvas_enabled")
         private val APPLE_CANVAS = booleanPreferencesKey("apple_canvas_enabled")
         private val POKKE_ANIMATED_COVERS = booleanPreferencesKey("pokke_animated_covers")
@@ -67,11 +72,21 @@ class UserPreferences(private val context: Context) {
     suspend fun setVendoredBackdropGlass(v: Boolean) { context.dataStore.edit { it[VENDORED_GLASS] = v } }
 
     val youtubeCatalogEnabled: Flow<Boolean> = context.dataStore.data.map { it[YOUTUBE_CATALOG] ?: false }
+    val lyricsTargetLang: Flow<String> = context.dataStore.data.map { it[LYRICS_TARGET_LANG] ?: "es" }
+    val lyricsColorMode: Flow<String> = context.dataStore.data.map { it[LYRICS_COLOR_MODE] ?: "classic" }
+    val lyricsAnimIntensity: Flow<Float> = context.dataStore.data.map { it[LYRICS_ANIM_INTENSITY] ?: 1f }
+    val homeCustomBgUrl: Flow<String> = context.dataStore.data.map { it[HOME_CUSTOM_BG] ?: "" }
+    val appAccentTheme: Flow<String> = context.dataStore.data.map { it[APP_ACCENT] ?: "violet" }
     val spotifyCanvasEnabled: Flow<Boolean> = context.dataStore.data.map { it[SPOTIFY_CANVAS] ?: false }
     val appleCanvasEnabled: Flow<Boolean> = context.dataStore.data.map { it[APPLE_CANVAS] ?: false }
     val pokkeAnimatedCoversEnabled: Flow<Boolean> = context.dataStore.data.map { it[POKKE_ANIMATED_COVERS] ?: true }
 
     suspend fun setYoutubeCatalogEnabled(v: Boolean) { context.dataStore.edit { it[YOUTUBE_CATALOG] = v } }
+    suspend fun setLyricsTargetLang(v: String) { context.dataStore.edit { it[LYRICS_TARGET_LANG] = v } }
+    suspend fun setLyricsColorMode(v: String) { context.dataStore.edit { it[LYRICS_COLOR_MODE] = v } }
+    suspend fun setLyricsAnimIntensity(v: Float) { context.dataStore.edit { it[LYRICS_ANIM_INTENSITY] = v.coerceIn(0.3f, 1.8f) } }
+    suspend fun setHomeCustomBgUrl(v: String) { context.dataStore.edit { it[HOME_CUSTOM_BG] = v } }
+    suspend fun setAppAccentTheme(v: String) { context.dataStore.edit { it[APP_ACCENT] = v } }
     suspend fun setSpotifyCanvasEnabled(v: Boolean) { context.dataStore.edit { it[SPOTIFY_CANVAS] = v } }
     suspend fun setAppleCanvasEnabled(v: Boolean) { context.dataStore.edit { it[APPLE_CANVAS] = v } }
     suspend fun setPokkeAnimatedCoversEnabled(v: Boolean) { context.dataStore.edit { it[POKKE_ANIMATED_COVERS] = v } }
