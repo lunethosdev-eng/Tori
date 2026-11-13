@@ -1,7 +1,6 @@
 package com.pokke.music.player
 
 import android.content.Context
-import android.media.AudioManager
 import android.net.Uri
 import android.widget.VideoView
 import androidx.compose.runtime.Composable
@@ -15,29 +14,13 @@ import com.music.bitchord.ui.player.PlayerPlatform
 import com.music.bitchord.ui.player.PokkeDefaultPlayerHost
 import com.pokke.music.data.model.Song
 import java.util.concurrent.ConcurrentHashMap
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
 
 /** Supplies Pokke animated cover URLs to the original BitChord player surface. */
 class PokkeAndroidPlayerHost(context: Context) : PlayerHost by PokkeDefaultPlayerHost {
     private val app = context.applicationContext
-    private val audioManager = app.getSystemService(Context.AUDIO_SERVICE) as AudioManager
-    private val volumeState = MutableStateFlow(readVolume())
-    override val volume: SystemVolume = object : SystemVolume {
-        override val level: StateFlow<Float> = volumeState
-        override fun set(level: Float) {
-            val maximum = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC).coerceAtLeast(1)
-            val target = (level.coerceIn(0f, 1f) * maximum).toInt()
-            audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, target, 0)
-            volumeState.value = readVolume()
-        }
-        override fun refresh() { volumeState.value = readVolume() }
-    }
-
-    private fun readVolume(): Float {
-        val maximum = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC).coerceAtLeast(1)
-        return audioManager.getStreamVolume(AudioManager.STREAM_MUSIC).toFloat() / maximum
-    }
+    // volume is provided by PokkeDefaultPlayerHost (PlayerHost delegation).
+    // Custom SystemVolume override removed: SystemVolume symbol is not always
+    // visible to the app module from bitchord-sharedui KMP on AGP 9.
 
     override fun cachedCanvas(song: BitChordSong): CanvasArtwork? = canvasForSong(song)
 
