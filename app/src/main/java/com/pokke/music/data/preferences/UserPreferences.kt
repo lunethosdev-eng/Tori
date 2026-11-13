@@ -47,6 +47,7 @@ class UserPreferences(private val context: Context) {
         private val SPOTIFY_CANVAS = booleanPreferencesKey("spotify_canvas_enabled")
         private val APPLE_CANVAS = booleanPreferencesKey("apple_canvas_enabled")
         private val POKKE_ANIMATED_COVERS = booleanPreferencesKey("pokke_animated_covers")
+        private val EXTERNAL_CANVAS = booleanPreferencesKey("external_canvas_enabled")
 
         // Home personalization
         private val HOME_SHOW_RECENT = booleanPreferencesKey("home_show_recent")
@@ -80,6 +81,7 @@ class UserPreferences(private val context: Context) {
     val spotifyCanvasEnabled: Flow<Boolean> = context.dataStore.data.map { it[SPOTIFY_CANVAS] ?: false }
     val appleCanvasEnabled: Flow<Boolean> = context.dataStore.data.map { it[APPLE_CANVAS] ?: false }
     val pokkeAnimatedCoversEnabled: Flow<Boolean> = context.dataStore.data.map { it[POKKE_ANIMATED_COVERS] ?: true }
+    val externalCanvasEnabled: Flow<Boolean> = context.dataStore.data.map { it[EXTERNAL_CANVAS] ?: true }
 
     suspend fun setYoutubeCatalogEnabled(v: Boolean) { context.dataStore.edit { it[YOUTUBE_CATALOG] = v } }
     suspend fun setLyricsTargetLang(v: String) { context.dataStore.edit { it[LYRICS_TARGET_LANG] = v } }
@@ -90,6 +92,7 @@ class UserPreferences(private val context: Context) {
     suspend fun setSpotifyCanvasEnabled(v: Boolean) { context.dataStore.edit { it[SPOTIFY_CANVAS] = v } }
     suspend fun setAppleCanvasEnabled(v: Boolean) { context.dataStore.edit { it[APPLE_CANVAS] = v } }
     suspend fun setPokkeAnimatedCoversEnabled(v: Boolean) { context.dataStore.edit { it[POKKE_ANIMATED_COVERS] = v } }
+    suspend fun setExternalCanvasEnabled(v: Boolean) { context.dataStore.edit { it[EXTERNAL_CANVAS] = v } }
 
     val liquidGlassEnabled: Flow<Boolean> = context.dataStore.data.map { it[LIQUID_GLASS] ?: false }
     val liquidSliderEnabled: Flow<Boolean> = context.dataStore.data.map { it[LIQUID_SLIDER] ?: true }
