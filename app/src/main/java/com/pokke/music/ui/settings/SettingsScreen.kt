@@ -223,6 +223,77 @@ fun SettingsScreen(
         )
 
 
+        
+        // —— Letras ——
+        Text(
+            "Letras",
+            color = Color.White.copy(.75f),
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Medium,
+            modifier = Modifier.padding(start = 22.dp, top = 16.dp, bottom = 8.dp)
+        )
+        val colorMode by prefs.lyricsColorMode.collectAsState("classic")
+        val anim by prefs.lyricsAnimIntensity.collectAsState(1f)
+        Row(Modifier.fillMaxWidth().padding(horizontal = 22.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            listOf("classic" to "Clásico", "emotion" to "Emoción", "mono" to "Mono").forEach { (id, label) ->
+                val sel = colorMode == id
+                Text(
+                    label,
+                    color = if (sel) Color.Black else Color.White,
+                    fontSize = 13.sp,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(if (sel) Color.White else Color(0xFF2A2A32))
+                        .clickable { scope.launch { prefs.setLyricsColorMode(id) } }
+                        .padding(horizontal = 12.dp, vertical = 8.dp)
+                )
+            }
+        }
+        Text(
+            "Intensidad animación letras",
+            color = Color.White.copy(.75f),
+            fontSize = 13.sp,
+            modifier = Modifier.padding(start = 22.dp, top = 10.dp)
+        )
+        Slider(
+            value = anim,
+            onValueChange = { v -> scope.launch { prefs.setLyricsAnimIntensity(v) } },
+            valueRange = 0.3f..1.8f,
+            modifier = Modifier.padding(horizontal = 22.dp),
+            colors = SliderDefaults.colors(thumbColor = Color.White, activeTrackColor = Color.White)
+        )
+
+        // —— Fondo Home ——
+        Text(
+            "Fondo custom Home (URL)",
+            color = Color.White.copy(.75f),
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Medium,
+            modifier = Modifier.padding(start = 22.dp, top = 16.dp, bottom = 8.dp)
+        )
+        val bg by prefs.homeCustomBgUrl.collectAsState("")
+        var bgField by remember(bg) { mutableStateOf(bg) }
+        androidx.compose.material3.OutlinedTextField(
+            value = bgField,
+            onValueChange = { bgField = it },
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 22.dp),
+            singleLine = true,
+            placeholder = { Text("https://…") }
+        )
+        Text(
+            "Guardar fondo",
+            color = Color.Black,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier
+                .padding(start = 22.dp, top = 8.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(Color.White)
+                .clickable { scope.launch { prefs.setHomeCustomBgUrl(bgField.trim()) } }
+                .padding(horizontal = 14.dp, vertical = 8.dp)
+        )
+
+
         Section("CUENTAS EXTERNAS")
         ExternalAccountsSection(prefs)
 
