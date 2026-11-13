@@ -5,10 +5,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * Public, unauthenticated motion-artwork sources ported from the BitChord
- * connector bundle. Spotify is intentionally not included here: its private
- * Canvas endpoint needs the listener's Spotify session cookie and a token
- * harvest flow, neither of which Pokke currently asks the user to configure.
+ * Public motion-artwork sources ported from the BitChord connector bundle.
+ * Spotify is handled separately by [SpotifyCanvasProvider] because it requires
+ * an explicitly connected Spotify Web session and a short-lived bearer token.
  */
 object ExternalCanvasRepository {
     private const val CACHE_TTL_MS = 3L * 60L * 60L * 1000L
