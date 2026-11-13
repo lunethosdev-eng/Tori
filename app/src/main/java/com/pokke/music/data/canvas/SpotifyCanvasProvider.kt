@@ -9,7 +9,7 @@ import com.music.bitchord.data.canvas.splitArtists
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.content
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -46,14 +46,14 @@ object SpotifyCanvasProvider {
         val wantedArtists = splitArtists(artist)
         val hit = items.firstNotNullOfOrNull { element ->
             val track = runCatching { element.jsonObject }.getOrNull() ?: return@firstNotNullOfOrNull null
-            val name = track["name"]?.jsonPrimitive?.content ?: return@firstNotNullOfOrNull null
-            val artists = runCatching { track["artists"]!!.jsonArray.mapNotNull { it.jsonObject["name"]?.jsonPrimitive?.content } }.getOrDefault(emptyList())
+            val name = track["name"]?.jsonPrimitive?.contentOrNull ?: return@firstNotNullOfOrNull null
+            val artists = runCatching { track["artists"]!!.jsonArray.mapNotNull { it.jsonObject["name"]?.jsonPrimitive?.contentOrNull } }.getOrDefault(emptyList())
             val artistParts = artists.flatMap(::splitArtists)
             val titleOk = name.normalizeForMatch() == wantedTitle
             val artistOk = wantedArtists.isNotEmpty() && wantedArtists.all { want -> artistParts.any { it == want } }
             if (!titleOk || !artistOk) return@firstNotNullOfOrNull null
-            val uri = track["uri"]?.jsonPrimitive?.content ?: return@firstNotNullOfOrNull null
-            val albumName = runCatching { track["album"]!!.jsonObject["name"]!!.jsonPrimitive.content }.getOrNull()
+            val uri = track["uri"]?.jsonPrimitive?.contentOrNull ?: return@firstNotNullOfOrNull null
+            val albumName = runCatching { track["album"]!!.jsonObject["name"]!!.jsonPrimitive.contentOrNull }.getOrNull()
             Triple(uri, name, albumName)
         } ?: return@withContext null
 
