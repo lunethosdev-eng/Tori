@@ -94,18 +94,18 @@ fun MiniPlayerBar(
             Modifier
                 .fillMaxWidth()
                 .padding(horizontal = if (compact) 28.dp else 16.dp)
-                .shadow(if (glass) 18.dp else 8.dp, RoundedCornerShape(28.dp), clip = false)
-                .clip(RoundedCornerShape(28.dp))
+                .shadow(if (glass) 18.dp else 8.dp, RoundedCornerShape(30.dp), clip = false)
+                .clip(RoundedCornerShape(30.dp))
                 .then(
                     if (glass && backdrop != null) {
                         Modifier
                             .drawBackdrop(
                                 backdrop = backdrop,
-                                shape = { RoundedCornerShape(28.dp) },
+                                shape = { RoundedCornerShape(30.dp) },
                                 effects = { blur(16f.dp.toPx()) },
                                 onDrawSurface = { drawRect(surfaceColor.copy(alpha = 0.76f)) }
                             )
-                            .border(0.7.dp, Color.White.copy(0.24f), RoundedCornerShape(28.dp))
+                            .border(0.8.dp, MaterialTheme.colorScheme.primary.copy(0.40f), RoundedCornerShape(30.dp))
                     } else {
                         Modifier.background(MaterialTheme.colorScheme.surface)
                     }
