@@ -2,7 +2,6 @@ package com.pokke.music.data.canvas
 
 import android.content.Context
 import android.net.Uri
-import kotlin.math.abs
 
 object ArtistCanvas {
     private val folders = linkedMapOf(
@@ -35,7 +34,7 @@ object ArtistCanvas {
             emptyList()
         }
         if (names.isEmpty()) return null
-        val idx = if (seed.isNullOrBlank()) 0 else abs(seed.hashCode()) % names.size
+        val idx = if (seed.isNullOrBlank()) 0 else Math.floorMod(seed.hashCode(), names.size)
         return Uri.parse("file:///android_asset/canvas/$folder/${names[idx]}")
     }
 }
