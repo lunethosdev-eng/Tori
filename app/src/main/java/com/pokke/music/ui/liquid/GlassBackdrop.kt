@@ -7,27 +7,37 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import com.pokke.music.ui.backdrop.Backdrop
+import com.pokke.music.ui.backdrop.backdrops.layerBackdrop
+import com.pokke.music.ui.backdrop.backdrops.rememberLayerBackdrop
 
-/**
- * Liquid Glass host.
- *
- * The previous layerBackdrop capture path crashed RenderThread on several
- * devices when Media3 SurfaceView was active (play from search / full player).
- * Until a stable capture path is validated, glass mode uses the Material
- * translucent fallback (LocalAppBackdrop = null) so the app never hard-crashes.
- * LiquidToggle / liquid chrome still switch visual style via the glass flag.
- */
+/** App-wide Liquid Glass source. A single recorded layer is shared by glass surfaces. */
 val LocalAppBackdrop = staticCompositionLocalOf<Backdrop?> { null }
+val LocalGlassPerformanceMode = staticCompositionLocalOf { true }
 
 @Composable
 fun GlassBackdropHost(
     enabled: Boolean,
+    performanceMode: Boolean = true,
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit
 ) {
-    // Always null backdrop for stability. Chrome components check prefs.glass
-    // and use translucent Material surfaces when LocalAppBackdrop is null.
-    CompositionLocalProvider(LocalAppBackdrop provides null) {
-        Box(modifier.fillMaxSize()) { content() }
+    if (!enabled) {
+        CompositionLocalProvider(
+            LocalAppBackdrop provides null,
+            LocalGlassPerformanceMode provides performanceMode
+        ) {
+            Box(modifier.fillMaxSize()) { content() }
+        }
+        return
+    }
+
+    // Capture once at the root instead of creating a separate recording for every card.
+    // The Canvas player uses TextureView (not SurfaceView) so it participates in this layer.
+    val source = rememberLayerBackdrop()
+    CompositionLocalProvider(
+        LocalAppBackdrop provides source,
+        LocalGlassPerformanceMode provides performanceMode
+    ) {
+        Box(modifier.fillMaxSize().layerBackdrop(source)) { content() }
     }
 }
