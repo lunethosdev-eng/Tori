@@ -146,7 +146,7 @@ object PlayerController {
             .setTitle(song.title)
             .setArtist(song.artist)
             .setAlbumTitle(song.album)
-            .setArtworkUri(song.displayCoverUrl?.takeIf { it.isNotBlank() }?.let(Uri::parse))
+            .setArtworkUri((song.coverUrl ?: song.displayCoverUrl)?.takeIf { it.isNotBlank() }?.let(Uri::parse))
             .build()
         return MediaItem.Builder()
             .setMediaId(song.id)
