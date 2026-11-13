@@ -157,6 +157,13 @@ object PlayerController {
 
     fun playSong(song: Song) = playQueue(listOf(song), 0)
 
+    /** Reproduce y, si la cola queda en 1, intenta rellenar con resultados relacionados (mismo artista). */
+    fun playSongWithAutoplay(song: Song, related: List<Song> = emptyList()) {
+        val extras = related.filter { it.id != song.id }.take(25)
+        if (extras.isEmpty()) playSong(song)
+        else playQueue(listOf(song) + extras, 0)
+    }
+
     fun playQueue(songs: List<Song>, startIndex: Int = 0) {
         if (songs.isEmpty()) return
         _playbackError.value = null
@@ -165,12 +172,22 @@ object PlayerController {
                 val localAudio = song.audioUrl?.let { raw ->
                     raw.startsWith("file://") || raw.startsWith("content://") || File(raw).isFile
                 } == true
-                if (song.youtubeId.isNullOrBlank() || localAudio) song
-                else runCatching {
-                    song.copy(audioUrl = YouTubeStreamResolver.resolve(song.youtubeId))
-                }.onFailure { error ->
-                    _playbackError.value = "No se pudo resolver ${song.title}: ${error.localizedMessage ?: "stream no disponible"}"
-                }.getOrDefault(song)
+                if (localAudio) song
+                else {
+                    val ytId = song.youtubeId?.takeIf { it.isNotBlank() }
+                        ?: song.id.removePrefix("yt_").takeIf { it.matches(Regex("[A-Za-z0-9_-]{11}")) }
+                    if (ytId.isNullOrBlank() || !song.audioUrl.isNullOrBlank()) song
+                    else runCatching {
+                        song.copy(
+                            youtubeId = ytId,
+                            audioUrl = YouTubeStreamResolver.resolve(ytId),
+                            coverUrl = song.coverUrl
+                                ?: "https://i.ytimg.com/vi/$ytId/hqdefault.jpg"
+                        )
+                    }.onFailure { error ->
+                        _playbackError.value = "No se pudo resolver ${song.title}: ${error.localizedMessage ?: "stream no disponible"}"
+                    }.getOrDefault(song)
+                }
             }
             val player = controller
             if (player == null) {
@@ -198,12 +215,20 @@ object PlayerController {
     fun addToQueue(song: Song, playNext: Boolean = false) {
         scope.launch {
             val localAudio = song.audioUrl?.let { raw -> raw.startsWith("file://") || raw.startsWith("content://") || File(raw).isFile } == true
-            val resolved = if (song.youtubeId.isNullOrBlank() || localAudio) song
-            else runCatching { song.copy(audioUrl = YouTubeStreamResolver.resolve(song.youtubeId)) }
-                .getOrElse {
-                    _playbackError.value = "No se pudo resolver el audio: ${it.localizedMessage ?: "error desconocido"}"
-                    return@launch
-                }
+            val ytId = song.youtubeId?.takeIf { it.isNotBlank() }
+                ?: song.id.removePrefix("yt_").takeIf { it.matches(Regex("[A-Za-z0-9_-]{11}")) }
+            val resolved = if (localAudio || (!song.audioUrl.isNullOrBlank() && ytId.isNullOrBlank())) song
+            else if (ytId.isNullOrBlank()) song
+            else runCatching {
+                song.copy(
+                    youtubeId = ytId,
+                    audioUrl = YouTubeStreamResolver.resolve(ytId),
+                    coverUrl = song.coverUrl ?: "https://i.ytimg.com/vi/$ytId/hqdefault.jpg"
+                )
+            }.getOrElse {
+                _playbackError.value = "No se pudo resolver el audio: ${it.localizedMessage ?: "error desconocido"}"
+                return@launch
+            }
             val player = controller ?: return@launch
             val insertAt = if (playNext) {
                 (player.currentMediaItemIndex + 1).coerceIn(0, player.mediaItemCount)
