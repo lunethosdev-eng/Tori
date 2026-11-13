@@ -179,7 +179,10 @@ private fun Song.toBitChordSong() = BitChordSong(
     videoId = youtubeId ?: id,
     title = title,
     artist = artist,
-    thumbnailUrl = displayCoverUrl,
+    // Prefer static cover, then animated still is not a thumbnail; fall back to YT hqdefault
+    thumbnailUrl = coverUrl?.takeIf { it.isNotBlank() }
+        ?: displayCoverUrl
+        ?: youtubeId?.takeIf { it.isNotBlank() }?.let { "https://i.ytimg.com/vi/$it/hqdefault.jpg" },
     durationText = durationSeconds.takeIf { it > 0 }?.let { seconds -> "%d:%02d".format(seconds / 60, seconds % 60) },
     albumName = album,
 )
