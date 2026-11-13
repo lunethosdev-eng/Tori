@@ -236,7 +236,7 @@ private fun SearchField(query: String, onQueryChange: (String) -> Unit) {
 @Composable
 private fun SongRow(song: Song, isFavorite: Boolean, onFavoriteClick: () -> Unit, onClick: () -> Unit) {
     Row(
-        modifier = Modifier.fillMaxWidth().clickable(enabled = !song.audioUrl.isNullOrBlank(), onClick = onClick).padding(horizontal = 20.dp, vertical = 10.dp),
+        modifier = Modifier.fillMaxWidth().clickable(enabled = !song.audioUrl.isNullOrBlank() || !song.youtubeId.isNullOrBlank(), onClick = onClick).padding(horizontal = 20.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         CoverImage(song.displayCoverUrl, 52)
@@ -244,7 +244,7 @@ private fun SongRow(song: Song, isFavorite: Boolean, onFavoriteClick: () -> Unit
         Column(modifier = Modifier.weight(1f)) {
             Text(song.title, color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(
-                if (song.audioUrl.isNullOrBlank()) "${song.artist} · Audio no disponible" else song.artist,
+                if (song.audioUrl.isNullOrBlank() && song.youtubeId.isNullOrBlank()) "${song.artist} · Audio no disponible" else if (!song.youtubeId.isNullOrBlank() && song.album == "YouTube Music") "${song.artist} · YouTube Music" else song.artist,
                 color = Color.White.copy(alpha = .58f), fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis
             )
         }
