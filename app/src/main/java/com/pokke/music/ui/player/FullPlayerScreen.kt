@@ -1,5 +1,7 @@
 package com.pokke.music.ui.player
 
+import androidx.compose.animation.animateContentSize
+
 import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
@@ -166,7 +168,7 @@ fun FullPlayerScreen(
         label = "playScale"
     )
 
-    Box(modifier = Modifier.fillMaxSize()) {
+    Box(modifier = Modifier.fillMaxSize().animateContentSize()) {
         if (!cover.isNullOrBlank()) {
             AsyncImage(
                 model = ImageRequest.Builder(context).data(cover).crossfade(true).build(),
