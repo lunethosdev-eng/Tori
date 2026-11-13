@@ -1,5 +1,11 @@
 package com.pokke.music.ui.sheets
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -17,6 +23,11 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -43,43 +54,51 @@ fun OverflowMenuSheet(
     onSongInfo: () -> Unit,
     glass: Boolean = true
 ) {
-    // Floating panel anchored top-end (from the ⋯ button)
+    var visible by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { visible = true }
+
     Popup(
         alignment = Alignment.TopEnd,
         offset = IntOffset((-12), 96),
         onDismissRequest = onDismiss,
         properties = PopupProperties(focusable = true)
     ) {
-        Column(
-            Modifier
-                .width(280.dp)
-                .shadow(24.dp, RoundedCornerShape(18.dp), clip = false)
-                .clip(RoundedCornerShape(18.dp))
-                .then(
-                    if (glass) Modifier
-                        .background(Color(0xCC2A2A32))
-                        .border(0.7.dp, Color.White.copy(0.22f), RoundedCornerShape(18.dp))
-                    else Modifier.background(Color(0xF21C1C22))
-                )
-                .padding(vertical = 8.dp)
+        AnimatedVisibility(
+            visible = visible,
+            enter = fadeIn(tween(160)) + scaleIn(initialScale = 0.90f, animationSpec = tween(190)),
+            exit = fadeOut(tween(110)) + scaleOut(targetScale = 0.94f, animationSpec = tween(110))
         ) {
-            MenuItem(Icons.Default.Share, "Compartir canción", onShareSong, glass)
-            MenuItem(Icons.Default.Favorite, "Agregar / quitar de favoritos", onFavorite, glass)
-            MenuItem(Icons.Default.Download, "Descargar para offline", onDownload, glass)
-            HorizontalDivider(color = Color.White.copy(.12f), modifier = Modifier.padding(vertical = 6.dp, horizontal = 12.dp))
-            MenuItem(Icons.Default.Queue, "Reproducir después", onPlayNext, glass)
-            MenuItem(Icons.Default.Queue, "Agregar a la cola", onAddToQueue, glass)
-            MenuItem(Icons.Default.Queue, "Agregar a una playlist", onAddToPlaylist, glass)
-            MenuItem(Icons.Default.Delete, "Quitar de la cola", onRemoveFromQueue, glass)
-            HorizontalDivider(color = Color.White.copy(.12f), modifier = Modifier.padding(vertical = 6.dp, horizontal = 12.dp))
-            MenuItem(Icons.Default.Timer, "Temporizador de apagado", onSleepTimer, glass)
-            MenuItem(Icons.Default.Info, "Información de la canción", onSongInfo, glass)
+            Column(
+                Modifier
+                    .width(280.dp)
+                    .shadow(24.dp, RoundedCornerShape(18.dp), clip = false)
+                    .clip(RoundedCornerShape(18.dp))
+                    .then(
+                        if (glass) Modifier
+                            .background(Color(0xCC2A2A32))
+                            .border(0.7.dp, Color.White.copy(0.22f), RoundedCornerShape(18.dp))
+                        else Modifier.background(Color(0xF21C1C22))
+                    )
+                    .padding(vertical = 8.dp)
+            ) {
+                MenuItem(Icons.Default.Share, "Compartir canción", onShareSong)
+                MenuItem(Icons.Default.Favorite, "Agregar / quitar de favoritos", onFavorite)
+                MenuItem(Icons.Default.Download, "Descargar para offline", onDownload)
+                HorizontalDivider(color = Color.White.copy(0.12f), modifier = Modifier.padding(vertical = 6.dp, horizontal = 12.dp))
+                MenuItem(Icons.Default.Queue, "Reproducir después", onPlayNext)
+                MenuItem(Icons.Default.Queue, "Agregar a la cola", onAddToQueue)
+                MenuItem(Icons.Default.Queue, "Agregar a una playlist", onAddToPlaylist)
+                MenuItem(Icons.Default.Delete, "Quitar de la cola", onRemoveFromQueue)
+                HorizontalDivider(color = Color.White.copy(0.12f), modifier = Modifier.padding(vertical = 6.dp, horizontal = 12.dp))
+                MenuItem(Icons.Default.Timer, "Temporizador de apagado", onSleepTimer)
+                MenuItem(Icons.Default.Info, "Información de la canción", onSongInfo)
+            }
         }
     }
 }
 
 @Composable
-private fun MenuItem(icon: ImageVector, title: String, onClick: () -> Unit, glass: Boolean) {
+private fun MenuItem(icon: ImageVector, label: String, onClick: () -> Unit) {
     Row(
         Modifier
             .fillMaxWidth()
@@ -87,8 +106,8 @@ private fun MenuItem(icon: ImageVector, title: String, onClick: () -> Unit, glas
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(icon, null, tint = Color.White.copy(if (glass) 0.95f else 0.9f), modifier = Modifier.size(20.dp))
+        Icon(icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(22.dp))
         Spacer(Modifier.width(14.dp))
-        Text(title, color = Color.White, fontSize = 14.sp)
+        Text(label, color = Color.White, fontSize = 15.sp)
     }
 }
