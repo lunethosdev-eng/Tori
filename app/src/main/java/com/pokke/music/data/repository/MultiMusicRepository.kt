@@ -3,6 +3,7 @@ package com.pokke.music.data.repository
 import com.pokke.music.data.model.Song
 import com.pokke.music.data.remote.MusicSourcesConfig
 import com.pokke.music.data.remote.UkiyoConfig
+import com.pokke.music.data.remote.CoverUrls
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -86,20 +87,7 @@ class MultiMusicRepository {
             val arr = JSONArray(body)
             return (0 until arr.length()).map { i ->
                 val o = arr.getJSONObject(i)
-                Song(
-                    id = o.optString("id"),
-                    title = o.optString("title"),
-                    artist = o.optString("artist"),
-                    album = o.optString("album").takeIf { it.isNotBlank() && it != "null" },
-                    coverUrl = o.optString("cover_url").takeIf { it.isNotBlank() && it != "null" },
-                    animatedCoverUrl = o.optString("animated_cover_url").takeIf { it.isNotBlank() && it != "null" },
-                    audioUrl = o.optString("audio_url").takeIf { it.isNotBlank() && it != "null" },
-                    durationSeconds = o.optInt("duration_seconds", 0),
-                    lyricsText = o.optString("lyrics_text").takeIf { it.isNotBlank() && it != "null" },
-                    lyricsUrl = o.optString("lyrics_url").takeIf { it.isNotBlank() && it != "null" },
-                    genre = o.optString("genre").takeIf { it.isNotBlank() && it != "null" },
-                    youtubeId = o.optString("youtube_id").takeIf { it.isNotBlank() && it != "null" }
-                )
+                parseSongRow(o, baseUrl)
             }
         } finally {
             conn.disconnect()
@@ -153,20 +141,42 @@ class MultiMusicRepository {
             val arr = JSONArray(body)
             return (0 until arr.length()).map { i ->
                 val o = arr.getJSONObject(i)
-                Song(
-                    id = o.optString("id"),
-                    title = o.optString("title"),
-                    artist = o.optString("artist"),
-                    album = o.optString("album").takeIf { it.isNotBlank() && it != "null" },
-                    coverUrl = o.optString("cover_url").takeIf { it.isNotBlank() && it != "null" },
-                    animatedCoverUrl = o.optString("animated_cover_url").takeIf { it.isNotBlank() && it != "null" },
-                    audioUrl = o.optString("audio_url").takeIf { it.isNotBlank() && it != "null" },
-                    durationSeconds = o.optInt("duration_seconds", 0),
-                )
+                parseSongRow(o, baseUrl)
             }
         } finally {
             conn.disconnect()
         }
     }
 
+
+    private fun parseSongRow(o: org.json.JSONObject, baseUrl: String): Song {
+        val yt = o.optString("youtube_id").takeIf { it.isNotBlank() && it != "null" }
+        val cover = CoverUrls.best(
+            o.optString("cover_url").takeIf { it.isNotBlank() && it != "null" },
+            yt,
+            baseUrl
+        )
+        val animated = CoverUrls.absolute(
+            o.optString("animated_cover_url").takeIf { it.isNotBlank() && it != "null" },
+            baseUrl
+        )
+        val audio = o.optString("audio_url").takeIf { it.isNotBlank() && it != "null" }?.let { raw ->
+            if (raw.startsWith("http") || raw.startsWith("file") || raw.startsWith("content")) raw
+            else CoverUrls.absolute(raw, baseUrl) ?: raw
+        }
+        return Song(
+            id = o.optString("id"),
+            title = o.optString("title"),
+            artist = o.optString("artist"),
+            album = o.optString("album").takeIf { it.isNotBlank() && it != "null" },
+            coverUrl = cover,
+            animatedCoverUrl = animated,
+            audioUrl = audio,
+            durationSeconds = o.optInt("duration_seconds", 0),
+            lyricsText = o.optString("lyrics_text").takeIf { it.isNotBlank() && it != "null" },
+            lyricsUrl = o.optString("lyrics_url").takeIf { it.isNotBlank() && it != "null" },
+            genre = o.optString("genre").takeIf { it.isNotBlank() && it != "null" },
+            youtubeId = yt
+        )
+    }
 }
