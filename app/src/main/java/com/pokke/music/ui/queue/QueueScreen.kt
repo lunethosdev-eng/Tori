@@ -42,10 +42,9 @@ fun QueueScreen(onBack: () -> Unit) {
     val isPlaying by PlayerController.isPlaying.collectAsState()
     val queue by PlayerController.queue.collectAsState()
     val currentIndex by PlayerController.currentIndex.collectAsState()
-    val cover = current?.coverUrl
-    val upcoming = queue.mapIndexedNotNull { index, song ->
-        if (index > currentIndex) index to song else null
-    }
+    val cover = current?.displayCoverUrl ?: current?.coverUrl
+    // Mostrar TODA la cola (anteriores + actual + siguientes)
+    val upcoming = queue.mapIndexed { index, song -> index to song }
 
     Box(modifier = Modifier.fillMaxSize()) {
         if (!cover.isNullOrBlank()) {
