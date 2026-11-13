@@ -12,16 +12,27 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Headphones
+import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.Piano
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material.icons.filled.LocationCity
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -42,14 +53,20 @@ import com.pokke.music.data.repository.MultiMusicRepository
 import com.pokke.music.player.PlayerController
 import com.pokke.music.tv.ui.components.tvFocusable
 
-private val categories = listOf("🎸 Rock", "🎧 Pop", "🏙️ Urbano", "🎹 Lo-Fi", "⚡ Electrónica")
-private const val FALLBACK_VIDEO = "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4"
+private data class TvCategory(val label: String, val query: String, val icon: ImageVector)
+
+private val categories = listOf(
+    TvCategory("Rock", "rock", Icons.Default.MusicNote),
+    TvCategory("Pop", "pop", Icons.Default.Headphones),
+    TvCategory("Urbano", "urbano reggaeton", Icons.Default.LocationCity),
+    TvCategory("Lo-Fi", "lofi", Icons.Default.Piano),
+    TvCategory("Electronica", "electronic", Icons.Default.Bolt),
+)
 
 /**
- * Android TV Home — adapted for D-pad / remote.
- * - Larger touch targets and clear focus rings via [tvFocusable]
- * - Sections aligned with mobile Home (hero, now playing, rails, categories)
- * - Liquid Glass style surfaces (translucent cards) without heavy blur on TV
+ * Android TV Home — D-pad friendly.
+ * Hero plays ArtistCanvas (local assets) or animatedCover / cover from Ukiyo.
+ * Categories use Material icons (no emoji). Sections are focusable rails.
  */
 @OptIn(UnstableApi::class)
 @Composable
@@ -61,8 +78,9 @@ fun TvHomeScreen(onPlay: (Song) -> Unit, onOpenPlayer: () -> Unit) {
     var hero by remember { mutableStateOf<Song?>(null) }
     var rails by remember { mutableStateOf<List<Song>>(emptyList()) }
     var recent by remember { mutableStateOf<List<Song>>(emptyList()) }
-    var videoOk by remember { mutableStateOf(true) }
+    var selectedCategory by remember { mutableStateOf(categories.first().label) }
     val current by PlayerController.currentSong.collectAsState()
+    val heroFocus = remember { FocusRequester() }
 
     LaunchedEffect(Unit) {
         repo.searchAll("bad bunny").onSuccess {
@@ -72,6 +90,17 @@ fun TvHomeScreen(onPlay: (Song) -> Unit, onOpenPlayer: () -> Unit) {
             }
         }
         repo.getRecentAll().onSuccess { recent = it.take(16) }
+        runCatching { heroFocus.requestFocus() }
+    }
+
+    LaunchedEffect(selectedCategory) {
+        val q = categories.firstOrNull { it.label == selectedCategory }?.query ?: return@LaunchedEffect
+        repo.searchAll(q).onSuccess {
+            if (it.isNotEmpty()) {
+                hero = it.first()
+                rails = it.take(24)
+            }
+        }
     }
 
     val scroll = rememberScrollState()
@@ -85,28 +114,26 @@ fun TvHomeScreen(onPlay: (Song) -> Unit, onOpenPlayer: () -> Unit) {
             .verticalScroll(scroll)
             .padding(horizontal = 48.dp, vertical = 28.dp)
     ) {
-        // Hero
+        // —— Hero with canvas video ——
         Box(
             Modifier
                 .fillMaxWidth()
-                .height(320.dp)
+                .height(340.dp)
                 .clip(RoundedCornerShape(20.dp))
                 .background(Color(0xFF12121A))
+                .focusRequester(heroFocus)
+                .tvFocusable(onClick = { hero?.let(onPlay) }, shape = RoundedCornerShape(20.dp), scaleFocused = 1.02f)
         ) {
-            // Video / image backdrop omitted for brevity — keep existing ExoPlayer logic if needed
-            hero?.let { h ->
-                AsyncImage(
-                    h.displayCoverUrl ?: h.coverUrl, null,
-                    Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop
-                )
+            val h = hero
+            if (h != null) {
+                HeroCanvasBackdrop(song = h)
             }
             Box(
                 Modifier
                     .fillMaxSize()
                     .background(
                         Brush.verticalGradient(
-                            listOf(Color.Transparent, Color(0xCC0B0B10))
+                            listOf(Color.Transparent, Color(0xCC0B0B10), Color(0xF00B0B10))
                         )
                     )
             )
@@ -115,15 +142,18 @@ fun TvHomeScreen(onPlay: (Song) -> Unit, onOpenPlayer: () -> Unit) {
                     .align(Alignment.BottomStart)
                     .padding(28.dp)
             ) {
+                Text("DESTACADO", color = Color.White.copy(0.55f), fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                Spacer(Modifier.height(6.dp))
                 Text(
                     hero?.title ?: "Pokke TV",
                     color = Color.White,
+                    fontWeight = FontWeight.Bold,
                     fontSize = 32.sp,
-                    fontWeight = FontWeight.Bold
+                    maxLines = 2
                 )
                 Text(
-                    hero?.artist ?: "Tu música en la gran pantalla",
-                    color = Color.White.copy(0.75f),
+                    hero?.artist ?: "Elige una categoria o reproduce",
+                    color = Color(0xFFC8C8D0),
                     fontSize = 18.sp
                 )
                 Spacer(Modifier.height(16.dp))
@@ -135,7 +165,11 @@ fun TvHomeScreen(onPlay: (Song) -> Unit, onOpenPlayer: () -> Unit) {
                         modifier = Modifier
                             .height(48.dp)
                             .tvFocusable(onClick = { hero?.let(onPlay) }, shape = RoundedCornerShape(12.dp))
-                    ) { Text("▶  Reproducir", fontWeight = FontWeight.Bold, fontSize = 16.sp) }
+                    ) {
+                        Icon(Icons.Default.PlayArrow, null, Modifier.size(22.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("Reproducir", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    }
                     OutlinedButton(
                         onClick = onOpenPlayer,
                         shape = RoundedCornerShape(12.dp),
@@ -147,7 +181,7 @@ fun TvHomeScreen(onPlay: (Song) -> Unit, onOpenPlayer: () -> Unit) {
             }
         }
 
-        // Now playing (if any)
+        // Now playing
         current?.let { song ->
             Spacer(Modifier.height(28.dp))
             Text("Reproduciendo", color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 20.sp)
@@ -158,7 +192,7 @@ fun TvHomeScreen(onPlay: (Song) -> Unit, onOpenPlayer: () -> Unit) {
                     .clip(RoundedCornerShape(16.dp))
                     .background(cardBg)
                     .border(1.dp, cardBorder, RoundedCornerShape(16.dp))
-                    .tvFocusable(onClick = onOpenPlayer, shape = RoundedCornerShape(16.dp))
+                    .tvFocusable(onClick = onOpenPlayer, shape = RoundedCornerShape(16.dp), scaleFocused = 1.03f)
                     .padding(16.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -172,50 +206,120 @@ fun TvHomeScreen(onPlay: (Song) -> Unit, onOpenPlayer: () -> Unit) {
                     Text(song.title, color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 18.sp, maxLines = 1)
                     Text(song.artist, color = Color(0xFF9A9AA3), fontSize = 15.sp, maxLines = 1)
                 }
-                Text("Abrir", color = Color.White.copy(0.8f), fontSize = 15.sp)
             }
         }
 
+        // Categories (SVG/vector icons, no emoji)
         Spacer(Modifier.height(28.dp))
-        Text("Categorías", color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 20.sp)
-        Spacer(Modifier.height(14.dp))
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-            items(categories) { cat ->
-                Box(
+        Text("Categorias", color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 20.sp)
+        Spacer(Modifier.height(12.dp))
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            items(categories, key = { it.label }) { cat ->
+                val selected = selectedCategory == cat.label
+                Row(
                     Modifier
-                        .tvFocusable(onClick = {}, shape = RoundedCornerShape(16.dp))
-                        .background(cardBg, RoundedCornerShape(16.dp))
-                        .border(1.dp, cardBorder, RoundedCornerShape(16.dp))
-                        .padding(horizontal = 28.dp, vertical = 18.dp)
-                ) { Text(cat, color = Color.White, fontSize = 17.sp) }
-            }
-        }
-
-        if (recent.isNotEmpty()) {
-            Spacer(Modifier.height(28.dp))
-            Text("Recientes", color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 20.sp)
-            Spacer(Modifier.height(14.dp))
-            LazyRow(
-                horizontalArrangement = Arrangement.spacedBy(18.dp),
-                contentPadding = PaddingValues(bottom = 8.dp)
-            ) {
-                items(recent, key = { "r-${it.id}" }) { song ->
-                    TvSongCard(song, cardBg, cardBorder, onPlay)
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(if (selected) Color.White else cardBg)
+                        .border(1.dp, if (selected) Color.White else cardBorder, RoundedCornerShape(14.dp))
+                        .tvFocusable(
+                            onClick = { selectedCategory = cat.label },
+                            shape = RoundedCornerShape(14.dp),
+                            scaleFocused = 1.08f
+                        )
+                        .padding(horizontal = 18.dp, vertical = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        cat.icon, null,
+                        tint = if (selected) Color.Black else Color.White,
+                        modifier = Modifier.size(22.dp)
+                    )
+                    Spacer(Modifier.width(10.dp))
+                    Text(
+                        cat.label,
+                        color = if (selected) Color.Black else Color.White,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 16.sp
+                    )
                 }
             }
         }
 
+        // Rails for category / search
         Spacer(Modifier.height(28.dp))
-        Text("Para ti", color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 20.sp)
-        Spacer(Modifier.height(14.dp))
+        Text(selectedCategory, color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 20.sp)
+        Spacer(Modifier.height(12.dp))
         LazyRow(
             horizontalArrangement = Arrangement.spacedBy(18.dp),
-            contentPadding = PaddingValues(bottom = 120.dp)
+            contentPadding = PaddingValues(bottom = 8.dp)
         ) {
             items(rails, key = { it.id }) { song ->
                 TvSongCard(song, cardBg, cardBorder, onPlay)
             }
         }
+
+        // Recent
+        if (recent.isNotEmpty()) {
+            Spacer(Modifier.height(24.dp))
+            Text("Recientes", color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 20.sp)
+            Spacer(Modifier.height(12.dp))
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(18.dp),
+                contentPadding = PaddingValues(bottom = 120.dp)
+            ) {
+                items(recent, key = { "r_" + it.id }) { song ->
+                    TvSongCard(song, cardBg, cardBorder, onPlay)
+                }
+            }
+        } else {
+            Spacer(Modifier.height(120.dp))
+        }
+    }
+}
+
+@OptIn(UnstableApi::class)
+@Composable
+private fun HeroCanvasBackdrop(song: Song) {
+    val context = LocalContext.current
+    val canvasUri = remember(song.id, song.artist, song.animatedCoverUrl) {
+        val animated = song.animatedCoverUrl?.takeIf { it.isNotBlank() }
+        when {
+            animated != null && (animated.endsWith(".mp4", true) || animated.endsWith(".webm", true) || animated.contains("/video")) ->
+                Uri.parse(animated)
+            else -> ArtistCanvas.uriFor(context, song.artist, song.id)
+        }
+    }
+    if (canvasUri != null) {
+        val exo = remember(canvasUri) {
+            ExoPlayer.Builder(context).build().apply {
+                setMediaItem(MediaItem.fromUri(canvasUri))
+                repeatMode = Player.REPEAT_MODE_ONE
+                volume = 0f
+                prepare()
+                playWhenReady = true
+            }
+        }
+        DisposableEffect(exo) { onDispose { exo.release() } }
+        AndroidView(
+            factory = { ctx ->
+                PlayerView(ctx).apply {
+                    useController = false
+                    resizeMode = AspectRatioFrameLayout.RESIZE_MODE_ZOOM
+                    player = exo
+                    layoutParams = FrameLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.MATCH_PARENT
+                    )
+                }
+            },
+            modifier = Modifier.fillMaxSize()
+        )
+    } else {
+        AsyncImage(
+            song.displayCoverUrl ?: song.coverUrl, null,
+            Modifier.fillMaxSize(),
+            contentScale = ContentScale.Crop
+        )
     }
 }
 
@@ -241,8 +345,8 @@ private fun TvSongCard(
                 .border(1.dp, cardBorder, RoundedCornerShape(12.dp)),
             contentScale = ContentScale.Crop
         )
-        Spacer(Modifier.height(10.dp))
-        Text(song.title, color = Color.White, maxLines = 1, fontSize = 14.sp, fontWeight = FontWeight.Medium)
-        Text(song.artist, color = Color(0xFF9A9AA3), maxLines = 1, fontSize = 13.sp)
+        Spacer(Modifier.height(8.dp))
+        Text(song.title, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 2)
+        Text(song.artist, color = Color(0xFF9A9AA3), fontSize = 12.sp, maxLines = 1)
     }
 }
