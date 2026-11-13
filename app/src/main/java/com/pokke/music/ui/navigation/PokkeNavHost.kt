@@ -194,6 +194,8 @@ fun PokkeNavHost() {
                     onOpenPlayer = { playerSheetMotion.open() },
                     onOpenSettings = { nav.navigate(Screen.Settings.route) },
                     onOpenProfile = { nav.navigate(if (auth.session.value == null) Screen.Auth.route else Screen.Profile.route) },
+                    onOpenLibrary = { nav.navigate(Screen.Library.route) },
+                    onOpenSearch = { nav.navigate(Screen.Search.route) },
                     onScrollStateChanged = { navCompact = it },
                     authRepository = auth
                 )
