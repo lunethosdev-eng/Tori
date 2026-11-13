@@ -57,6 +57,11 @@ android {
         compose = true
         buildConfig = true
     }
+    androidResources {
+        // MediaPlayer uses AssetFileDescriptor for bundled Canvas clips.
+        noCompress += listOf("mp4", "webm")
+    }
+
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
