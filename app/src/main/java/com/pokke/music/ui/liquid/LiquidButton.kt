@@ -2,6 +2,7 @@ package com.pokke.music.ui.liquid
 
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
@@ -43,6 +44,8 @@ fun LiquidButton(
     content: @Composable RowScope.() -> Unit
 ) {
     val animationScope = rememberCoroutineScope()
+    val performanceMode = LocalGlassPerformanceMode.current
+    val clickInteraction = remember { MutableInteractionSource() }
 
     val interactiveHighlight = remember(animationScope) {
         InteractiveHighlight(
@@ -57,8 +60,8 @@ fun LiquidButton(
                 shape = { Capsule() },
                 effects = {
                     vibrancy()
-                    blur(2f.dp.toPx())
-                    lens(12f.dp.toPx(), 24f.dp.toPx())
+                    blur((if (performanceMode) 1.5f else 3f).dp.toPx())
+                    lens((if (performanceMode) 8f else 14f).dp.toPx(), (if (performanceMode) 16f else 26f).dp.toPx())
                 },
                 layerBlock = if (isInteractive) {
                     {
@@ -98,8 +101,9 @@ fun LiquidButton(
                     }
                 }
             )
+            .pokkePressMotion(clickInteraction, enabled = isInteractive)
             .clickable(
-                interactionSource = null,
+                interactionSource = clickInteraction,
                 indication = if (isInteractive) null else LocalIndication.current,
                 role = Role.Button,
                 onClick = onClick
