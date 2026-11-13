@@ -1,5 +1,6 @@
 package com.pokke.music.ui.liquid
 
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -56,9 +57,7 @@ fun LiquidSlider(
     performanceMode: Boolean = false
 ) {
     val isLightTheme = !isSystemInDarkTheme()
-    val accentColor =
-        if (isLightTheme) Color(0xFF0088FF)
-        else Color(0xFF0091FF)
+    val accentColor = MaterialTheme.colorScheme.primary
     val trackColor =
         if (isLightTheme) Color(0xFF787878).copy(0.2f)
         else Color(0xFF787880).copy(0.36f)
