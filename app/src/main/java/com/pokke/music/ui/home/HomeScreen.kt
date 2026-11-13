@@ -187,7 +187,7 @@ fun HomeScreen(
             // Secciones según orden y visibilidad
             orderedSections.forEach { sectionId ->
                 when (sectionId) {
-                    "now_playing" -> if (showNowPlaying) {
+                    "now_playing" -> if (false && showNowPlaying) { // disabled: global MiniPlayerBar is enough
                         current?.let { song ->
                             item(key = "now_playing") {
                                 NowPlayingCard(
