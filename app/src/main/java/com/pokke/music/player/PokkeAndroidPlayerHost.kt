@@ -2,7 +2,10 @@ package com.pokke.music.player
 
 import android.content.Context
 import android.net.Uri
-import android.widget.VideoView
+import android.graphics.SurfaceTexture
+import android.media.MediaPlayer
+import android.view.Surface
+import android.view.TextureView
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
@@ -15,6 +18,9 @@ import com.music.bitchord.ui.player.PlayerPlatform
 import com.music.bitchord.ui.player.PlayerSettingsSource
 import com.music.bitchord.ui.player.PokkeDefaultPlayerHost
 import com.pokke.music.data.model.Song
+import com.pokke.music.auth.external.ExternalAuthStore
+import com.pokke.music.data.canvas.SpotifyToken
+import com.pokke.music.data.canvas.SpotifyCanvasProvider
 import com.pokke.music.data.canvas.ArtistCanvas
 import com.pokke.music.data.canvas.ExternalCanvasRepository
 import com.pokke.music.data.preferences.UserPreferences
@@ -26,6 +32,18 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+
+private class CanvasPlayback {
+    @Volatile var shouldPlay: Boolean = false
+    @Volatile var player: MediaPlayer? = null
+    @Volatile var surface: Surface? = null
+    fun release() {
+        runCatching { player?.setOnPreparedListener(null); player?.setOnErrorListener(null); player?.stop(); player?.reset(); player?.release() }
+        player = null
+        runCatching { surface?.release() }
+        surface = null
+    }
+}
 
 /** Supplies Pokke animated cover URLs to the original BitChord player surface. */
 class PokkeAndroidPlayerHost(context: Context) : PlayerHost by PokkeDefaultPlayerHost {
@@ -39,6 +57,11 @@ class PokkeAndroidPlayerHost(context: Context) : PlayerHost by PokkeDefaultPlaye
     }
 
     init {
+        SpotifyToken.init(app) {
+            ExternalAuthStore(app).sessions()
+                .firstOrNull { it.provider.equals("spotify", ignoreCase = true) }
+                ?.cookie?.substringAfter("sp_dc=", "")?.takeIf { it.isNotBlank() }
+        }
         preferenceScope.launch {
             UserPreferences(app).pokkeAnimatedCoversEnabled.collect { enabled ->
                 // This preference controls only the bundled local library;
@@ -60,10 +83,16 @@ class PokkeAndroidPlayerHost(context: Context) : PlayerHost by PokkeDefaultPlaye
         val preferences = UserPreferences(app)
         localCanvasEnabled = runCatching { preferences.pokkeAnimatedCoversEnabled.first() }.getOrDefault(true)
         val externalEnabled = runCatching { preferences.externalCanvasEnabled.first() }.getOrDefault(true)
+        val spotifyEnabled = runCatching { preferences.spotifyCanvasEnabled.first() }.getOrDefault(false)
+        val spotifyConnected = ExternalAuthStore(app).sessions().any { it.provider.equals("spotify", ignoreCase = true) }
         val source = artworkFor(song.videoId)
         val suppliedUrl = source?.animatedCoverUrl?.takeIf(::isVideoUrl)
         if (suppliedUrl != null) {
             return CanvasArtwork(url = suppliedUrl, title = source.title, artist = source.artist, album = source.album)
+        }
+        if (spotifyEnabled && spotifyConnected) {
+            runCatching { SpotifyCanvasProvider.find(song.title, song.artist, song.albumName) }
+                .getOrNull()?.takeIf { it.matches(song.title, song.artist, song.albumName) }?.let { return it }
         }
         if (externalEnabled) {
             ExternalCanvasRepository.find(song.title, song.artist, song.albumName)?.let { return it }
@@ -92,36 +121,70 @@ class PokkeAndroidPlayerHost(context: Context) : PlayerHost by PokkeDefaultPlaye
     override fun CanvasVideo(spec: CanvasVideoSpec, modifier: Modifier) {
         val shouldPlay = spec.isPlaying && !spec.pausedForTransition
         AndroidView(
-            modifier = modifier.graphicsLayer {
-                alpha = spec.presentationAlpha().coerceIn(0f, 1f)
-            },
+            modifier = modifier.graphicsLayer { alpha = spec.presentationAlpha().coerceIn(0f, 1f) },
             factory = { viewContext ->
-                VideoView(viewContext).apply {
-                    tag = shouldPlay
-                    setVideoURI(Uri.parse(spec.canvas.url))
-                    setOnPreparedListener { player ->
-                        player.isLooping = true
-                        player.setVolume(0f, 0f)
-                        if (spec.startPositionMs > 0L) seekTo(spec.startPositionMs.toInt())
-                        if (tag as? Boolean == true) start()
-                        spec.onRenderedChanged(true)
-                    }
-                    setOnErrorListener { _, _, _ ->
-                        spec.onRenderedChanged(false)
-                        true
+                TextureView(viewContext).apply {
+                    val playback = CanvasPlayback().also { it.shouldPlay = shouldPlay }
+                    tag = playback
+                    surfaceTextureListener = object : TextureView.SurfaceTextureListener {
+                        override fun onSurfaceTextureAvailable(texture: SurfaceTexture, width: Int, height: Int) {
+                            val surface = Surface(texture)
+                            playback.surface = surface
+                            val player = MediaPlayer()
+                            playback.player = player
+                            runCatching {
+                                player.isLooping = true
+                                player.setVolume(0f, 0f)
+                                player.setSurface(surface)
+                                player.setOnPreparedListener { prepared ->
+                                    if (spec.startPositionMs > 0L) prepared.seekTo(spec.startPositionMs.toInt())
+                                    if (playback.shouldPlay) prepared.start()
+                                    spec.onRenderedChanged(true)
+                                }
+                                player.setOnErrorListener { _, _, _ -> spec.onRenderedChanged(false); true }
+                                val mediaUri = Uri.parse(spec.canvas.url)
+                                val assetPath = mediaUri.path?.substringAfter("/android_asset/", "")?.takeIf { mediaUri.scheme == "file" && it.isNotBlank() }
+                                if (assetPath != null) {
+                                    viewContext.assets.openFd(assetPath).use { descriptor ->
+                                        player.setDataSource(descriptor.fileDescriptor, descriptor.startOffset, descriptor.length)
+                                    }
+                                } else {
+                                    player.setDataSource(viewContext, mediaUri)
+                                }
+                                player.prepareAsync()
+                            }.onFailure {
+                                playback.release()
+                                spec.onRenderedChanged(false)
+                            }
+                        }
+                        override fun onSurfaceTextureSizeChanged(texture: SurfaceTexture, width: Int, height: Int) = Unit
+                        override fun onSurfaceTextureDestroyed(texture: SurfaceTexture): Boolean {
+                            playback.release()
+                            return true
+                        }
+                        override fun onSurfaceTextureUpdated(texture: SurfaceTexture) = Unit
                     }
                 }
             },
-            update = { video ->
-                video.tag = shouldPlay
-                if (shouldPlay && !video.isPlaying) {
-                    video.start()
-                    spec.onResumed()
-                } else if (!shouldPlay && video.isPlaying) {
-                    video.pause()
+            update = { texture ->
+                val playback = texture.tag as? CanvasPlayback
+                if (playback != null) {
+                    playback.shouldPlay = shouldPlay
+                    val player = playback.player
+                    val isPlaying = runCatching { player?.isPlaying == true }.getOrDefault(false)
+                    if (shouldPlay && player != null && !isPlaying) {
+                        runCatching { player.start() }
+                        spec.onResumed()
+                    } else if (!shouldPlay && player != null && isPlaying) {
+                        runCatching { player.pause() }
+                    }
                 }
             },
-            onRelease = { it.stopPlayback() },
+            onRelease = { texture ->
+                texture.surfaceTextureListener = null
+                (texture.tag as? CanvasPlayback)?.release()
+                texture.tag = null
+            },
         )
     }
 
