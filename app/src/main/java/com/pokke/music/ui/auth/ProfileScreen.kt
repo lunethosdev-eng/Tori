@@ -1,4 +1,6 @@
 package com.pokke.music.ui.auth
+
+import androidx.compose.animation.animateContentSize
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import android.net.Uri
@@ -9,6 +11,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.rememberScrollState
@@ -43,6 +46,7 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.pokke.music.data.model.UserProfile
 import com.pokke.music.data.preferences.UserPreferences
+import com.pokke.music.ui.liquid.pokkePressMotion
 import com.pokke.music.data.repository.AuthRepository
 import com.pokke.music.ui.profile.AvatarFrames
 import com.pokke.music.ui.profile.FramedAvatar
@@ -222,7 +226,7 @@ fun ProfileScreen(repository: AuthRepository, onBack: () -> Unit, onSignedOut: (
         val sCol = try { Color(android.graphics.Color.parseColor(secondaryColor)) } catch (_: Exception) { Color(0xFF1A1C26) }
         Brush.verticalGradient(listOf(sCol.copy(alpha=0.9f), pageBackground, Color(0xFF0A0A0C)))
     } else null
-    Column(Modifier.fillMaxSize().then(
+    Column(Modifier.fillMaxSize().animateContentSize().then(
         if (customBg.ifBlank { profile?.customBgUrl.orEmpty() }.isNotBlank()) Modifier.background(Color(0xFF0A0A0C))
         else if (pageBrush != null) Modifier.background(pageBrush)
         else Modifier.background(pageBackground)
@@ -514,7 +518,8 @@ fun ProfileScreen(repository: AuthRepository, onBack: () -> Unit, onSignedOut: (
 }
 
 @Composable private fun ProfileTopButton(onClick: () -> Unit, content: @Composable () -> Unit) {
-    Box(Modifier.size(42.dp).clip(CircleShape).background(Color.Black.copy(.34f)).clickable(onClick = onClick), contentAlignment = Alignment.Center, content = { content() })
+    val interaction = remember { MutableInteractionSource() }
+    Box(Modifier.size(42.dp).clip(CircleShape).background(Color.Black.copy(.34f)).pokkePressMotion(interaction, pressedScale = .88f).clickable(interactionSource = interaction, indication = null, onClick = onClick), contentAlignment = Alignment.Center, content = { content() })
 }
 
 @Composable private fun ProfileField(label: String, value: String, multiline: Boolean = false, onChange: (String) -> Unit) {
