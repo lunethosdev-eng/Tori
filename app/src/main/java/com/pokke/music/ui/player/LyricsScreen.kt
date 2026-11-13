@@ -43,10 +43,7 @@ import com.pokke.music.player.PlayerController
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import org.json.JSONArray
-import java.util.concurrent.TimeUnit
+import com.pokke.music.data.lyrics.LyricsTranslator
 
 @Composable
 fun LyricsScreen(onBack: () -> Unit) {
@@ -121,7 +118,8 @@ fun LyricsScreen(onBack: () -> Unit) {
                         if (src.isEmpty()) return@launch
                         loading = true
                         originalLines = src
-                        val out = translateLines(src, targetLang)
+                        val texts = LyricsTranslator.translateLines(src.map { it.text }, targetLang)
+                        val out = if (texts.isEmpty()) emptyList() else src.mapIndexed { i, line -> line.copy(text = texts.getOrElse(i) { line.text }) }
                         if (out.isNotEmpty()) {
                             lines = out
                             translated = true
