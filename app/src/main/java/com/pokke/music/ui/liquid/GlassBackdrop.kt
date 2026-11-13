@@ -7,12 +7,15 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import com.pokke.music.ui.backdrop.Backdrop
-import com.pokke.music.ui.backdrop.backdrops.layerBackdrop
-import com.pokke.music.ui.backdrop.backdrops.rememberLayerBackdrop
 
 /**
- * Provides a layer [Backdrop] captured from [content] so liquid controls
- * (toggle/button/tabs/slider) can refract the real background like iOS glass.
+ * Liquid Glass host.
+ *
+ * The previous layerBackdrop capture path crashed RenderThread on several
+ * devices when Media3 SurfaceView was active (play from search / full player).
+ * Until a stable capture path is validated, glass mode uses the Material
+ * translucent fallback (LocalAppBackdrop = null) so the app never hard-crashes.
+ * LiquidToggle / liquid chrome still switch visual style via the glass flag.
  */
 val LocalAppBackdrop = staticCompositionLocalOf<Backdrop?> { null }
 
@@ -22,16 +25,9 @@ fun GlassBackdropHost(
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit
 ) {
-    if (!enabled) {
-        CompositionLocalProvider(LocalAppBackdrop provides null) {
-            Box(modifier.fillMaxSize()) { content() }
-        }
-        return
-    }
-    val backdrop = rememberLayerBackdrop()
-    CompositionLocalProvider(LocalAppBackdrop provides backdrop) {
-        Box(modifier.fillMaxSize().layerBackdrop(backdrop)) {
-            content()
-        }
+    // Always null backdrop for stability. Chrome components check prefs.glass
+    // and use translucent Material surfaces when LocalAppBackdrop is null.
+    CompositionLocalProvider(LocalAppBackdrop provides null) {
+        Box(modifier.fillMaxSize()) { content() }
     }
 }
