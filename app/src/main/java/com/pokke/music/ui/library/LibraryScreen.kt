@@ -1,7 +1,10 @@
 package com.pokke.music.ui.library
 
+import androidx.compose.animation.animateContentSize
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -32,6 +35,7 @@ import com.pokke.music.data.repository.AuthRepository
 import com.pokke.music.data.repository.LocalLibraryStore
 import com.pokke.music.data.repository.DownloadQueueManager
 import com.pokke.music.ui.theme.PokkeBlack
+import com.pokke.music.ui.liquid.pokkePressMotion
 import kotlinx.coroutines.launch
 import java.io.File
 
@@ -97,7 +101,7 @@ fun LibraryScreen(
     }
 
     LazyColumn(
-        modifier = Modifier.fillMaxSize().background(PokkeBlack).statusBarsPadding(),
+        modifier = Modifier.fillMaxSize().animateContentSize().background(PokkeBlack).statusBarsPadding(),
         contentPadding = PaddingValues(bottom = 110.dp)
     ) {
         item {
@@ -267,7 +271,8 @@ fun LibraryScreen(
 
 @Composable
 private fun LibraryShortcut(title: String, count: Int, icon: androidx.compose.ui.graphics.vector.ImageVector, modifier: Modifier, onClick: () -> Unit) {
-    Column(modifier.clip(RoundedCornerShape(15.dp)).background(Color(0xFF191919)).clickable(onClick = onClick).padding(12.dp)) {
+    val interaction = remember { MutableInteractionSource() }
+    Column(modifier.clip(RoundedCornerShape(15.dp)).background(Color(0xFF191919)).pokkePressMotion(interaction).clickable(interactionSource = interaction, indication = null, onClick = onClick).padding(12.dp)) {
         Icon(icon, null, tint = Color.White, modifier = Modifier.size(23.dp))
         Spacer(Modifier.height(12.dp))
         Text(title, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
@@ -277,7 +282,8 @@ private fun LibraryShortcut(title: String, count: Int, icon: androidx.compose.ui
 
 @Composable
 private fun SongRow(song: Song, trailing: String?, onClick: () -> Unit, onTrailing: () -> Unit) {
-    Row(Modifier.fillMaxWidth().clickable(enabled = !song.audioUrl.isNullOrBlank(), onClick = onClick).padding(horizontal = 20.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+    val interaction = remember { MutableInteractionSource() }
+    Row(Modifier.fillMaxWidth().pokkePressMotion(interaction, enabled = !song.audioUrl.isNullOrBlank()).clickable(interactionSource = interaction, indication = null, enabled = !song.audioUrl.isNullOrBlank(), onClick = onClick).padding(horizontal = 20.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
         AsyncImage(model = song.displayCoverUrl, contentDescription = null, modifier = Modifier.size(50.dp).clip(RoundedCornerShape(8.dp)))
         Column(Modifier.weight(1f).padding(start = 12.dp)) {
             Text(song.title, color = Color.White, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
