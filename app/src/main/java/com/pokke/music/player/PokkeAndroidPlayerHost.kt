@@ -60,7 +60,7 @@ class PokkeAndroidPlayerHost(context: Context) : PlayerHost by PokkeDefaultPlaye
         SpotifyToken.init(app) {
             ExternalAuthStore(app).sessions()
                 .firstOrNull { it.provider.equals("spotify", ignoreCase = true) }
-                ?.cookie?.substringAfter("sp_dc=", "")?.takeIf { it.isNotBlank() }
+                ?.cookie?.substringAfter("sp_dc=", "")?.takeIf { it.isNotBlank() }.orEmpty()
         }
         preferenceScope.launch {
             UserPreferences(app).pokkeAnimatedCoversEnabled.collect { enabled ->
