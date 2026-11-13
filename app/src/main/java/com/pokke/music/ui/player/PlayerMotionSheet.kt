@@ -31,10 +31,11 @@ fun PlayerMotionSheet(
     val sheetState = rememberModalBottomSheetState(
         skipPartiallyExpanded = true,
         confirmValueChange = { target ->
+            // Allow hide so the sheet actually dismisses (was returning false → black frame)
             if (target == SheetValue.Hidden) {
                 motion.close()
-                false
-            } else true
+            }
+            true
         },
     )
     val windowInfo = LocalWindowInfo.current
