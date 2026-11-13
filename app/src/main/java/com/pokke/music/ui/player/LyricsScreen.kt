@@ -226,29 +226,3 @@ fun LyricsScreen(onBack: () -> Unit) {
 
 private fun anyWord(text: String, words: List<String>) = words.any { it in text }
 
-private suspend fun translateLines(src: List<LyricLine>, targetLang: String): List<LyricLine> =
-    withContext(Dispatchers.IO) {
-        runCatching {
-            val client = OkHttpClient.Builder().connectTimeout(12, TimeUnit.SECONDS).readTimeout(20, TimeUnit.SECONDS).build()
-            val joined = src.joinToString("\n") { it.text }
-            // LibreTranslate public instance (best-effort; may rate-limit)
-            val url = "https://libretranslate.com/translate"
-            val body = okhttp3.FormBody.Builder()
-                .add("q", joined.take(4500))
-                .add("source", "auto")
-                .add("target", targetLang)
-                .add("format", "text")
-                .build()
-            val req = Request.Builder().url(url).post(body).header("Accept", "application/json").build()
-            client.newCall(req).execute().use { resp ->
-                val text = resp.body?.string().orEmpty()
-                if (!resp.isSuccessful) return@runCatching emptyList()
-                val translated = org.json.JSONObject(text).optString("translatedText")
-                if (translated.isBlank()) return@runCatching emptyList()
-                val parts = translated.split("\n")
-                src.mapIndexed { i, line ->
-                    line.copy(text = parts.getOrNull(i)?.takeIf { it.isNotBlank() } ?: line.text)
-                }
-            }
-        }.getOrDefault(emptyList())
-    }
