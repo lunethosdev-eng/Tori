@@ -41,9 +41,12 @@ fun SettingsScreen(
     val blur by prefs.blurPlayerBackground.collectAsState(initial = true)
     val accent by prefs.accentColor.collectAsState(initial = "white")
     val theme by prefs.appTheme.collectAsState(initial = "dark")
+    val dynamicColors by prefs.dynamicColors.collectAsState(initial = true)
     val gapless by prefs.gaplessPlayback.collectAsState(initial = true)
     val showListening by prefs.showListeningOnProfile.collectAsState(initial = true)
     val animated by prefs.autoAnimatedCovers.collectAsState(initial = true)
+    val localCanvas by prefs.pokkeAnimatedCoversEnabled.collectAsState(initial = true)
+    val externalCanvas by prefs.externalCanvasEnabled.collectAsState(initial = true)
     val liquidSlider by prefs.liquidSliderEnabled.collectAsState(initial = true)
     val performance by prefs.liquidPerformanceMode.collectAsState(initial = true)
     val chatsEnabled by prefs.experimentalChatsEnabled.collectAsState(initial = false)
@@ -98,6 +101,20 @@ fun SettingsScreen(
             checked = animated,
             glass = false,
             onChange = { scope.launch { prefs.setAutoAnimatedCovers(it) } }
+        )
+        LiquidOrMaterialToggle(
+            title = "Canvas local de artistas",
+            subtitle = "Reproduce clips incluidos en la app cuando la canción coincide con un artista compatible. No consume datos móviles.",
+            checked = localCanvas,
+            glass = false,
+            onChange = { scope.launch { prefs.setPokkeAnimatedCoversEnabled(it) } }
+        )
+        LiquidOrMaterialToggle(
+            title = "Canvas externos",
+            subtitle = "Busca motion artwork en Apple Music, Tidal y el catálogo comunitario. Requiere conexión; Spotify necesita vinculación de sesión y aún no se activa aquí.",
+            checked = externalCanvas,
+            glass = false,
+            onChange = { scope.launch { prefs.setExternalCanvasEnabled(it) } }
         )
         LiquidOrMaterialToggle(
             title = "Liquid Slider",
@@ -337,6 +354,13 @@ fun SettingsScreen(
                 }
             }
         }
+        LiquidOrMaterialToggle(
+            title = "Colores dinámicos del sistema",
+            subtitle = "Usa la paleta de Android 12 o superior. Desactívalo para respetar el color de acento elegido arriba.",
+            checked = dynamicColors,
+            glass = false,
+            onChange = { scope.launch { prefs.setDynamicColors(it) } }
+        )
 
         Section("PRIVACIDAD Y PERFIL")
         LiquidOrMaterialToggle(
