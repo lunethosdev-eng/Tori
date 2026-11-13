@@ -32,8 +32,9 @@ class MainActivity : ComponentActivity() {
                 Surface(modifier = Modifier.fillMaxSize()) {
                     val prefs = UserPreferences(LocalContext.current)
                     val glass by prefs.liquidGlassEnabled.collectAsState(false)
-                    // Only host layer when glass ON; avoids RenderThread stack overflow when OFF
-                    GlassBackdropHost(enabled = glass) { PokkeNavHost() }
+                    val performance by prefs.liquidPerformanceMode.collectAsState(true)
+                    // A single root capture feeds all glass surfaces; TextureView Canvas avoids SurfaceView capture conflicts.
+                    GlassBackdropHost(enabled = glass, performanceMode = performance) { PokkeNavHost() }
                 }
             }
         }
