@@ -129,6 +129,7 @@ fun HomeScreen(
     }
 
     val current by PlayerController.currentSong.collectAsState()
+    val customBg by prefs.homeCustomBgUrl.collectAsState("")
 
     val orderedSections = remember(sectionOrder) {
         sectionOrder.split(",").map { it.trim() }.filter { it.isNotEmpty() }
