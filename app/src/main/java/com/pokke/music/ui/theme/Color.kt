@@ -16,9 +16,9 @@ val SurfaceDark = Color(0xFF16161C)
 val SurfaceElevated = Color(0xFF1E1E26)
 
 fun accentColor(theme: String): Color = when (theme.lowercase()) {
-    "ocean" -> PokkeOcean
-    "rose" -> PokkeRose
-    "forest" -> PokkeForest
-    "mono" -> PokkeMono
+    "ocean", "blue" -> PokkeOcean
+    "rose", "pink" -> PokkeRose
+    "forest", "green" -> PokkeForest
+    "mono", "white" -> PokkeMono
     else -> PokkeViolet
 }
