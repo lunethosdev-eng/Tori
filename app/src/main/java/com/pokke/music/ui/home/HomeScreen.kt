@@ -59,6 +59,8 @@ fun HomeScreen(
     onOpenPlayer: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenProfile: () -> Unit,
+    onOpenLibrary: () -> Unit = {},
+    onOpenSearch: () -> Unit = {},
     onScrollStateChanged: (Boolean) -> Unit = {},
     authRepository: AuthRepository
 ) {
@@ -207,7 +209,10 @@ fun HomeScreen(
                                 backdrop = backdrop,
                                 sectionTop = sectionTop,
                                 onOpenPlayer = onOpenPlayer,
-                                onOpenProfile = onOpenProfile
+                                onOpenProfile = onOpenProfile,
+                                recentSongs = recent,
+                                onOpenLibrary = onOpenLibrary,
+                                onOpenSearch = onOpenSearch
                             )
                         }
                     }
@@ -246,7 +251,7 @@ fun HomeScreen(
                             SectionTitle("Tu biblioteca", sectionTop)
                         }
                         item(key = "library_shortcuts") {
-                            LibraryShortcutsRow(glass = glass, backdrop = backdrop)
+                            LibraryShortcutsRow(glass = glass, backdrop = backdrop, onOpenLibrary = onOpenLibrary)
                         }
                     }
                 }
@@ -326,7 +331,10 @@ private fun QuickAccessRow(
     backdrop: Any?,
     sectionTop: Dp,
     onOpenPlayer: () -> Unit,
-    onOpenProfile: () -> Unit
+    onOpenProfile: () -> Unit,
+    recentSongs: List<Song>,
+    onOpenLibrary: () -> Unit,
+    onOpenSearch: () -> Unit
 ) {
     Column(Modifier.padding(top = sectionTop)) {
         SectionTitle("Accesos rápidos", 0.dp)
@@ -339,7 +347,7 @@ private fun QuickAccessRow(
                     icon = Icons.Default.Shuffle,
                     label = "Aleatorio",
                     glass = glass,
-                    onClick = { /* PlayerController puede exponer shuffle si está disponible */ }
+                    onClick = { if (recentSongs.isNotEmpty()) PlayerController.playQueue(recentSongs.shuffled()) }
                 )
             }
             item {
@@ -347,7 +355,7 @@ private fun QuickAccessRow(
                     icon = Icons.Default.Favorite,
                     label = "Favoritos",
                     glass = glass,
-                    onClick = { }
+                    onClick = onOpenLibrary
                 )
             }
             item {
@@ -355,7 +363,7 @@ private fun QuickAccessRow(
                     icon = Icons.Default.LibraryMusic,
                     label = "Biblioteca",
                     glass = glass,
-                    onClick = { }
+                    onClick = onOpenLibrary
                 )
             }
             item {
@@ -363,7 +371,7 @@ private fun QuickAccessRow(
                     icon = Icons.Default.Search,
                     label = "Buscar",
                     glass = glass,
-                    onClick = { }
+                    onClick = onOpenSearch
                 )
             }
         }
@@ -430,19 +438,19 @@ private fun SongListRow(song: Song, onClick: () -> Unit) {
 }
 
 @Composable
-private fun LibraryShortcutsRow(glass: Boolean, backdrop: Any?) {
+private fun LibraryShortcutsRow(glass: Boolean, backdrop: Any?, onOpenLibrary: () -> Unit) {
     LazyRow(
         contentPadding = PaddingValues(horizontal = 16.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         item {
-            QuickChip(Icons.Default.Favorite, "Me gusta", glass) { }
+            QuickChip(Icons.Default.Favorite, "Me gusta", glass, onOpenLibrary)
         }
         item {
-            QuickChip(Icons.Default.LibraryMusic, "Playlists", glass) { }
+            QuickChip(Icons.Default.LibraryMusic, "Playlists", glass, onOpenLibrary)
         }
         item {
-            QuickChip(Icons.Default.PlayArrow, "Recientes", glass) { }
+            QuickChip(Icons.Default.PlayArrow, "Recientes", glass, onOpenLibrary)
         }
     }
 }
