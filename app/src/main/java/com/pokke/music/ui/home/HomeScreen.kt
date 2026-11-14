@@ -41,6 +41,7 @@ import com.pokke.music.data.model.Song
 import com.pokke.music.data.preferences.UserPreferences
 import com.pokke.music.data.repository.AuthRepository
 import com.pokke.music.data.repository.MultiMusicRepository
+import com.pokke.music.data.plugins.PluginRepository
 import com.pokke.music.player.PlayerController
 import androidx.compose.ui.platform.LocalContext
 import java.util.Calendar
@@ -134,12 +135,27 @@ fun HomeScreen(
 
     val current by PlayerController.currentSong.collectAsState()
     val customBg by prefs.homeCustomBgUrl.collectAsState("")
+    val pluginRepository = remember(ctx) { PluginRepository(ctx) }
+    val pluginBackground = remember(ctx) { pluginRepository.activeThemeBackground() }
+    val pluginBackgroundColor = remember(ctx) {
+        pluginRepository.activeThemeBackgroundColor()?.let { runCatching { Color(android.graphics.Color.parseColor(it)) }.getOrNull() }
+    }
+    val pluginHomeCards = remember(ctx) { pluginRepository.activeHomeCards() }
 
     val orderedSections = remember(sectionOrder) {
         sectionOrder.split(",").map { it.trim() }.filter { it.isNotEmpty() }
     }
 
-    Box(Modifier.fillMaxSize().animateContentSize().background(MaterialTheme.colorScheme.background)) {
+    Box(Modifier.fillMaxSize().animateContentSize().background(pluginBackgroundColor ?: MaterialTheme.colorScheme.background)) {
+        if (pluginBackground != null) {
+            AsyncImage(
+                model = pluginBackground,
+                contentDescription = "Fondo del plugin activo",
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize()
+            )
+            Box(Modifier.fillMaxSize().background(Color(0x9909090D)))
+        }
         LazyColumn(
             state = listState,
             modifier = Modifier.fillMaxSize().statusBarsPadding(),
@@ -185,6 +201,44 @@ fun HomeScreen(
                     }
                     IconButton(onClick = onOpenSettings) {
                         Icon(Icons.Default.Settings, null, tint = MaterialTheme.colorScheme.onSurface.copy(.9f))
+                    }
+                }
+            }
+
+            // Widgets declarativos instalados por plugins con permiso ui.home_widgets.
+            pluginHomeCards.forEachIndexed { index, card ->
+                val title = card.optString("title").take(60)
+                val subtitle = card.optString("subtitle").take(120)
+                val action = card.optString("action")
+                item(key = "community-plugin-card-$index") {
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 5.dp)
+                            .clip(RoundedCornerShape(18.dp))
+                            .background(MaterialTheme.colorScheme.surface.copy(alpha = if (glass) .78f else 1f))
+                            .clickable {
+                                when (action) {
+                                    "open:home" -> Unit
+                                    "open:library" -> onOpenLibrary()
+                                    "open:search" -> onOpenSearch()
+                                    "open:profile" -> onOpenProfile()
+                                    "open:settings" -> onOpenSettings()
+                                    "open:player" -> onOpenPlayer()
+                                    "open:queue", "open:lyrics" -> onOpenPlayer()
+                                }
+                            }
+                            .padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        val iconAsset = card.optString("iconAsset")
+                        val iconFile = iconAsset.takeIf { it.startsWith("assets/") }?.let { java.io.File(card.optString("_pluginDir"), it) }
+                        if (iconFile?.isFile == true) AsyncImage(model = iconFile, contentDescription = null, modifier = Modifier.size(36.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text(title, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+                            if (subtitle.isNotBlank()) Text(subtitle, color = MaterialTheme.colorScheme.onSurface.copy(.65f), fontSize = 12.sp)
+                        }
                     }
                 }
             }
