@@ -55,6 +55,7 @@ import com.pokke.music.ui.player.LyricsScreen
 import com.pokke.music.ui.queue.QueueScreen
 import com.pokke.music.ui.search.SearchScreen
 import com.pokke.music.ui.settings.SettingsScreen
+import com.pokke.music.plugins.PluginStoreScreen
 import com.pokke.music.ui.admin.AdminPanelScreen
 import com.pokke.music.ui.social.ChatScreen
 import com.pokke.music.ui.player.MiniPlayerBar
@@ -100,6 +101,7 @@ sealed class Screen(val route: String) {
     data object Queue : Screen("queue")
     data object Lyrics : Screen("lyrics")
     data object Settings : Screen("settings")
+    data object Plugins : Screen("plugins")
     data object Admin : Screen("admin")
     data object StoryPublish : Screen("story_publish")
     data object Maps : Screen("maps")
@@ -257,8 +259,12 @@ fun PokkeNavHost() {
                 SettingsScreen(
                     onBack = { nav.popBackStack() },
                     onOpenAdmin = { nav.navigate(Screen.Admin.route) },
+                    onOpenPlugins = { nav.navigate(Screen.Plugins.route) },
                     authRepository = auth
                 )
+            }
+            composable(Screen.Plugins.route) {
+                PluginStoreScreen(onBack = { nav.popBackStack() })
             }
             composable(Screen.Admin.route) {
                 AdminPanelScreen(repository = auth, onBack = { nav.popBackStack() })
