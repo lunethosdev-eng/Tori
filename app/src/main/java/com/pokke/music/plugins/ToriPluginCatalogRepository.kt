@@ -1,6 +1,6 @@
 package com.pokke.music.plugins
 
-import com.pokke.music.BuildConfig
+import com.pokke.music.data.remote.KokoroConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
@@ -17,18 +17,18 @@ object ToriPluginCatalogRepository {
         .build()
 
     fun isConfigured(): Boolean =
-        BuildConfig.PLUGINS_SUPABASE_URL.startsWith("https://") &&
-            BuildConfig.PLUGINS_SUPABASE_ANON_KEY.isNotBlank()
+        KokoroConfig.SUPABASE_URL.startsWith("https://") &&
+            KokoroConfig.SUPABASE_PUBLISHABLE_KEY.isNotBlank()
 
     suspend fun fetchCatalog(): Result<List<PluginCatalogItem>> = withContext(Dispatchers.IO) {
         runCatching {
             check(isConfigured()) { "La tienda todavía no está conectada al proyecto Supabase." }
-            val base = BuildConfig.PLUGINS_SUPABASE_URL.trimEnd('/')
+            val base = KokoroConfig.SUPABASE_URL.trimEnd('/')
             val url = "$base/rest/v1/plugins?select=id,name,description,category,author_name,current_version,package_url,sha256,downloads&status=eq.published&order=downloads.desc"
             val request = Request.Builder()
                 .url(url)
-                .header("apikey", BuildConfig.PLUGINS_SUPABASE_ANON_KEY)
-                .header("Authorization", "Bearer ${BuildConfig.PLUGINS_SUPABASE_ANON_KEY}")
+                .header("apikey", KokoroConfig.SUPABASE_PUBLISHABLE_KEY)
+                .header("Authorization", "Bearer ${KokoroConfig.SUPABASE_PUBLISHABLE_KEY}")
                 .header("Accept", "application/json")
                 .get()
                 .build()
