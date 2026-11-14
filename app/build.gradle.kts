@@ -19,6 +19,15 @@ android {
         versionName = "1.0.0"
         multiDexEnabled = true
 
+        // Public Supabase project settings for the community plugin catalog.
+        // Configure with Gradle properties or TORI_PLUGINS_SUPABASE_* environment variables.
+        val pluginsSupabaseUrl = (project.findProperty("pluginsSupabaseUrl") as String?)
+            ?: System.getenv("TORI_PLUGINS_SUPABASE_URL").orEmpty()
+        val pluginsSupabaseAnonKey = (project.findProperty("pluginsSupabaseAnonKey") as String?)
+            ?: System.getenv("TORI_PLUGINS_SUPABASE_ANON_KEY").orEmpty()
+        buildConfigField("String", "PLUGINS_SUPABASE_URL", "\\"${pluginsSupabaseUrl.replace("\\", "\\\\").replace("\\\"","\\\\\\\"")}\\"")
+        buildConfigField("String", "PLUGINS_SUPABASE_ANON_KEY", "\\"${pluginsSupabaseAnonKey.replace("\\", "\\\\").replace("\\\"","\\\\\\\"")}\\"")
+
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
             useSupportLibrary = true
