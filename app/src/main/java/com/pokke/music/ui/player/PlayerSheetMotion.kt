@@ -2,7 +2,9 @@ package com.pokke.music.ui.player
 
 import android.view.Window
 import android.view.WindowManager
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animate
+import androidx.compose.animation.core.spring
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.SheetState
 import androidx.compose.runtime.Stable
@@ -22,6 +24,31 @@ import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.math.abs
 import com.pokke.music.ui.motion.MotionSettings
 import com.pokke.music.ui.motion.ToriMotionEngine
+
+/**
+ * The spring every open and close runs on: critically damped, so it never
+ * bounces, with about 0.45s of response — the way Apple Music's player sheet
+ * moves. Unlike a timed ease it has no fast end: it leaves briskly and then
+ * spends most of its time settling, slower and slower, into place, which is
+ * where the eye is following the artwork home.
+ */
+private const val SLIDE_STIFFNESS = 195f
+
+/** Close enough to stop, in pixels — rather than a spring's whole long tail. */
+private const val SLIDE_SETTLED_PX = 0.5f
+
+/** How old the sheet's last movement can be and still count as its speed. */
+private const val SHEET_VELOCITY_FRESH_MS = 80f
+
+/** How long a sheet waits to be laid out before an open starts regardless. */
+private const val LAYOUT_WAIT_MS = 300L
+
+/**
+ * How long after the sheet appears its window gets its exit animation back —
+ * long enough that the enter animation it was taken away from has had its
+ * chance to start, and not, then, play.
+ */
+private const val WINDOW_ENTER_MS = 600L
 
 /**
  * Where the player sheet stands while the app moves it, rather than M3.
