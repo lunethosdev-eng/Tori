@@ -33,7 +33,8 @@ private const val OWNER_EMAIL = "lunethos.dev@gmail.com"
 fun SettingsScreen(
     onBack: () -> Unit,
     onOpenAdmin: (() -> Unit)? = null,
-    authRepository: AuthRepository? = null
+    authRepository: AuthRepository? = null,
+    onOpenPlugins: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val prefs = remember(context) { UserPreferences(context) }
@@ -234,6 +235,28 @@ fun SettingsScreen(
             glass = false,
             onChange = { scope.launch { prefs.setMotionReduce(it) } }
         )
+
+        Section("EXTENSIONES")
+        Text(
+            "Descubre temas, funciones, widgets y fuentes musicales creadas por la comunidad. También puedes instalar paquetes ZIP revisados por Tori.",
+            color = Color.White.copy(.5f),
+            fontSize = 12.sp,
+            lineHeight = 17.sp,
+            modifier = Modifier.padding(horizontal = 22.dp, vertical = 5.dp)
+        )
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 6.dp)
+                .clip(RoundedCornerShape(16.dp))
+                .background(Color(0xFF19191F))
+                .clickable(onClick = onOpenPlugins)
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("Tienda de plugins", color = Color.White, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+            Text("Explorar  ›", color = Color(0xFFB8A7FF), fontSize = 13.sp)
+        }
 
         Section("PERSONALIZAR INICIO")
         Text(
