@@ -69,6 +69,8 @@ import com.pokke.music.ui.social.StoryPublisherScreen
 import com.pokke.music.ui.social.FriendsMapScreen
 import com.pokke.music.ui.liquid.LocalAppBackdrop
 import com.pokke.music.ui.liquid.pokkePressMotion
+import com.pokke.music.ui.motion.MotionSettings
+import com.pokke.music.ui.motion.ToriMotionEngine
 import com.pokke.music.ui.liquid.LocalGlassPerformanceMode
 import com.pokke.music.ui.backdrop.drawBackdrop
 import com.pokke.music.ui.backdrop.effects.blur
@@ -148,6 +150,8 @@ fun PokkeNavHost() {
     val glass by prefs.liquidGlassEnabled.collectAsState(false)
     val appBackdrop = LocalAppBackdrop.current
     val performanceMode = LocalGlassPerformanceMode.current
+    val motionSettings by prefs.motionSettings.collectAsState(initial = MotionSettings())
+    val currentMotionSettings = rememberUpdatedState(motionSettings)
     val chatsEnabled by prefs.experimentalChatsEnabled.collectAsState(false)
     val backStack by nav.currentBackStackEntryAsState()
     val route = backStack?.destination?.route
@@ -170,6 +174,7 @@ fun PokkeNavHost() {
                 if (next && routeState.value != Screen.Player.route) nav.navigate(Screen.Player.route)
                 else if (!next && routeState.value == Screen.Player.route) nav.popBackStack()
             },
+            motionSettings = { ToriMotionEngine.effectiveSettings(context, currentMotionSettings.value) },
         )
     }
     val playerWindowInfo = androidx.compose.ui.platform.LocalWindowInfo.current
@@ -290,11 +295,18 @@ fun PokkeNavHost() {
                 .navigationBarsPadding()
         )
 
-        AnimatedVisibility(visible = showNav, modifier = Modifier.align(Alignment.BottomCenter), enter = fadeIn(androidx.compose.animation.core.tween(150)) + slideInVertically(androidx.compose.animation.core.tween(180)) { it / 3 }, exit = fadeOut(androidx.compose.animation.core.tween(110)) + slideOutVertically(androidx.compose.animation.core.tween(140)) { it / 3 }) {
+        val navEnterMs = ToriMotionEngine.transitionDurationMillis(motionSettings, 180)
+        val navExitMs = ToriMotionEngine.transitionDurationMillis(motionSettings, 140)
+        AnimatedVisibility(
+            visible = showNav,
+            modifier = Modifier.align(Alignment.BottomCenter),
+            enter = fadeIn(tween(navEnterMs)) + slideInVertically(tween(navEnterMs)) { it / 3 },
+            exit = fadeOut(tween(navExitMs)) + slideOutVertically(tween(navExitMs)) { it / 3 }
+        ) {
             // Liquid Glass bottom bar (Kyant-inspired surface when toggle ON)
             Row(
                 modifier = Modifier.padding(bottom = 10.dp).navigationBarsPadding()
-                    .animateContentSize(androidx.compose.animation.core.tween(190))
+                    .animateContentSize(tween(ToriMotionEngine.transitionDurationMillis(motionSettings, 190)))
                     .clip(RoundedCornerShape(40.dp))
                     .then(
                         if (glass && appBackdrop != null) Modifier.drawBackdrop(
