@@ -288,6 +288,24 @@ fun FullPlayerScreen(
                                 )
                         )
                     }
+                    if (motionSettings.enabled && !motionSettings.reduceMotion && motionSettings.reflections) {
+                        Box(
+                            Modifier
+                                .fillMaxWidth(0.82f)
+                                .aspectRatio(1f)
+                                .align(Alignment.Center)
+                                .clip(RoundedCornerShape(22.dp))
+                                .background(
+                                    Brush.linearGradient(
+                                        listOf(
+                                            Color.White.copy(alpha = 0.10f * motionSettings.intensity.coerceIn(0f, 1f)),
+                                            Color.Transparent,
+                                            Color.Transparent
+                                        )
+                                    )
+                                )
+                        )
+                    }
                 }
             }
 
@@ -488,8 +506,7 @@ fun FullPlayerScreen(
                 onShareSong = {
                     showOverflow = false
                     current?.let { song ->
-                        val text = "${song.title} — ${song.artist}" + (song.audioUrl?.takeIf { it.startsWith("https://") }?.let { "
-$it" } ?: "")
+                        val text = "${song.title} — ${song.artist}" + (song.audioUrl?.takeIf { it.startsWith("https://") }?.let { "\n$it" } ?: "")
                         context.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, text), "Compartir canción"))
                     }
                 },
