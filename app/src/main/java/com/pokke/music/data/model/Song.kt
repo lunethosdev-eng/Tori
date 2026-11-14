@@ -44,7 +44,10 @@ data class Playlist(
     val coverUrl: String? = null,
     val description: String? = null,
     val isPublic: Boolean = false,
-    val songCount: Int = 0
+    val songCount: Int = 0,
+    val primaryColor: String = "#6750A4",
+    val secondaryColor: String = "#26324A",
+    val visualStyle: String = "gradient"
 )
 
 data class UserProfile(
