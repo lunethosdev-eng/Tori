@@ -65,6 +65,8 @@ import com.pokke.music.ui.player.LocalPlayerDock
 import com.pokke.music.ui.sheets.OverflowMenuSheet
 import com.pokke.music.ui.liquid.LiquidSlider
 import com.pokke.music.ui.backdrop.backdrops.rememberLayerBackdrop
+import com.pokke.music.ui.motion.MotionSettings
+import com.pokke.music.ui.motion.ToriMotionEngine
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -85,6 +87,8 @@ fun FullPlayerScreen(
     val liquidSliderEnabled by preferences.liquidSliderEnabled.collectAsState(true)
     val sharedPlayerBackdrop = rememberLayerBackdrop()
     val liquidPerformanceMode by preferences.liquidPerformanceMode.collectAsState(true)
+    val storedMotionSettings by preferences.motionSettings.collectAsState(initial = MotionSettings())
+    val motionSettings = ToriMotionEngine.effectiveSettings(context, storedMotionSettings)
     val current by PlayerController.currentSong.collectAsState()
     val isPlaying by PlayerController.isPlaying.collectAsState()
     val positionMs by PlayerController.positionMs.collectAsState()
@@ -242,7 +246,9 @@ fun FullPlayerScreen(
                             .clip(RoundedCornerShape(22.dp))
                             .onGloballyPositioned { coverCoordinates = it }
                             .graphicsLayer {
-                                shadowElevation = 18.dp.toPx()
+                                val depth = ToriMotionEngine.depthScale(motionSettings)
+                                shadowElevation = (18f + depth * 14f).dp.toPx()
+                                cameraDistance = 8f * density
                                 val dock = playerDock
                                 val coordinates = coverCoordinates
                                 val mini = if (dock?.attached == true) dock.miniArtOnScreen() else null
@@ -264,6 +270,24 @@ fun FullPlayerScreen(
                             },
                         contentScale = ContentScale.Crop
                     )
+                    if (motionSettings.enabled && !motionSettings.reduceMotion && motionSettings.reflections) {
+                        Box(
+                            Modifier
+                                .fillMaxWidth(0.82f)
+                                .aspectRatio(1f)
+                                .align(Alignment.Center)
+                                .clip(RoundedCornerShape(22.dp))
+                                .background(
+                                    Brush.linearGradient(
+                                        listOf(
+                                            Color.White.copy(alpha = 0.10f * motionSettings.intensity.coerceIn(0f, 1f)),
+                                            Color.Transparent,
+                                            Color.Transparent
+                                        )
+                                    )
+                                )
+                        )
+                    }
                 }
             }
 
@@ -464,7 +488,8 @@ fun FullPlayerScreen(
                 onShareSong = {
                     showOverflow = false
                     current?.let { song ->
-                        val text = "${song.title} — ${song.artist}" + (song.audioUrl?.takeIf { it.startsWith("https://") }?.let { "\n$it" } ?: "")
+                        val text = "${song.title} — ${song.artist}" + (song.audioUrl?.takeIf { it.startsWith("https://") }?.let { "
+$it" } ?: "")
                         context.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, text), "Compartir canción"))
                     }
                 },
