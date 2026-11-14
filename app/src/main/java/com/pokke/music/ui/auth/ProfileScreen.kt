@@ -22,6 +22,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AddLink
 import androidx.compose.material.icons.filled.Badge
+import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Favorite
@@ -48,6 +49,7 @@ import com.pokke.music.data.model.UserProfile
 import com.pokke.music.data.preferences.UserPreferences
 import com.pokke.music.ui.liquid.pokkePressMotion
 import com.pokke.music.data.repository.AuthRepository
+import com.pokke.music.data.repository.UserEmblemRepository
 import com.pokke.music.ui.profile.AvatarFrames
 import com.pokke.music.ui.profile.FramedAvatar
 import com.pokke.music.ui.profile.ListeningCard
@@ -65,6 +67,11 @@ private val ProfileMuted = Color(0xFFA5A4B5)
 fun ProfileScreen(repository: AuthRepository, onBack: () -> Unit, onSignedOut: () -> Unit) {
     val session by repository.session.collectAsState()
     val scope = rememberCoroutineScope()
+    var hasDeveloperEmblem by remember { mutableStateOf(false) }
+    val emblemRepository = remember { UserEmblemRepository() }
+    LaunchedEffect(session?.userId) {
+        hasDeveloperEmblem = session?.let { emblemRepository.hasDeveloperEmblem(it) } ?: false
+    }
     var profile by remember { mutableStateOf<UserProfile?>(null) }
     var displayName by remember { mutableStateOf("") }
     var username by remember { mutableStateOf("") }
@@ -279,7 +286,17 @@ fun ProfileScreen(repository: AuthRepository, onBack: () -> Unit, onSignedOut: (
 
         Column(Modifier.fillMaxWidth().padding(horizontal = 22.dp)) {
             Spacer(Modifier.height(12.dp))
-            Text(displayName.ifBlank { "Tu perfil" }, color = ProfileInk, fontSize = 29.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(displayName.ifBlank { "Tu perfil" }, color = ProfileInk, fontSize = 29.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                if (hasDeveloperEmblem) {
+                    Surface(color = Color(0xFFA78BFA).copy(alpha = .18f), contentColor = Color(0xFFA78BFA), shape = RoundedCornerShape(8.dp)) {
+                        Row(Modifier.padding(horizontal = 8.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Icon(Icons.Default.Code, contentDescription = "Desarrollador", modifier = Modifier.size(14.dp))
+                            Text("Dev", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("@${username.ifBlank { "usuario" }}", color = ProfileMuted, fontSize = 14.sp)
                 if (pronouns.isNotBlank()) Text("  ·  $pronouns", color = ProfileMuted, fontSize = 13.sp)
