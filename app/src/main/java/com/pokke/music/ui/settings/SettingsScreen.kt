@@ -25,6 +25,7 @@ import com.pokke.music.data.repository.AuthRepository
 import kotlinx.coroutines.launch
 import com.pokke.music.ui.liquid.LocalAppBackdrop
 import com.pokke.music.ui.liquid.LiquidToggle
+import com.pokke.music.ui.motion.MotionSettings
 
 private const val OWNER_EMAIL = "lunethos.dev@gmail.com"
 
@@ -52,6 +53,7 @@ fun SettingsScreen(
     val performance by prefs.liquidPerformanceMode.collectAsState(initial = true)
     val chatsEnabled by prefs.experimentalChatsEnabled.collectAsState(initial = false)
     val mapsEnabled by prefs.experimentalMapsEnabled.collectAsState(initial = false)
+    val motion by prefs.motionSettings.collectAsState(initial = MotionSettings())
 
     val session by (authRepository?.session ?: kotlinx.coroutines.flow.MutableStateFlow(null)).collectAsState()
     val isOwner = session?.email?.equals(OWNER_EMAIL, ignoreCase = true) == true
@@ -143,6 +145,95 @@ fun SettingsScreen(
             Text("El modo rendimiento evita mantener capturas y efectos de cristal en pantallas que no están visibles.", color = Color.White.copy(.42f), fontSize = 11.sp, modifier = Modifier.padding(horizontal = 22.dp, vertical = 4.dp))
         }
 
+
+        Section("TORI MOTION ENGINE")
+        Text(
+            "Motor de movimiento propio de Tori. Centraliza las curvas Spring, la respuesta táctil y los parámetros visuales; los ajustes se guardan en este dispositivo.",
+            color = Color.White.copy(.5f),
+            fontSize = 12.sp,
+            lineHeight = 17.sp,
+            modifier = Modifier.padding(horizontal = 22.dp, vertical = 5.dp)
+        )
+        LiquidOrMaterialToggle(
+            title = "Activar Motion Engine",
+            subtitle = "Control maestro para las animaciones compatibles.",
+            checked = motion.enabled,
+            glass = false,
+            onChange = { scope.launch { prefs.setMotionEnabled(it) } }
+        )
+        Text("Perfil de movimiento", color = Color.White.copy(.75f), fontSize = 13.sp,
+            modifier = Modifier.padding(start = 22.dp, top = 8.dp, bottom = 8.dp))
+        Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            listOf(
+                MotionSettings.PROFILE_FULL to "Completo",
+                MotionSettings.PROFILE_BALANCED to "Equilibrado",
+                MotionSettings.PROFILE_LIGHT to "Ligero"
+            ).forEach { (id, label) ->
+                val selected = motion.profile == id
+                Box(
+                    Modifier.weight(1f).clip(RoundedCornerShape(12.dp))
+                        .background(if (selected) Color.White else Color(0xFF202024))
+                        .clickable { scope.launch { prefs.setMotionProfile(id) } }
+                        .padding(vertical = 11.dp),
+                    contentAlignment = Alignment.Center
+                ) { Text(label, color = if (selected) Color.Black else Color.White, fontSize = 11.sp) }
+            }
+        }
+        Text("Intensidad", color = Color.White.copy(.75f), fontSize = 13.sp,
+            modifier = Modifier.padding(start = 22.dp, top = 12.dp))
+        Slider(
+            value = motion.intensity,
+            onValueChange = { v -> scope.launch { prefs.setMotionIntensity(v) } },
+            valueRange = 0f..1.8f,
+            modifier = Modifier.padding(horizontal = 22.dp),
+            enabled = motion.enabled
+        )
+        Text("Velocidad", color = Color.White.copy(.75f), fontSize = 13.sp,
+            modifier = Modifier.padding(start = 22.dp, top = 4.dp))
+        Slider(
+            value = motion.speed,
+            onValueChange = { v -> scope.launch { prefs.setMotionSpeed(v) } },
+            valueRange = 0.5f..1.8f,
+            modifier = Modifier.padding(horizontal = 22.dp),
+            enabled = motion.enabled
+        )
+        Text("Profundidad 3D", color = Color.White.copy(.75f), fontSize = 13.sp,
+            modifier = Modifier.padding(start = 22.dp, top = 4.dp))
+        Slider(
+            value = motion.depth,
+            onValueChange = { v -> scope.launch { prefs.setMotionDepth(v) } },
+            valueRange = 0f..1f,
+            modifier = Modifier.padding(horizontal = 22.dp),
+            enabled = motion.enabled
+        )
+        LiquidOrMaterialToggle(
+            title = "Iluminación y reflejos",
+            subtitle = "Permite que los componentes compatibles utilicen reflejos ambientales.",
+            checked = motion.reflections,
+            glass = false,
+            onChange = { scope.launch { prefs.setMotionReflections(it) } }
+        )
+        LiquidOrMaterialToggle(
+            title = "Parallax",
+            subtitle = "Movimiento de profundidad en superficies compatibles.",
+            checked = motion.parallax,
+            glass = false,
+            onChange = { scope.launch { prefs.setMotionParallax(it) } }
+        )
+        LiquidOrMaterialToggle(
+            title = "Respuesta táctil",
+            subtitle = "Habilita la opción de feedback háptico para componentes compatibles.",
+            checked = motion.haptics,
+            glass = false,
+            onChange = { scope.launch { prefs.setMotionHaptics(it) } }
+        )
+        LiquidOrMaterialToggle(
+            title = "Reducir movimiento",
+            subtitle = "Desactiva las animaciones del motor que no sean necesarias para la interacción.",
+            checked = motion.reduceMotion,
+            glass = false,
+            onChange = { scope.launch { prefs.setMotionReduce(it) } }
+        )
 
         Section("PERSONALIZAR INICIO")
         Text(
