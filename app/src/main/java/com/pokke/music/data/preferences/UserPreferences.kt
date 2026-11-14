@@ -10,6 +10,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import com.pokke.music.ui.motion.MotionSettings
 
 val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "pokke_prefs")
 
@@ -58,6 +59,17 @@ class UserPreferences(private val context: Context) {
         private val HOME_SECTION_ORDER = stringPreferencesKey("home_section_order")
         private val HOME_LAYOUT = stringPreferencesKey("home_layout") // compact | comfortable | dense
         private val HOME_DENSITY = stringPreferencesKey("home_density") // small | medium | large
+
+        // Tori Motion Engine
+        private val MOTION_ENABLED = booleanPreferencesKey("tori_motion_enabled")
+        private val MOTION_PROFILE = stringPreferencesKey("tori_motion_profile")
+        private val MOTION_INTENSITY = floatPreferencesKey("tori_motion_intensity")
+        private val MOTION_SPEED = floatPreferencesKey("tori_motion_speed")
+        private val MOTION_DEPTH = floatPreferencesKey("tori_motion_depth")
+        private val MOTION_REFLECTIONS = booleanPreferencesKey("tori_motion_reflections")
+        private val MOTION_PARALLAX = booleanPreferencesKey("tori_motion_parallax")
+        private val MOTION_HAPTICS = booleanPreferencesKey("tori_motion_haptics")
+        private val MOTION_REDUCE = booleanPreferencesKey("tori_motion_reduce")
     }
 
     val externalAccountsEnabled: Flow<Boolean> = context.dataStore.data.map { it[EXTERNAL_ACCOUNTS] ?: false }
@@ -148,6 +160,35 @@ class UserPreferences(private val context: Context) {
     suspend fun setHomeSectionOrder(v: String) = context.dataStore.edit { it[HOME_SECTION_ORDER] = v }
     suspend fun setHomeLayout(v: String) = context.dataStore.edit { it[HOME_LAYOUT] = v }
     suspend fun setHomeDensity(v: String) = context.dataStore.edit { it[HOME_DENSITY] = v }
+
+
+    val motionSettings: Flow<MotionSettings> = context.dataStore.data.map { prefs ->
+        MotionSettings(
+            enabled = prefs[MOTION_ENABLED] ?: true,
+            profile = prefs[MOTION_PROFILE] ?: MotionSettings.PROFILE_BALANCED,
+            intensity = prefs[MOTION_INTENSITY] ?: 1f,
+            speed = prefs[MOTION_SPEED] ?: 1f,
+            depth = prefs[MOTION_DEPTH] ?: 0.65f,
+            reflections = prefs[MOTION_REFLECTIONS] ?: true,
+            parallax = prefs[MOTION_PARALLAX] ?: true,
+            haptics = prefs[MOTION_HAPTICS] ?: true,
+            reduceMotion = prefs[MOTION_REDUCE] ?: false,
+        )
+    }
+
+    suspend fun setMotionEnabled(v: Boolean) { context.dataStore.edit { it[MOTION_ENABLED] = v } }
+    suspend fun setMotionProfile(v: String) {
+        val safe = v.takeIf { it in setOf(MotionSettings.PROFILE_FULL, MotionSettings.PROFILE_BALANCED, MotionSettings.PROFILE_LIGHT) }
+            ?: MotionSettings.PROFILE_BALANCED
+        context.dataStore.edit { it[MOTION_PROFILE] = safe }
+    }
+    suspend fun setMotionIntensity(v: Float) { context.dataStore.edit { it[MOTION_INTENSITY] = v.coerceIn(0f, 1.8f) } }
+    suspend fun setMotionSpeed(v: Float) { context.dataStore.edit { it[MOTION_SPEED] = v.coerceIn(0.5f, 1.8f) } }
+    suspend fun setMotionDepth(v: Float) { context.dataStore.edit { it[MOTION_DEPTH] = v.coerceIn(0f, 1f) } }
+    suspend fun setMotionReflections(v: Boolean) { context.dataStore.edit { it[MOTION_REFLECTIONS] = v } }
+    suspend fun setMotionParallax(v: Boolean) { context.dataStore.edit { it[MOTION_PARALLAX] = v } }
+    suspend fun setMotionHaptics(v: Boolean) { context.dataStore.edit { it[MOTION_HAPTICS] = v } }
+    suspend fun setMotionReduce(v: Boolean) { context.dataStore.edit { it[MOTION_REDUCE] = v } }
 
     /** Restore default Home layout and visibility. */
     suspend fun resetHomeCustomization() = context.dataStore.edit {
