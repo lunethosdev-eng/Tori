@@ -129,7 +129,7 @@ private val baseNavItems = listOf(
 )
 
 @Composable
-fun PokkeNavHost(pluginDeepLinkUri: Uri? = null, onPluginDeepLinkHandled: () -> Unit = {}) {
+fun PokkeNavHost(pluginDeepLinkUri: Uri? = null, onPluginDeepLinkHandled: () -> Unit = {}, onRestartOnboarding: () -> Unit = {}) {
     val nav = rememberNavController()
     val context = LocalContext.current
     LaunchedEffect(pluginDeepLinkUri) {
@@ -416,7 +416,8 @@ fun PokkeNavHost(pluginDeepLinkUri: Uri? = null, onPluginDeepLinkHandled: () -> 
                     onOpenAdmin = { nav.navigate(Screen.Admin.route) },
                     authRepository = auth,
                     pluginDeepLinkUri = pluginDeepLinkUri,
-                    onPluginDeepLinkHandled = onPluginDeepLinkHandled
+                    onPluginDeepLinkHandled = onPluginDeepLinkHandled,
+                    onRestartOnboarding = onRestartOnboarding
                 )
             }
             composable(Screen.Admin.route) {
