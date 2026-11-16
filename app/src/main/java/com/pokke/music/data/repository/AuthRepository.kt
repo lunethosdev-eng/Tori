@@ -92,6 +92,23 @@ class AuthRepository(context: Context) {
         }
     }
 
+    /** Sends a lightweight request to wake the independent POLIC Render service. */
+    suspend fun wakePolicServer(): Result<Unit> = withContext(Dispatchers.IO) {
+        runCatching {
+            val connection = (URL("$POLIC_API_BASE/health").openConnection() as HttpURLConnection).apply {
+                requestMethod = "GET"
+                connectTimeout = 30_000
+                readTimeout = 30_000
+                setRequestProperty("Accept", "application/json")
+            }
+            try {
+                // Any HTTP response means the Render web process answered; auth is not needed here.
+                connection.responseCode
+                Unit
+            } finally { connection.disconnect() }
+        }
+    }
+
     /** Starts the official Discord OAuth2 flow through the Pokke backend. */
     suspend fun startDiscordOAuth(): Result<String> = withContext(Dispatchers.IO) {
         runCatching {
