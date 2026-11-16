@@ -38,7 +38,8 @@ fun SettingsScreen(
     onOpenAdmin: (() -> Unit)? = null,
     authRepository: AuthRepository? = null,
     pluginDeepLinkUri: Uri? = null,
-    onPluginDeepLinkHandled: () -> Unit = {}
+    onPluginDeepLinkHandled: () -> Unit = {},
+    onRestartOnboarding: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val prefs = remember(context) { UserPreferences(context) }
@@ -102,6 +103,9 @@ fun SettingsScreen(
 
         if (selectedCategory == null) {
             Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                OutlinedButton(onClick = onRestartOnboarding, modifier = Modifier.fillMaxWidth().height(48.dp), shape = RoundedCornerShape(16.dp)) {
+                    Text("Editar preferencias iniciales")
+                }
                 SettingsCategoryCard("Apariencia y movimiento", "Liquid Glass, Canvas, Motion Engine y tema visual", "appearance") { selectedCategory = it }
                 SettingsCategoryCard("Personalizar inicio", "Secciones, distribución, carátulas y fondo de Home", "home") { selectedCategory = it }
                 SettingsCategoryCard("Búsqueda y letras", "Catálogos activos, historial y estilo de letras", "search") { selectedCategory = it }
