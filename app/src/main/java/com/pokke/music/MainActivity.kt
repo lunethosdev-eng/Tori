@@ -20,6 +20,10 @@ import com.pokke.music.ui.navigation.PokkeNavHost
 import com.pokke.music.ui.liquid.GlassBackdropHost
 import com.pokke.music.data.preferences.UserPreferences
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
+import com.pokke.music.data.repository.AuthRepository
+import com.pokke.music.ui.onboarding.OnboardingScreen
 import androidx.compose.ui.platform.LocalContext
 import com.pokke.music.ui.theme.PokkeTheme
 
@@ -38,11 +42,25 @@ class MainActivity : ComponentActivity() {
         setContent {
             PokkeTheme {
                 Surface(modifier = Modifier.fillMaxSize()) {
-                    val prefs = UserPreferences(LocalContext.current)
+                    val context = LocalContext.current
+                    val prefs = UserPreferences(context)
                     val glass by prefs.liquidGlassEnabled.collectAsState(false)
                     val performance by prefs.liquidPerformanceMode.collectAsState(true)
+                    val onboardingComplete by prefs.onboardingCompleted.collectAsState(false)
+                    val scope = rememberCoroutineScope()
+                    val authRepository = androidx.compose.runtime.remember(context) { AuthRepository(context) }
                     // A single root capture feeds all glass surfaces; TextureView Canvas avoids SurfaceView capture conflicts.
-                    GlassBackdropHost(enabled = glass, performanceMode = performance) { PokkeNavHost(pluginDeepLinkUri = pluginDeepLinkUri, onPluginDeepLinkHandled = { pluginDeepLinkUri = null }) }
+                    GlassBackdropHost(enabled = glass, performanceMode = performance) {
+                        if (onboardingComplete) {
+                            PokkeNavHost(
+                                pluginDeepLinkUri = pluginDeepLinkUri,
+                                onPluginDeepLinkHandled = { pluginDeepLinkUri = null },
+                                onRestartOnboarding = { scope.launch { prefs.reopenOnboarding() } }
+                            )
+                        } else {
+                            OnboardingScreen(prefs = prefs, authRepository = authRepository, onComplete = { })
+                        }
+                    }
                 }
             }
         }
