@@ -23,21 +23,25 @@ import com.pokke.music.util.QrBitmap
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.launch
 
 @Composable
 fun TvLinkDeviceScreen(onBack: () -> Unit) {
     val context = LocalContext.current
     val repository = remember { DeviceLinkRepository() }
+    val scope = rememberCoroutineScope()
     var qr by remember { mutableStateOf<Bitmap?>(null) }
     var code by remember { mutableStateOf("············") }
     var pin by remember { mutableStateOf("------") }
     var status by remember { mutableStateOf("Preparando vinculación segura…") }
     var approved by remember { mutableStateOf(false) }
+    var pairingSecret by remember { mutableStateOf<String?>(null) }
+    var actionMessage by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(Unit) {
         val created = repository.createTvPairing(android.os.Build.MODEL ?: "Pokke Android TV")
         created.onSuccess { pairing ->
-            code = pairing.code; pin = pairing.pin
+            code = pairing.code; pin = pairing.pin; pairingSecret = pairing.secret
             qr = withContext(Dispatchers.Default) { QrBitmap.encode(QrBitmap.pairPayload(pairing.id, pairing.code, pairing.pin, pairing.secret), 640) }
             status = "Escanea el QR desde Pokke móvil o introduce el código y PIN."
             while (!approved && System.currentTimeMillis() / 1000 < pairing.expiresAt) {
@@ -63,6 +67,20 @@ fun TvLinkDeviceScreen(onBack: () -> Unit) {
             Text("PIN  $pin", color = Color(0xFFB9D7FF), fontSize = 22.sp, fontWeight = FontWeight.SemiBold)
             Spacer(Modifier.height(18.dp))
             Text(status, color = if (approved) Color(0xFF9BE7B0) else Color.White.copy(alpha = alpha + .2f), fontSize = 14.sp)
+            if (approved) {
+                Spacer(Modifier.height(14.dp))
+                val closeOtherSessions: () -> Unit = {
+                    val secret = pairingSecret
+                    if (secret != null) scope.launch {
+                        repository.tvCloseOtherSessions(secret).onSuccess { actionMessage = "$it sesiones secundarias cerradas. El teléfono principal está protegido." }
+                            .onFailure { actionMessage = it.message ?: "No autorizado. Revisa los permisos desde el teléfono." }
+                    }
+                }
+                TextButton(onClick = closeOtherSessions, modifier = Modifier.tvFocusable(onClick = closeOtherSessions)) {
+                    Text("Cerrar sesiones de otros dispositivos", color = Color(0xFFB9D7FF))
+                }
+                actionMessage?.let { Text(it, color = Color.White.copy(.75f), fontSize = 12.sp) }
+            }
         }
         Spacer(Modifier.width(32.dp))
         Box(Modifier.size(300.dp).background(Color.White, RoundedCornerShape(22.dp)).padding(18.dp), contentAlignment = Alignment.Center) {
