@@ -11,7 +11,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.music.bitchord.data.lyrics.LyricLine as BitChordLyricLine
@@ -58,7 +57,6 @@ fun BitChordNowPlayingHost(
     var favorite by remember(current?.id) { mutableStateOf(false) }
     var accountName by remember { mutableStateOf<String?>(null) }
     var showMenu by remember { mutableStateOf(false) }
-    var menuAnchorRect by remember { mutableStateOf<Rect?>(null) }
     val library = remember(context) { LocalLibraryStore(context.applicationContext) }
 
     LaunchedEffect(positionMs, isPlaying) {
@@ -134,7 +132,6 @@ fun BitChordNowPlayingHost(
         onMoveInQueue = PlayerController::moveQueueItem,
         onClearQueue = PlayerController::clearQueue,
         onOpenMenu = { showMenu = true },
-        onMenuAnchorChanged = { menuAnchorRect = it },
         onOpenAlbum = {},
         onOpenArtist = { _, _ -> },
         onOpenPlaybackSource = onClose,
@@ -153,7 +150,7 @@ fun BitChordNowPlayingHost(
 
     if (showMenu) {
         OverflowMenuSheet(
-            anchorRect = menuAnchorRect,
+            anchorRect = null,
             onDismiss = { showMenu = false },
             onShareSong = {
                 showMenu = false
