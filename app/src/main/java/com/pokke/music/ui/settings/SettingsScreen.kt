@@ -40,7 +40,8 @@ fun SettingsScreen(
     authRepository: AuthRepository? = null,
     pluginDeepLinkUri: Uri? = null,
     onPluginDeepLinkHandled: () -> Unit = {},
-    onRestartOnboarding: () -> Unit = {}
+    onRestartOnboarding: () -> Unit = {},
+    onOpenRemoteControl: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val prefs = remember(context) { UserPreferences(context) }
@@ -558,6 +559,9 @@ fun SettingsScreen(
 
         }
         if (selectedCategory == "devices") {
+            Section("CONTROL REMOTO DE POKKE TV")
+            OutlinedButton(onClick = onOpenRemoteControl, modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) { Text("Abrir control remoto") }
+            Text("Busca televisores Pokke en la misma red Wi‑Fi. La TV muestra un código temporal para autorizar el control local.", color = Color.White.copy(.55f), fontSize = 12.sp, modifier = Modifier.padding(horizontal = 22.dp, vertical = 6.dp))
             Section("TUS DISPOSITIVOS")
             val deviceRepo = remember(authRepository) { DeviceLinkRepository(authRepository) }
             var devices by remember { mutableStateOf<List<DeviceLinkRepository.LinkedDevice>>(emptyList()) }
