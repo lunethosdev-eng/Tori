@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -24,6 +25,7 @@ import com.pokke.music.auth.external.YtMusicLoginScreen
 import com.pokke.music.data.preferences.UserPreferences
 import com.pokke.music.data.repository.AuthRepository
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 
 /** Optional external providers. Discord uses official server-side OAuth2, never a WebView token. */
 @Composable
@@ -41,6 +43,7 @@ fun ExternalAccountsSection(prefs: UserPreferences, authRepository: AuthReposito
     var discordBusy by remember { mutableStateOf(false) }
     var discordMessage by remember { mutableStateOf<String?>(null) }
     var themeBusy by remember { mutableStateOf(false) }
+    var showDiscordWakeWarning by remember { mutableStateOf(false) }
 
     // Purge legacy Discord user-session tokens captured by the previous WebView flow.
     LaunchedEffect(Unit) { store.clearProvider("discord") }
@@ -62,21 +65,9 @@ fun ExternalAccountsSection(prefs: UserPreferences, authRepository: AuthReposito
             if (ytOn) OutlinedButton(onClick = { openLogin = "ytmusic" }) { Text("Conectar YouTube Music") }
             if (discordOn) {
                 Button(
-                    enabled = !discordBusy && authRepository != null,
-                    onClick = {
-                        discordBusy = true
-                        discordMessage = null
-                        scope.launch {
-                            val result = authRepository?.startDiscordOAuth()
-                            result?.onSuccess { url ->
-                                runCatching { ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }
-                                    .onFailure { discordMessage = "No se pudo abrir Discord: ${it.message}" }
-                            }?.onFailure { discordMessage = it.message ?: "No se pudo iniciar OAuth2" }
-                            if (authRepository == null) discordMessage = "Inicia sesión en Pokke para vincular Discord."
-                            discordBusy = false
-                        }
-                    }
-                ) { Text(if (discordBusy) "Conectando…" else "Vincular Discord con OAuth2") }
+                    enabled = !discordBusy,
+                    onClick = { showDiscordWakeWarning = true }
+                ) { Text(if (discordBusy) "Esperando a POLIC…" else if (discordLinked) "Reconectar Discord" else "Vincular Discord con OAuth2") }
                 Text(if (discordLinked) "Discord vinculado a tu cuenta Pokke." else "La autorización se realiza en Discord. Pokke nunca lee ni guarda el token privado de tu sesión.", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = .58f))
                 discordMessage?.let { Text(it, fontSize = 12.sp, color = MaterialTheme.colorScheme.error) }
             }
@@ -102,6 +93,40 @@ fun ExternalAccountsSection(prefs: UserPreferences, authRepository: AuthReposito
                 }) { Text("Recuperar tema desde POLIC") }
             }
         }
+    }
+
+    if (showDiscordWakeWarning) {
+        AlertDialog(
+            onDismissRequest = { showDiscordWakeWarning = false },
+            title = { Text("Antes de conectar Discord") },
+            text = {
+                Text("El servidor POLIC puede tardar entre 25 y 30 segundos en despertarse. Espera ese tiempo antes de comprobar tu perfil: si el servidor aún no está listo, tu vinculación y los datos de tu tarjeta podrían no aparecer todavía.")
+            },
+            confirmButton = {
+                androidx.compose.material3.TextButton(onClick = {
+                    showDiscordWakeWarning = false
+                    if (authRepository == null) {
+                        discordMessage = "Inicia sesión en Pokke para vincular Discord."
+                    } else {
+                        discordBusy = true
+                        discordMessage = null
+                        scope.launch {
+                            // Wake Render in the background, then give its free instance 27 seconds to become ready.
+                            scope.launch(kotlinx.coroutines.Dispatchers.IO) { authRepository.wakePolicServer() }
+                            discordMessage = "Despertando POLIC; espera aproximadamente 27 segundos…"
+                            delay(27_000)
+                            authRepository.startDiscordOAuth()
+                                .onSuccess { url ->
+                                    runCatching { ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }
+                                        .onFailure { discordMessage = "No se pudo abrir Discord: ${it.message}" }
+                                }
+                                .onFailure { discordMessage = it.message ?: "No se pudo iniciar OAuth2" }
+                            discordBusy = false
+                        }
+                    }
+                }) { Text("OK") }
+            }
+        )
     }
 
     when (openLogin) {
