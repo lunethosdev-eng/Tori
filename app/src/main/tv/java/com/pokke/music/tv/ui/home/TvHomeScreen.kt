@@ -364,5 +364,4 @@ private fun TvSongCard(
         Text(song.title, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 2)
         Text(song.artist, color = Color(0xFF9A9AA3), fontSize = 12.sp, maxLines = 1)
     }
-    }
 }
