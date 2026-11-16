@@ -21,6 +21,7 @@ import com.pokke.music.player.PlayerController
 import com.pokke.music.player.PokkeAndroidPlayerHost
 import com.pokke.music.tv.navigation.TvNavHost
 import com.pokke.music.ui.theme.PokkeTheme
+import com.pokke.music.remote.TvRemoteServer
 
 /**
  * Entry point for the Android TV / leanback APK (applicationId com.pokke.music.tv).
@@ -47,6 +48,16 @@ class TvMainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    override fun onStart() {
+        super.onStart()
+        TvRemoteServer.start(this)
+    }
+
+    override fun onStop() {
+        TvRemoteServer.stop()
+        super.onStop()
     }
 
     override fun onNewIntent(intent: Intent) {
