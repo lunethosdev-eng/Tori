@@ -35,7 +35,7 @@ import com.music.bitchord.ui.player.PlayerHost
 import com.music.bitchord.ui.player.PlayerPlatform
 import com.pokke.music.data.preferences.UserPreferences
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.withFrameNanos
+import androidx.compose.runtime.withFrameNanos
 import kotlin.math.max
 import kotlin.math.min
 
