@@ -6,15 +6,15 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 data class ExternalSession(
-    val provider: String, // spotify | discord | ytmusic
+    val provider: String, // spotify | ytmusic
     val label: String,
     val cookie: String,
     val addedAt: Long = System.currentTimeMillis()
 )
 
 /**
- * Multi-sesión cifrada para logins externos (Spotify / Discord / YT Music).
- * Activar desde Settings → Cuentas externas.
+ * Sesiones externas cifradas de Spotify / YouTube Music.
+ * Discord usa OAuth2 oficial del backend y nunca se guarda aquí.
  */
 class ExternalAuthStore(context: Context) {
     private val prefs: SharedPreferences =
