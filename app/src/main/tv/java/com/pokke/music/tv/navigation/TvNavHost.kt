@@ -62,6 +62,8 @@ import java.util.Date
 import java.util.Locale
 import android.content.Intent
 import android.net.Uri
+import com.pokke.music.remote.TvRemoteBus
+import com.pokke.music.remote.TvRemoteCommand
 
 object TvRoutes {
     const val Home = "tv_home"
@@ -97,6 +99,14 @@ fun TvNavHost(deepLinkUri: Uri? = null, onDeepLinkHandled: () -> Unit = {}) {
     val showChrome = route !in setOf(TvRoutes.Player, TvRoutes.Auth, TvRoutes.Lyrics)
 
     LaunchedEffect(auth) { auth.restoreSession() }
+    LaunchedEffect(nav) {
+        TvRemoteBus.commands.collect { command ->
+            when (command) {
+                TvRemoteCommand.Home -> nav.navigate(TvRoutes.Home) { popUpTo(TvRoutes.Home) { inclusive = false }; launchSingleTop = true }
+                is TvRemoteCommand.Search -> nav.navigate(TvRoutes.Search) { launchSingleTop = true }
+            }
+        }
+    }
     LaunchedEffect(deepLinkUri) {
         when (val target = ShareLinks.parse(deepLinkUri)) {
             is ShareLinks.Target.Profile -> nav.navigate(TvRoutes.publicProfile(target.username))
