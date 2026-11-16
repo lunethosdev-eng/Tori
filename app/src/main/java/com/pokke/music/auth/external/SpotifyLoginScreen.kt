@@ -41,6 +41,11 @@ private fun hostMatches(uri: Uri?, suffixes: List<String>): Boolean {
 
 private fun isLoginHost(uri: Uri?) = hostMatches(uri, LOGIN_HOST_SUFFIXES)
 
+/** Keeps the device WebView's mobile browser identity while removing WebView-only markers. */
+private fun browserUserAgent(userAgent: String): String = userAgent
+    .replace(Regex("\\s;\\s*wv\\)"), ")")
+    .replace(Regex("\\sVersion/4\\.0"), "")
+
 /**
  * Signs the login WebView out of Spotify. Disconnecting only forgot the
  * stored cookie, and the WebView's own jar would have signed the next
