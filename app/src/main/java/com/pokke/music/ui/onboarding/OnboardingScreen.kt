@@ -324,7 +324,7 @@ private fun DiscordOAuthPending(onContinue: () -> Unit) {
     Column(Modifier.fillMaxSize().padding(horizontal = 28.dp, vertical = 110.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
         Text("Discord necesita una conexión segura", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
         Spacer(Modifier.height(12.dp))
-        Text("La integración oficial requiere configurar OAuth2 y el backend del bot de Pokke. Esta versión no captura ni almacena tokens privados de Discord.", color = Color.White.copy(.65f), textAlign = TextAlign.Center, fontSize = 13.sp, lineHeight = 20.sp)
+        Text("Discord se conecta con OAuth2 oficial desde Ajustes → Cuentas externas, después de iniciar sesión en Pokke. Así vinculamos la cuenta correcta sin leer ni almacenar tokens privados de Discord.", color = Color.White.copy(.65f), textAlign = TextAlign.Center, fontSize = 13.sp, lineHeight = 20.sp)
         Spacer(Modifier.height(22.dp))
         Button(onClick = onContinue, shape = RoundedCornerShape(18.dp), colors = ButtonDefaults.buttonColors(containerColor = Violet, contentColor = Color(0xFF11101A))) { Text("Continuar", fontWeight = FontWeight.Bold) }
     }
