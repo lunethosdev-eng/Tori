@@ -21,6 +21,7 @@ class UserPreferences(private val context: Context) {
         private val EXTERNAL_ACCOUNTS = booleanPreferencesKey("external_accounts_enabled")
         private val SPOTIFY_LOGIN = booleanPreferencesKey("spotify_login_enabled")
         private val DISCORD_LOGIN = booleanPreferencesKey("discord_login_enabled")
+        private val DISCORD_POLIC_LINKED = booleanPreferencesKey("discord_polic_linked")
         private val YTMUSIC_LOGIN = booleanPreferencesKey("ytmusic_login_enabled")
         private val VENDORED_GLASS = booleanPreferencesKey("vendored_backdrop_glass")
 
@@ -119,12 +120,14 @@ class UserPreferences(private val context: Context) {
     val externalAccountsEnabled: Flow<Boolean> = context.dataStore.data.map { it[EXTERNAL_ACCOUNTS] ?: false }
     val spotifyLoginEnabled: Flow<Boolean> = context.dataStore.data.map { it[SPOTIFY_LOGIN] ?: false }
     val discordLoginEnabled: Flow<Boolean> = context.dataStore.data.map { it[DISCORD_LOGIN] ?: false }
+    val discordPolicLinked: Flow<Boolean> = context.dataStore.data.map { it[DISCORD_POLIC_LINKED] ?: false }
     val ytMusicLoginEnabled: Flow<Boolean> = context.dataStore.data.map { it[YTMUSIC_LOGIN] ?: false }
     val vendoredBackdropGlass: Flow<Boolean> = context.dataStore.data.map { it[VENDORED_GLASS] ?: true }
 
     suspend fun setExternalAccountsEnabled(v: Boolean) { context.dataStore.edit { it[EXTERNAL_ACCOUNTS] = v } }
     suspend fun setSpotifyLoginEnabled(v: Boolean) { context.dataStore.edit { it[SPOTIFY_LOGIN] = v } }
     suspend fun setDiscordLoginEnabled(v: Boolean) { context.dataStore.edit { it[DISCORD_LOGIN] = v } }
+    suspend fun setDiscordPolicLinked(v: Boolean) { context.dataStore.edit { it[DISCORD_POLIC_LINKED] = v } }
     suspend fun setYtMusicLoginEnabled(v: Boolean) { context.dataStore.edit { it[YTMUSIC_LOGIN] = v } }
     suspend fun setVendoredBackdropGlass(v: Boolean) { context.dataStore.edit { it[VENDORED_GLASS] = v } }
 
