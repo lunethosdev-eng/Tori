@@ -1,4 +1,6 @@
 package com.pokke.music.ui.auth
+
+import androidx.compose.animation.animateContentSize
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import android.net.Uri
@@ -9,6 +11,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.rememberScrollState
@@ -19,6 +22,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AddLink
 import androidx.compose.material.icons.filled.Badge
+import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Favorite
@@ -37,13 +41,16 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.pokke.music.data.model.UserProfile
 import com.pokke.music.data.preferences.UserPreferences
+import com.pokke.music.ui.liquid.pokkePressMotion
 import com.pokke.music.data.repository.AuthRepository
+import com.pokke.music.data.repository.UserEmblemRepository
 import com.pokke.music.ui.profile.AvatarFrames
 import com.pokke.music.ui.profile.FramedAvatar
 import com.pokke.music.ui.profile.ListeningCard
@@ -61,6 +68,11 @@ private val ProfileMuted = Color(0xFFA5A4B5)
 fun ProfileScreen(repository: AuthRepository, onBack: () -> Unit, onSignedOut: () -> Unit) {
     val session by repository.session.collectAsState()
     val scope = rememberCoroutineScope()
+    var hasDeveloperEmblem by remember { mutableStateOf(false) }
+    val emblemRepository = remember { UserEmblemRepository() }
+    LaunchedEffect(session?.userId) {
+        hasDeveloperEmblem = session?.let { emblemRepository.hasDeveloperEmblem(it) } ?: false
+    }
     var profile by remember { mutableStateOf<UserProfile?>(null) }
     var displayName by remember { mutableStateOf("") }
     var username by remember { mutableStateOf("") }
@@ -79,6 +91,10 @@ fun ProfileScreen(repository: AuthRepository, onBack: () -> Unit, onSignedOut: (
     var secondaryColor by remember { mutableStateOf("#1A1C26") }
     var gradientEnabled by remember { mutableStateOf(true) }
     var customBg by remember { mutableStateOf("") }
+    var nameplateStyle by remember { mutableStateOf("aurora") }
+    var nameFont by remember { mutableStateOf("sans") }
+    var nameColor by remember { mutableStateOf("#F3F2FA") }
+    var profileCardOrder by remember { mutableStateOf("listening,badges,mangas") }
     var isPublic by remember { mutableStateOf(true) }
     var showListening by remember { mutableStateOf(true) }
     var favoriteMangasJson by remember { mutableStateOf("[]") }
@@ -92,6 +108,7 @@ fun ProfileScreen(repository: AuthRepository, onBack: () -> Unit, onSignedOut: (
     var message by remember { mutableStateOf<String?>(null) }
     val context = androidx.compose.ui.platform.LocalContext.current
     val prefs = remember { UserPreferences(context) }
+    val liquidGlass by prefs.liquidGlassEnabled.collectAsState(initial = false)
     var uploadingMedia by remember { mutableStateOf(false) }
     val pickAvatar = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
         if (uri == null) return@rememberLauncherForActivityResult
@@ -183,6 +200,10 @@ fun ProfileScreen(repository: AuthRepository, onBack: () -> Unit, onSignedOut: (
             secondaryColor = p?.secondaryColor ?: "#1A1C26"
             gradientEnabled = p?.gradientEnabled ?: true
             customBg = p?.customBgUrl.orEmpty()
+            nameplateStyle = p?.nameplateStyle?.takeIf { it in setOf("aurora", "neon", "royal", "minimal", "cyber") } ?: "aurora"
+            nameFont = p?.nameFont?.takeIf { it in setOf("sans", "serif", "mono", "cursive") } ?: "sans"
+            nameColor = p?.nameColor?.takeIf { it.matches(Regex("#[0-9A-Fa-f]{6}")) } ?: "#F3F2FA"
+            profileCardOrder = p?.profileCardOrder?.split(',')?.filter { it in setOf("listening", "badges", "mangas") }?.distinct()?.let { (it + listOf("listening", "badges", "mangas")).distinct().joinToString(",") } ?: "listening,badges,mangas"
             showListening = p?.showListening ?: true
             favoriteMangasJson = p?.favoriteMangas ?: "[]"
             linkLabel = p?.linkLabel.orEmpty(); linkUrl = p?.linkUrl.orEmpty()
@@ -214,7 +235,7 @@ fun ProfileScreen(repository: AuthRepository, onBack: () -> Unit, onSignedOut: (
         "amoled" -> Color.Black; else -> Color(0xFF171A28)
     }
     val cardBackground = when (cardStyle) {
-        "solid" -> Color(0xFF252A3D); "outline" -> pageBackground.copy(alpha = .55f); else -> Color(0xCC252A40)
+        "solid" -> if (liquidGlass) Color(0xCC252A3D) else Color(0xFF252A3D); "outline" -> pageBackground.copy(alpha = .55f); else -> if (liquidGlass) Color(0xAA252A40) else Color(0xCC252A40)
     }
 
     val pageBrush = if (gradientEnabled) {
@@ -222,7 +243,7 @@ fun ProfileScreen(repository: AuthRepository, onBack: () -> Unit, onSignedOut: (
         val sCol = try { Color(android.graphics.Color.parseColor(secondaryColor)) } catch (_: Exception) { Color(0xFF1A1C26) }
         Brush.verticalGradient(listOf(sCol.copy(alpha=0.9f), pageBackground, Color(0xFF0A0A0C)))
     } else null
-    Column(Modifier.fillMaxSize().then(
+    Column(Modifier.fillMaxSize().animateContentSize().then(
         if (customBg.ifBlank { profile?.customBgUrl.orEmpty() }.isNotBlank()) Modifier.background(Color(0xFF0A0A0C))
         else if (pageBrush != null) Modifier.background(pageBrush)
         else Modifier.background(pageBackground)
@@ -275,7 +296,37 @@ fun ProfileScreen(repository: AuthRepository, onBack: () -> Unit, onSignedOut: (
 
         Column(Modifier.fillMaxWidth().padding(horizontal = 22.dp)) {
             Spacer(Modifier.height(12.dp))
-            Text(displayName.ifBlank { "Tu perfil" }, color = ProfileInk, fontSize = 29.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                val displayNameColor = runCatching { Color(android.graphics.Color.parseColor(nameColor)) }.getOrDefault(ProfileInk)
+                val displayNameFont = when (nameFont) { "serif" -> FontFamily.Serif; "mono" -> FontFamily.Monospace; "cursive" -> FontFamily.Cursive; else -> FontFamily.SansSerif }
+                val customPlateStart = runCatching { Color(android.graphics.Color.parseColor(profile?.nameplatePrimaryColor ?: "")) }.getOrNull()
+                val customPlateEnd = runCatching { Color(android.graphics.Color.parseColor(profile?.nameplateSecondaryColor ?: "")) }.getOrNull()
+                val nameplateBrush = if (!profile?.nameplateId.isNullOrBlank() && customPlateStart != null && customPlateEnd != null) Brush.horizontalGradient(listOf(customPlateStart, customPlateEnd)) else when (nameplateStyle) {
+                    "neon" -> Brush.horizontalGradient(listOf(Color(0xFF17102D), Color(0xFF6C3BBD), Color(0xFF17102D)))
+                    "royal" -> Brush.horizontalGradient(listOf(Color(0xFF34230C), Color(0xFFB88A3D), Color(0xFF34230C)))
+                    "minimal" -> Brush.horizontalGradient(listOf(Color(0x33FFFFFF), Color(0x11FFFFFF)))
+                    "cyber" -> Brush.horizontalGradient(listOf(Color(0xFF3B101C), Color(0xFFB52B56), Color(0xFF1A1018)))
+                    else -> Brush.horizontalGradient(listOf(Color(0xFF202C4A), Color(0xFF7658B5), Color(0xFF202C4A)))
+                }
+                Box(Modifier.clip(RoundedCornerShape(12.dp)).background(nameplateBrush).border(1.dp, Color.White.copy(.12f), RoundedCornerShape(12.dp)).padding(horizontal = 10.dp, vertical = 5.dp)) {
+                    if (!profile?.nameplateImageUrl.isNullOrBlank()) {
+                        AsyncImage(profile?.nameplateImageUrl, null, Modifier.matchParentSize(), contentScale = ContentScale.Crop)
+                        Box(Modifier.matchParentSize().background(Brush.horizontalGradient(listOf(Color.Black.copy(.52f), Color.Transparent))))
+                    }
+                    Text(displayName.ifBlank { "Tu perfil" }, color = displayNameColor, fontFamily = displayNameFont, fontSize = 25.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+                if (!profile?.nameplateId.isNullOrBlank()) {
+                    Text("NAMEPLATE PERSONALIZADO", color = accentColor, fontSize = 8.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                }
+                if (hasDeveloperEmblem) {
+                    Surface(color = Color(0xFFA78BFA).copy(alpha = .18f), contentColor = Color(0xFFA78BFA), shape = RoundedCornerShape(8.dp)) {
+                        Row(Modifier.padding(horizontal = 8.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Icon(Icons.Default.Code, contentDescription = "Desarrollador", modifier = Modifier.size(14.dp))
+                            Text("Dev", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("@${username.ifBlank { "usuario" }}", color = ProfileMuted, fontSize = 14.sp)
                 if (pronouns.isNotBlank()) Text("  ·  $pronouns", color = ProfileMuted, fontSize = 13.sp)
@@ -311,8 +362,6 @@ fun ProfileScreen(repository: AuthRepository, onBack: () -> Unit, onSignedOut: (
                     Text(hostLabel(linkUrl), color = ProfileMuted, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
             }
-            MangaFavoritesDisplay(favoriteMangasJson, accentColor, ProfileInk, ProfileMuted, cardBackground)
-
             Button(onClick = { editing = !editing }, modifier = Modifier.fillMaxWidth().padding(top = 22.dp).height(52.dp), shape = RoundedCornerShape(16.dp), colors = ButtonDefaults.buttonColors(containerColor = accentColor, contentColor = Color(0xFF171827))) {
                 Icon(Icons.Default.Edit, null, modifier = Modifier.size(18.dp)); Spacer(Modifier.width(9.dp)); Text(if (editing) "Cerrar editor" else "Editar perfil principal", fontWeight = FontWeight.Bold)
             }
@@ -325,6 +374,45 @@ fun ProfileScreen(repository: AuthRepository, onBack: () -> Unit, onSignedOut: (
                     ProfileField("Pronombres", pronouns) { pronouns = it }
                     ProfileField("Estado personalizado", status) { status = it }
                     ProfileField("Biografía", bio, false) { bio = it }
+                    Spacer(Modifier.height(12.dp))
+                    Text("IDENTIDAD VISUAL", color = accentColor, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.2.sp)
+                    Text("Plantillas predeterminadas", color = ProfileMuted, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp, bottom = 6.dp))
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                        listOf("aurora" to "Aurora", "cyber" to "Cyber", "minimal" to "Minimal").forEach { (id, label) ->
+                            Text(label, color = ProfileInk, fontSize = 11.sp, modifier = Modifier.weight(1f).clip(RoundedCornerShape(10.dp)).background(Color.White.copy(.08f)).clickable {
+                                nameplateStyle = id
+                                when (id) {
+                                    "cyber" -> { accent = "pink"; cardStyle = "solid"; primaryColor = "#7B2448"; secondaryColor = "#1A1018" }
+                                    "minimal" -> { accent = "blue"; cardStyle = "outline"; primaryColor = "#263247"; secondaryColor = "#10141C" }
+                                    else -> { accent = "violet"; cardStyle = "glass"; primaryColor = "#7658B5"; secondaryColor = "#202C4A" }
+                                }
+                            }.padding(vertical = 10.dp), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                        }
+                    }
+                    Text("Nameplate", color = ProfileMuted, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp, bottom = 6.dp))
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        listOf("aurora" to "Aurora", "neon" to "Neon", "royal" to "Royal", "minimal" to "Minimal", "cyber" to "Cyber").forEach { (id, label) ->
+                            val selected = nameplateStyle == id
+                            Text(label, color = if (selected) Color.Black else ProfileInk, fontSize = 10.sp, modifier = Modifier.clip(RoundedCornerShape(9.dp)).background(if (selected) accentColor else Color.White.copy(.08f)).clickable { nameplateStyle = id }.padding(horizontal = 8.dp, vertical = 9.dp))
+                        }
+                    }
+                    ProfileChoice("Tipografía del nombre", nameFont, listOf("sans", "serif", "mono", "cursive"), listOf("Sans", "Serif", "Mono", "Cursiva"), accentColor) { nameFont = it }
+                    Text("Color del nombre", color = ProfileMuted, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp, bottom = 6.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        listOf("#F3F2FA", "#BBA5FF", "#83DFFF", "#FF9FCB", "#E8C77E", "#9CE0B5").forEach { hex ->
+                            val color = runCatching { Color(android.graphics.Color.parseColor(hex)) }.getOrDefault(ProfileInk)
+                            Box(Modifier.size(30.dp).clip(CircleShape).background(color).border(if (nameColor == hex) 3.dp else 1.dp, if (nameColor == hex) Color.White else Color.White.copy(.25f), CircleShape).clickable { nameColor = hex })
+                        }
+                    }
+                    Text("Orden de tarjetas", color = ProfileMuted, fontSize = 12.sp, modifier = Modifier.padding(top = 12.dp, bottom = 6.dp))
+                    val orderedCards = profileCardOrder.split(',').filter { it in setOf("listening", "badges", "mangas") }.distinct().let { (it + listOf("listening", "badges", "mangas")).distinct() }
+                    orderedCards.forEachIndexed { index, card ->
+                        Row(Modifier.fillMaxWidth().padding(vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Text(when (card) { "listening" -> "Actividad / escuchando"; "badges" -> "Colección de emblemas"; else -> "Favoritos de manga" }, color = ProfileInk, fontSize = 12.sp, modifier = Modifier.weight(1f))
+                            Text("↑", color = accentColor, modifier = Modifier.clickable(enabled = index > 0) { profileCardOrder = orderedCards.toMutableList().apply { add(index - 1, removeAt(index)) }.joinToString(",") }.padding(horizontal = 10.dp))
+                            Text("↓", color = accentColor, modifier = Modifier.clickable(enabled = index < orderedCards.lastIndex) { profileCardOrder = orderedCards.toMutableList().apply { add(index + 1, removeAt(index)) }.joinToString(",") }.padding(horizontal = 10.dp))
+                        }
+                    }
                     Text("Foto y banner", color = ProfileMuted, fontSize = 12.sp, modifier = Modifier.padding(bottom = 8.dp))
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Button(
@@ -440,7 +528,11 @@ fun ProfileScreen(repository: AuthRepository, onBack: () -> Unit, onSignedOut: (
                                 primaryColor = primaryColor,
                                 secondaryColor = secondaryColor,
                                 gradientEnabled = gradientEnabled,
-                                customBgUrl = customBg
+                                customBgUrl = customBg,
+                                nameplateStyle = nameplateStyle,
+                                nameFont = nameFont,
+                                nameColor = nameColor,
+                                profileCardOrder = profileCardOrder
                             )
                                 .onSuccess { profile = it; message = "Cambios guardados correctamente" }
                                 .onFailure { message = it.localizedMessage ?: "No se pudo guardar el perfil" }
@@ -459,19 +551,20 @@ fun ProfileScreen(repository: AuthRepository, onBack: () -> Unit, onSignedOut: (
             }
             when (tab) {
                 0 -> {
-                    if (showListening) {
-                        Spacer(Modifier.height(12.dp))
-                        ListeningCard(
-                            accent = accentColor,
-                            cardBg = cardBackground,
-                            ink = ProfileInk,
-                            muted = ProfileMuted,
-                            live = true
-                        )
-                    } else {
-                        ProfilePanel(cardBackground, accentColor, "Actividad", "Escucha oculta", "Activaste la privacidad: otros no verán lo que escuchas.", Icons.Default.MusicNote)
+                    val orderedCards = profileCardOrder.split(',').filter { it in setOf("listening", "badges", "mangas") }.distinct().let { (it + listOf("listening", "badges", "mangas")).distinct() }
+                    orderedCards.forEach { card ->
+                        when (card) {
+                            "listening" -> if (showListening) {
+                                Spacer(Modifier.height(12.dp))
+                                ListeningCard(accent = accentColor, cardBg = cardBackground, ink = ProfileInk, muted = ProfileMuted, live = true)
+                            } else ProfilePanel(cardBackground, accentColor, "Actividad", "Escucha oculta", "Activaste la privacidad: otros no verán lo que escuchas.", Icons.Default.MusicNote)
+                            "badges" -> ProfilePanel(cardBackground, accentColor, "Emblemas", "Colección del perfil", badges.ifBlank { "Todavía no has añadido emblemas." }, Icons.Default.Badge)
+                            "mangas" -> {
+                                Spacer(Modifier.height(12.dp))
+                                MangaFavoritesDisplay(favoriteMangasJson, accentColor, ProfileInk, ProfileMuted, cardBackground)
+                            }
+                        }
                     }
-                    ProfilePanel(cardBackground, accentColor, "Emblemas", "Colección del perfil", badges.ifBlank { "Todavía no has añadido emblemas." }, Icons.Default.Badge)
                 }
                 1 -> {
                         var favs by remember { mutableStateOf<List<com.pokke.music.data.model.Song>>(emptyList()) }
@@ -514,7 +607,8 @@ fun ProfileScreen(repository: AuthRepository, onBack: () -> Unit, onSignedOut: (
 }
 
 @Composable private fun ProfileTopButton(onClick: () -> Unit, content: @Composable () -> Unit) {
-    Box(Modifier.size(42.dp).clip(CircleShape).background(Color.Black.copy(.34f)).clickable(onClick = onClick), contentAlignment = Alignment.Center, content = { content() })
+    val interaction = remember { MutableInteractionSource() }
+    Box(Modifier.size(42.dp).clip(CircleShape).background(Color.Black.copy(.34f)).pokkePressMotion(interaction, pressedScale = .88f).clickable(interactionSource = interaction, indication = null, onClick = onClick), contentAlignment = Alignment.Center, content = { content() })
 }
 
 @Composable private fun ProfileField(label: String, value: String, multiline: Boolean = false, onChange: (String) -> Unit) {

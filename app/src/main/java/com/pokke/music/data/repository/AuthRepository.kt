@@ -154,7 +154,11 @@ class AuthRepository(context: Context) {
         searchCardEffect: String? = null,
         searchCardBannerUrl: String? = null,
         customBgUrl: String? = null,
-        aboutExtra: String? = null
+        aboutExtra: String? = null,
+        nameplateStyle: String? = null,
+        nameFont: String? = null,
+        nameColor: String? = null,
+        profileCardOrder: String? = null
     ): Result<UserProfile> = withContext(Dispatchers.IO) {
         runCatching {
             val s = requireSession()
@@ -174,6 +178,10 @@ class AuthRepository(context: Context) {
                 if (searchCardColor != null) put("search_card_color", searchCardColor)
                 if (searchCardEffect != null) put("search_card_effect", searchCardEffect)
                 if (aboutExtra != null) put("about_extra", aboutExtra)
+                if (nameplateStyle != null) put("nameplate_style", nameplateStyle.takeIf { it in setOf("aurora", "neon", "royal", "minimal", "cyber") } ?: "aurora")
+                if (nameFont != null) put("name_font", nameFont.takeIf { it in setOf("sans", "serif", "mono", "cursive") } ?: "sans")
+                if (nameColor != null) put("name_color", nameColor.takeIf { it.matches(Regex("#[0-9A-Fa-f]{6}")) } ?: "#F3F2FA")
+                if (profileCardOrder != null) put("profile_card_order", profileCardOrder.take(80))
                 if (searchCardBannerUrl != null) {
                     if (searchCardBannerUrl.isBlank()) put("search_card_banner_url", JSONObject.NULL)
                     else put("search_card_banner_url", searchCardBannerUrl.trim())
@@ -403,7 +411,7 @@ class AuthRepository(context: Context) {
             val pattern = "*$term*"
             val s = _session.value
             val params = mapOf(
-                "select" to "id,display_name,username,avatar_url,banner_url,custom_bg_url,bio,theme,frame,is_public,badge,pronouns,status_text,accent_color,card_style,badges,link_label,link_url,show_listening,extra_links,favorite_mangas,search_card_style,search_card_color,search_card_effect,primary_color,secondary_color,gradient_enabled,profile_gifs,about_extra,is_owner",
+                "select" to "id,display_name,username,avatar_url,banner_url,custom_bg_url,bio,theme,frame,is_public,badge,pronouns,status_text,accent_color,card_style,badges,link_label,link_url,show_listening,extra_links,favorite_mangas,search_card_style,search_card_color,search_card_effect,primary_color,secondary_color,gradient_enabled,profile_gifs,about_extra,is_owner,nameplate_id,nameplate_image_url,nameplate_primary_color,nameplate_secondary_color,nameplate_style,name_font,name_color,profile_card_order",
                 "or" to "(username.ilike.$pattern,display_name.ilike.$pattern)",
                 "is_public" to "eq.true",
                 "order" to "username.asc",
@@ -459,17 +467,64 @@ class AuthRepository(context: Context) {
         }
     }
 
+    /** Download account-wide Tori appearance/Home preferences from Kokoro. */
+    suspend fun getAccountAppSettings(): Result<JSONObject?> = withContext(Dispatchers.IO) {
+        runCatching {
+            val s = requireSession()
+            val rows = JSONArray(request(KokoroConfig.TORI_USER_APP_STATE, "GET", s, params = mapOf(
+                "user_id" to "eq.${s.userId}", "select" to "settings", "limit" to "1"
+            )))
+            if (rows.length() == 0) null else rows.getJSONObject(0).optJSONObject("settings")
+        }
+    }
+
+    /** Upsert account-wide Tori appearance/Home preferences under the signed-in user. */
+    suspend fun saveAccountAppSettings(settings: JSONObject): Result<Unit> = withContext(Dispatchers.IO) {
+        runCatching {
+            val s = requireSession()
+            val payload = JSONArray().put(JSONObject().apply {
+                put("user_id", s.userId)
+                put("settings", settings)
+                put("updated_at", java.time.Instant.now().toString())
+            })
+            request(
+                KokoroConfig.TORI_USER_APP_STATE,
+                "POST",
+                s,
+                params = mapOf("on_conflict" to "user_id"),
+                body = payload.toString(),
+                prefer = "resolution=merge-duplicates,return=minimal"
+            )
+            Unit
+        }
+    }
+
     suspend fun getPlaylists(): Result<List<Playlist>> = withContext(Dispatchers.IO) {
         runCatching {
             val s = requireSession()
-            val rows = JSONArray(request(KokoroConfig.PLAYLISTS, "GET", s, params = mapOf(
-                "user_id" to "eq.${s.userId}", "select" to "id,name,description,cover_url,is_public,created_at", "order" to "updated_at.desc"
-            )))
+            val playlistParams = mapOf(
+                "user_id" to "eq.${s.userId}",
+                "select" to "id,name,description,cover_url,is_public,created_at,primary_color,secondary_color,visual_style",
+                "order" to "updated_at.desc"
+            )
+            val rows = runCatching { JSONArray(request(KokoroConfig.PLAYLISTS, "GET", s, params = playlistParams)) }
+                .getOrElse {
+                    // Older Supabase schemas remain readable until the visual-fields migration is applied.
+                    JSONArray(request(KokoroConfig.PLAYLISTS, "GET", s, params = mapOf(
+                        "user_id" to "eq.${s.userId}",
+                        "select" to "id,name,description,cover_url,is_public,created_at",
+                        "order" to "updated_at.desc"
+                    )))
+                }
             (0 until rows.length()).map { i ->
                 val row = rows.getJSONObject(i)
                 val id = row.getString("id")
                 val countRows = JSONArray(request(KokoroConfig.PLAYLIST_SONGS, "GET", s, params = mapOf("playlist_id" to "eq.$id", "select" to "id")))
-                Playlist(id, row.optString("name"), row.optString("cover_url").nullable(), row.optString("description").nullable(), row.optBoolean("is_public"), countRows.length())
+                Playlist(
+                    id, row.optString("name"), row.optString("cover_url").nullable(), row.optString("description").nullable(),
+                    row.optBoolean("is_public"), countRows.length(), row.optString("primary_color", "#6750A4"),
+                    row.optString("secondary_color", "#26324A"), row.optString("visual_style", "gradient")
+                )
             }
         }
     }
@@ -483,7 +538,109 @@ class AuthRepository(context: Context) {
             }.toString(), prefer = "return=representation"))
             if (rows.length() == 0) throw IOException("No se pudo crear la playlist")
             val row = rows.getJSONObject(0)
-            Playlist(row.getString("id"), row.getString("name"), row.optString("cover_url").nullable(), row.optString("description").nullable(), row.optBoolean("is_public"), 0)
+            Playlist(
+                row.getString("id"), row.getString("name"), row.optString("cover_url").nullable(),
+                row.optString("description").nullable(), row.optBoolean("is_public"), 0,
+                row.optString("primary_color", "#6750A4"), row.optString("secondary_color", "#26324A"),
+                row.optString("visual_style", "gradient")
+            )
+        }
+    }
+
+    suspend fun updatePlaylistDetails(
+        playlistId: String,
+        name: String,
+        description: String,
+        coverUrl: String?,
+        isPublic: Boolean
+    ): Result<Unit> = withContext(Dispatchers.IO) {
+        runCatching {
+            val s = requireSession()
+            require(name.isNotBlank()) { "Escribe un nombre para la playlist" }
+            require(name.length <= 80) { "El nombre no puede superar 80 caracteres" }
+            require(description.length <= 500) { "La descripción no puede superar 500 caracteres" }
+            request(
+                KokoroConfig.PLAYLISTS,
+                "PATCH",
+                s,
+                params = mapOf("id" to "eq.$playlistId", "user_id" to "eq.${s.userId}"),
+                body = JSONObject().put("name", name.trim())
+                    .put("description", description.trim())
+                    .put("cover_url", coverUrl ?: JSONObject.NULL)
+                    .put("is_public", isPublic)
+                    .put("updated_at", java.time.Instant.now().toString()).toString(),
+                prefer = "return=minimal"
+            )
+            Unit
+        }
+    }
+
+    suspend fun updatePlaylistAppearance(
+        playlistId: String,
+        primaryColor: String,
+        secondaryColor: String,
+        visualStyle: String
+    ): Result<Unit> = withContext(Dispatchers.IO) {
+        runCatching {
+            val s = requireSession()
+            require(primaryColor.matches(Regex("#[0-9A-Fa-f]{6}")))
+            require(secondaryColor.matches(Regex("#[0-9A-Fa-f]{6}")))
+            require(visualStyle in setOf("gradient", "solid", "glass"))
+            request(
+                KokoroConfig.PLAYLISTS,
+                "PATCH",
+                s,
+                params = mapOf("id" to "eq.$playlistId", "user_id" to "eq.${s.userId}"),
+                body = JSONObject().put("primary_color", primaryColor).put("secondary_color", secondaryColor)
+                    .put("visual_style", visualStyle).put("updated_at", java.time.Instant.now().toString()).toString(),
+                prefer = "return=minimal"
+            )
+            Unit
+        }
+    }
+
+    /** Public share links may resolve only playlists explicitly marked public. */
+    suspend fun getPublicPlaylistById(playlistId: String): Result<Pair<Playlist, List<Song>>?> = withContext(Dispatchers.IO) {
+        runCatching {
+            require(playlistId.matches(Regex("[A-Za-z0-9_.-]{1,64}"))) { "Identificador de playlist no válido" }
+            val playlistParams = mapOf(
+                "id" to "eq.$playlistId", "is_public" to "eq.true",
+                "select" to "id,name,description,cover_url,is_public,primary_color,secondary_color,visual_style",
+                "limit" to "1"
+            )
+            val activeSession = _session.value
+            val playlistBody = if (activeSession != null) request(KokoroConfig.PLAYLISTS, "GET", activeSession, params = playlistParams)
+                else http(KokoroConfig.PLAYLISTS, "GET", params = playlistParams)
+            val rows = JSONArray(playlistBody)
+            if (rows.length() == 0) return@runCatching null
+            val row = rows.getJSONObject(0)
+            val songsParams = mapOf(
+                "playlist_id" to "eq.$playlistId",
+                "select" to "song_id,title,artist,cover_url,duration,stream_url",
+                "order" to "position.asc,added_at.asc"
+            )
+            val songsBody = if (activeSession != null) request(KokoroConfig.PLAYLIST_SONGS, "GET", activeSession, params = songsParams)
+                else http(KokoroConfig.PLAYLIST_SONGS, "GET", params = songsParams)
+            val songsRows = JSONArray(songsBody)
+            val songs = (0 until songsRows.length()).map { index ->
+                val item = songsRows.getJSONObject(index)
+                Song(
+                    id = item.optString("song_id"), title = item.optString("title", "Sin título"),
+                    artist = item.optString("artist", "Artista desconocido"),
+                    coverUrl = item.optString("cover_url").nullable(),
+                    audioUrl = item.optString("stream_url").nullable(),
+                    durationSeconds = item.optInt("duration")
+                )
+            }
+            val playlist = Playlist(
+                id = row.optString("id"), name = row.optString("name"),
+                coverUrl = row.optString("cover_url").nullable(), description = row.optString("description").nullable(),
+                isPublic = true, songCount = songs.size,
+                primaryColor = row.optString("primary_color", "#6750A4"),
+                secondaryColor = row.optString("secondary_color", "#26324A"),
+                visualStyle = row.optString("visual_style", "gradient")
+            )
+            playlist to songs
         }
     }
 
@@ -629,7 +786,15 @@ class AuthRepository(context: Context) {
         aboutExtra = o.optString("about_extra").nullable(),
         isOwner = o.optBoolean("is_owner", false),
         searchCardBannerUrl = o.optString("search_card_banner_url").nullable(),
-        customBgUrl = o.optString("custom_bg_url").nullable()
+        customBgUrl = o.optString("custom_bg_url").nullable(),
+        nameplateId = o.optString("nameplate_id").nullable(),
+        nameplateImageUrl = o.optString("nameplate_image_url").nullable(),
+        nameplatePrimaryColor = o.optString("nameplate_primary_color").nullable(),
+        nameplateSecondaryColor = o.optString("nameplate_secondary_color").nullable(),
+        nameplateStyle = o.optString("nameplate_style", "aurora"),
+        nameFont = o.optString("name_font", "sans"),
+        nameColor = o.optString("name_color", "#F3F2FA"),
+        profileCardOrder = o.optString("profile_card_order", "listening,badges,mangas")
     )
 
     private fun authRequest(path: String, body: JSONObject): JSONObject = JSONObject(http(path, "POST", body = body.toString(), authToken = null))

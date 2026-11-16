@@ -22,6 +22,8 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.math.abs
+import com.pokke.music.ui.motion.MotionSettings
+import com.pokke.music.ui.motion.ToriMotionEngine
 
 /**
  * The spring every open and close runs on: critically damped, so it never
@@ -71,6 +73,7 @@ class PlayerSheetMotion(
     private val dock: PlayerDock,
     private val shown: () -> Boolean,
     private val setShown: (Boolean) -> Unit,
+    private val motionSettings: () -> MotionSettings = { MotionSettings() },
 ) : MiniPlayerPull {
     /** NaN while the sheet stands where M3 put it. */
     var held by mutableFloatStateOf(Float.NaN)
@@ -336,11 +339,7 @@ class PlayerSheetMotion(
             initialValue = from,
             targetValue = to,
             initialVelocity = velocity,
-            animationSpec = spring(
-                dampingRatio = Spring.DampingRatioNoBouncy,
-                stiffness = SLIDE_STIFFNESS,
-                visibilityThreshold = SLIDE_SETTLED_PX,
-            ),
+            animationSpec = ToriMotionEngine.playerSheetSpring(motionSettings()),
         ) { value, _ ->
             // Critically damped never bounces from rest, but thrown hard
             // enough at its target it can pass it once: never past open or

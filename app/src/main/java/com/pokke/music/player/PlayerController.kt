@@ -2,8 +2,10 @@ package com.pokke.music.player
 
 import android.content.ComponentName
 import android.content.Context
+import android.os.Bundle
 import android.net.Uri
 import java.io.File
+import java.util.UUID
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Player
@@ -141,21 +143,71 @@ object PlayerController {
         }
     }
 
+    /**
+     * Media3 mediaIds identify queue entries, not catalogue tracks. A track may
+     * occur more than once (or exist in more than one server), so using Song.id
+     * here caused entries to collapse when the timeline was synchronized.
+     * Keep the original catalogue fields in metadata extras so the unified queue
+     * can be rebuilt after timeline callbacks or external MediaSession changes.
+     */
     private fun toMediaItem(song: Song): MediaItem {
+        val extras = Bundle().apply {
+            putString("pokke.song.id", song.id)
+            putString("pokke.song.title", song.title)
+            putString("pokke.song.artist", song.artist)
+            putString("pokke.song.album", song.album)
+            putString("pokke.song.cover", song.coverUrl)
+            putString("pokke.song.animated_cover", song.animatedCoverUrl)
+            putString("pokke.song.audio", song.audioUrl)
+            putInt("pokke.song.duration", song.durationSeconds)
+            putString("pokke.song.lyrics_text", song.lyricsText)
+            putString("pokke.song.lyrics_url", song.lyricsUrl)
+            putString("pokke.song.genre", song.genre)
+            putString("pokke.song.youtube_id", song.youtubeId)
+        }
         val metadata = MediaMetadata.Builder()
             .setTitle(song.title)
             .setArtist(song.artist)
             .setAlbumTitle(song.album)
-            .setArtworkUri(song.displayCoverUrl?.takeIf { it.isNotBlank() }?.let(Uri::parse))
+            .setArtworkUri((song.coverUrl ?: song.displayCoverUrl)?.takeIf { it.isNotBlank() }?.let(Uri::parse))
+            .setExtras(extras)
             .build()
         return MediaItem.Builder()
-            .setMediaId(song.id)
-            .setUri(song.audioUrl?.let { raw -> if (raw.startsWith("http://") || raw.startsWith("https://") || raw.startsWith("file://")) Uri.parse(raw) else Uri.fromFile(File(raw)) } ?: Uri.EMPTY)
+            .setMediaId("pokke:${UUID.randomUUID()}")
+            .setUri(song.audioUrl?.let { raw -> if (raw.startsWith("http://") || raw.startsWith("https://") || raw.startsWith("file://") || raw.startsWith("content://")) Uri.parse(raw) else Uri.fromFile(File(raw)) } ?: Uri.EMPTY)
             .setMediaMetadata(metadata)
             .build()
     }
 
+    private fun songFromMediaItem(mediaItem: MediaItem): Song {
+        val metadata = mediaItem.mediaMetadata
+        val extras = metadata.extras
+        val audio = extras?.getString("pokke.song.audio")
+            ?: mediaItem.localConfiguration?.uri?.toString()
+        return Song(
+            id = extras?.getString("pokke.song.id")?.takeIf(String::isNotBlank) ?: mediaItem.mediaId,
+            title = extras?.getString("pokke.song.title") ?: metadata.title?.toString().orEmpty(),
+            artist = extras?.getString("pokke.song.artist") ?: metadata.artist?.toString().orEmpty(),
+            album = extras?.getString("pokke.song.album") ?: metadata.albumTitle?.toString(),
+            coverUrl = extras?.getString("pokke.song.cover") ?: metadata.artworkUri?.toString(),
+            animatedCoverUrl = extras?.getString("pokke.song.animated_cover"),
+            audioUrl = audio,
+            durationSeconds = extras?.getInt("pokke.song.duration") ?: 0,
+            lyricsText = extras?.getString("pokke.song.lyrics_text"),
+            lyricsUrl = extras?.getString("pokke.song.lyrics_url"),
+            genre = extras?.getString("pokke.song.genre"),
+            youtubeId = extras?.getString("pokke.song.youtube_id")
+        )
+    }
+
     fun playSong(song: Song) = playQueue(listOf(song), 0)
+
+    /** Reproduce y, si la cola queda en 1, intenta rellenar con resultados relacionados (mismo artista). */
+    fun playSongWithAutoplay(song: Song, related: List<Song> = emptyList()) {
+        val extras = related.filter { it.id != song.id }.take(25)
+        if (extras.isEmpty()) playSong(song)
+        else playQueue(listOf(song) + extras, 0)
+    }
 
     fun playQueue(songs: List<Song>, startIndex: Int = 0) {
         if (songs.isEmpty()) return
@@ -165,12 +217,22 @@ object PlayerController {
                 val localAudio = song.audioUrl?.let { raw ->
                     raw.startsWith("file://") || raw.startsWith("content://") || File(raw).isFile
                 } == true
-                if (song.youtubeId.isNullOrBlank() || localAudio) song
-                else runCatching {
-                    song.copy(audioUrl = YouTubeStreamResolver.resolve(song.youtubeId))
-                }.onFailure { error ->
-                    _playbackError.value = "No se pudo resolver ${song.title}: ${error.localizedMessage ?: "stream no disponible"}"
-                }.getOrDefault(song)
+                if (localAudio) song
+                else {
+                    val ytId = song.youtubeId?.takeIf { it.isNotBlank() }
+                        ?: song.id.removePrefix("yt_").takeIf { it.matches(Regex("[A-Za-z0-9_-]{11}")) }
+                    if (ytId.isNullOrBlank() || !song.audioUrl.isNullOrBlank()) song
+                    else runCatching {
+                        song.copy(
+                            youtubeId = ytId,
+                            audioUrl = YouTubeStreamResolver.resolve(ytId),
+                            coverUrl = song.coverUrl
+                                ?: "https://i.ytimg.com/vi/$ytId/hqdefault.jpg"
+                        )
+                    }.onFailure { error ->
+                        _playbackError.value = "No se pudo resolver ${song.title}: ${error.localizedMessage ?: "stream no disponible"}"
+                    }.getOrDefault(song)
+                }
             }
             val player = controller
             if (player == null) {
@@ -198,19 +260,27 @@ object PlayerController {
     fun addToQueue(song: Song, playNext: Boolean = false) {
         scope.launch {
             val localAudio = song.audioUrl?.let { raw -> raw.startsWith("file://") || raw.startsWith("content://") || File(raw).isFile } == true
-            val resolved = if (song.youtubeId.isNullOrBlank() || localAudio) song
-            else runCatching { song.copy(audioUrl = YouTubeStreamResolver.resolve(song.youtubeId)) }
-                .getOrElse {
-                    _playbackError.value = "No se pudo resolver el audio: ${it.localizedMessage ?: "error desconocido"}"
-                    return@launch
-                }
+            val ytId = song.youtubeId?.takeIf { it.isNotBlank() }
+                ?: song.id.removePrefix("yt_").takeIf { it.matches(Regex("[A-Za-z0-9_-]{11}")) }
+            val resolved = if (localAudio || (!song.audioUrl.isNullOrBlank() && ytId.isNullOrBlank())) song
+            else if (ytId.isNullOrBlank()) song
+            else runCatching {
+                song.copy(
+                    youtubeId = ytId,
+                    audioUrl = YouTubeStreamResolver.resolve(ytId),
+                    coverUrl = song.coverUrl ?: "https://i.ytimg.com/vi/$ytId/hqdefault.jpg"
+                )
+            }.getOrElse {
+                _playbackError.value = "No se pudo resolver el audio: ${it.localizedMessage ?: "error desconocido"}"
+                return@launch
+            }
             val player = controller ?: return@launch
             val insertAt = if (playNext) {
                 (player.currentMediaItemIndex + 1).coerceIn(0, player.mediaItemCount)
             } else player.mediaItemCount
             player.addMediaItem(insertAt, toMediaItem(resolved))
-            val updated = _queue.value.toMutableList().apply { add(insertAt.coerceAtMost(size), resolved) }
-            _queue.value = updated
+            syncQueue()
+            syncCurrentItem()
         }
     }
 
@@ -308,17 +378,14 @@ object PlayerController {
 
     private fun syncQueue() {
         val player = controller ?: return
-        val known = _queue.value.associateBy { it.id }
-        val items = (0 until player.mediaItemCount).mapNotNull { index ->
+        val previous = _queue.value
+        val items = (0 until player.mediaItemCount).map { index ->
             val mediaItem = player.getMediaItemAt(index)
-            known[mediaItem.mediaId] ?: Song(
-                id = mediaItem.mediaId,
-                title = mediaItem.mediaMetadata.title?.toString().orEmpty(),
-                artist = mediaItem.mediaMetadata.artist?.toString().orEmpty(),
-                album = mediaItem.mediaMetadata.albumTitle?.toString(),
-                coverUrl = mediaItem.mediaMetadata.artworkUri?.toString(),
-                audioUrl = mediaItem.localConfiguration?.uri?.toString()
-            )
+            val restored = songFromMediaItem(mediaItem)
+            // Preserve fields not represented in MediaMetadata extras (for
+            // example timed lyric lines) when this is an entry we already own.
+            val known = previous.firstOrNull { it.id == restored.id && it.title == restored.title && it.artist == restored.artist }
+            if (known != null) restored.copy(lyrics = known.lyrics) else restored
         }
         _queue.value = items
     }
@@ -332,14 +399,7 @@ object PlayerController {
             _currentSong.value = null
             return
         }
-        _currentSong.value = _queue.value.getOrNull(index) ?: Song(
-            id = mediaItem.mediaId,
-            title = mediaItem.mediaMetadata.title?.toString().orEmpty(),
-            artist = mediaItem.mediaMetadata.artist?.toString().orEmpty(),
-            album = mediaItem.mediaMetadata.albumTitle?.toString(),
-            coverUrl = mediaItem.mediaMetadata.artworkUri?.toString(),
-            audioUrl = mediaItem.localConfiguration?.uri?.toString()
-        )
+        _currentSong.value = _queue.value.getOrNull(index) ?: songFromMediaItem(mediaItem)
     }
 
     private fun syncPlaybackState() {

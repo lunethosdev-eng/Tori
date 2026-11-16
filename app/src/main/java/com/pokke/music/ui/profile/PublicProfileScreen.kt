@@ -12,6 +12,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.Shield
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -24,7 +25,9 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -32,11 +35,15 @@ import coil.compose.AsyncImage
 import com.pokke.music.data.model.Song
 import com.pokke.music.data.model.UserProfile
 import com.pokke.music.data.repository.AuthRepository
+import com.pokke.music.util.ShareLinks
+import com.pokke.music.data.preferences.UserPreferences
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 private val Ink = Color(0xFFF3F2FA)
 private val Muted = Color(0xFFA5A4B5)
+
+private fun pUsername(profile: UserProfile?, fallback: String): String? = profile?.username?.takeIf { it.isNotBlank() } ?: fallback.takeIf { it.isNotBlank() }
 
 @Composable
 fun PublicProfileScreen(
@@ -50,6 +57,9 @@ fun PublicProfileScreen(
     var loading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
     val uriHandler = LocalUriHandler.current
+    val context = LocalContext.current
+    val preferences = remember(context) { UserPreferences(context) }
+    val liquidGlass by preferences.liquidGlassEnabled.collectAsState(initial = false)
 
     LaunchedEffect(username) {
         loading = true
@@ -80,7 +90,7 @@ fun PublicProfileScreen(
         "violet" -> Color(0xFFB69CFF)
         else -> Color(0xFFE5C17A)
     }
-    val cardBg = Color(0xFF1A1A20)
+    val cardBg = if (liquidGlass) Color(0xAA1A1A20) else Color(0xFF1A1A20)
 
     Box(Modifier.fillMaxSize().background(Color(0xFF09090B))) {
         when {
@@ -97,6 +107,12 @@ fun PublicProfileScreen(
                         IconButton(onClick = onBack, modifier = Modifier.statusBarsPadding().padding(8.dp)) {
                             Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = Color.White)
                         }
+                        if (!pUsername(p, username).isNullOrBlank()) {
+                            IconButton(
+                                onClick = { ShareLinks.share(context, ShareLinks.Kind.PROFILE, pUsername(p, username).orEmpty(), "Perfil de Pokke") },
+                                modifier = Modifier.align(Alignment.TopEnd).statusBarsPadding().padding(8.dp)
+                            ) { Icon(Icons.Default.Share, "Compartir perfil", tint = Color.White) }
+                        }
                     }
                     Column(Modifier.padding(horizontal = 20.dp).offset(y = (-40).dp)) {
                         AsyncImage(
@@ -106,7 +122,27 @@ fun PublicProfileScreen(
                             contentScale = ContentScale.Crop
                         )
                         Spacer(Modifier.height(12.dp))
-                        Text(p.displayName ?: p.username ?: username, color = Ink, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                        val titleColor = runCatching { Color(android.graphics.Color.parseColor(p.nameColor ?: "#F3F2FA")) }.getOrDefault(Ink)
+                        val titleFont = when (p.nameFont) { "serif" -> FontFamily.Serif; "mono" -> FontFamily.Monospace; "cursive" -> FontFamily.Cursive; else -> FontFamily.SansSerif }
+                        val customPlateStart = runCatching { Color(android.graphics.Color.parseColor(p.nameplatePrimaryColor ?: "")) }.getOrNull()
+                        val customPlateEnd = runCatching { Color(android.graphics.Color.parseColor(p.nameplateSecondaryColor ?: "")) }.getOrNull()
+                        val plateBrush = if (!p.nameplateId.isNullOrBlank() && customPlateStart != null && customPlateEnd != null) Brush.horizontalGradient(listOf(customPlateStart, customPlateEnd)) else when (p.nameplateStyle) {
+                            "neon" -> Brush.horizontalGradient(listOf(Color(0xFF17102D), Color(0xFF6C3BBD), Color(0xFF17102D)))
+                            "royal" -> Brush.horizontalGradient(listOf(Color(0xFF34230C), Color(0xFFB88A3D), Color(0xFF34230C)))
+                            "cyber" -> Brush.horizontalGradient(listOf(Color(0xFF3B101C), Color(0xFFB52B56), Color(0xFF1A1018)))
+                            "minimal" -> Brush.horizontalGradient(listOf(Color(0x33FFFFFF), Color(0x11FFFFFF)))
+                            else -> Brush.horizontalGradient(listOf(Color(0xFF202C4A), Color(0xFF7658B5), Color(0xFF202C4A)))
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Box(Modifier.clip(RoundedCornerShape(10.dp)).background(plateBrush).padding(horizontal = 9.dp, vertical = 4.dp)) {
+                                if (!p.nameplateImageUrl.isNullOrBlank()) {
+                                    AsyncImage(p.nameplateImageUrl, null, Modifier.matchParentSize(), contentScale = ContentScale.Crop)
+                                    Box(Modifier.matchParentSize().background(Brush.horizontalGradient(listOf(Color.Black.copy(.5f), Color.Transparent))))
+                                }
+                                Text(p.displayName ?: p.username ?: username, color = titleColor, fontFamily = titleFont, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                            }
+                            if (!p.nameplateId.isNullOrBlank()) Text("CUSTOM", color = accent, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                        }
                         Text("@${p.username ?: username}", color = Muted, fontSize = 14.sp)
 
                         // Real badge chips with icons
@@ -151,7 +187,7 @@ fun PublicProfileScreen(
                                 fallbackSong = song,
                                 fallbackPositionMs = listening!!.positionMs,
                                 fallbackDurationMs = listening!!.durationMs.coerceAtLeast(1),
-                                showLyrics = false
+                                showLyrics = true
                             )
                         }
 

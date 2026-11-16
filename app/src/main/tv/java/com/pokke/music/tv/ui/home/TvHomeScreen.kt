@@ -5,22 +5,36 @@ import android.view.ViewGroup
 import android.widget.FrameLayout
 import androidx.annotation.OptIn
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Headphones
+import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.Piano
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material.icons.filled.LocationCity
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.blur
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -36,131 +50,319 @@ import androidx.media3.ui.PlayerView
 import coil.compose.AsyncImage
 import com.pokke.music.data.canvas.ArtistCanvas
 import com.pokke.music.data.model.Song
+import com.pokke.music.data.preferences.UserPreferences
 import com.pokke.music.data.repository.MultiMusicRepository
+import com.pokke.music.player.PlayerController
 import com.pokke.music.tv.ui.components.tvFocusable
 
-private val categories = listOf("🎸 Rock", "🎧 Pop", "🏙️ Urbano", "🎹 Lo-Fi", "⚡ Electrónica")
-private const val FALLBACK_VIDEO = "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4"
+private data class TvCategory(val label: String, val query: String, val icon: ImageVector)
 
+private val categories = listOf(
+    TvCategory("Rock", "rock", Icons.Default.MusicNote),
+    TvCategory("Pop", "pop", Icons.Default.Headphones),
+    TvCategory("Urbano", "urbano reggaeton", Icons.Default.LocationCity),
+    TvCategory("Lo-Fi", "lofi", Icons.Default.Piano),
+    TvCategory("Electronica", "electronic", Icons.Default.Bolt),
+)
+
+/**
+ * Android TV Home — D-pad friendly.
+ * Hero plays ArtistCanvas (local assets) or animatedCover / cover from Ukiyo.
+ * Categories use Material icons (no emoji). Sections are focusable rails.
+ */
 @OptIn(UnstableApi::class)
 @Composable
 fun TvHomeScreen(onPlay: (Song) -> Unit, onOpenPlayer: () -> Unit) {
     val context = LocalContext.current
     val repo = remember { MultiMusicRepository() }
+    val prefs = remember { UserPreferences(context) }
+    val glass by prefs.liquidGlassEnabled.collectAsState(initial = false)
+    val youtubeCatalog by prefs.youtubeCatalogEnabled.collectAsState(initial = false)
     var hero by remember { mutableStateOf<Song?>(null) }
     var rails by remember { mutableStateOf<List<Song>>(emptyList()) }
-    var videoOk by remember { mutableStateOf(true) }
+    var recent by remember { mutableStateOf<List<Song>>(emptyList()) }
+    var selectedCategory by remember { mutableStateOf(categories.first().label) }
+    val current by PlayerController.currentSong.collectAsState()
+    val heroFocus = remember { FocusRequester() }
 
     LaunchedEffect(Unit) {
-        // Prefer artists that have local canvas
-        repo.searchAll("bad bunny").onSuccess {
+        repo.searchAll("bad bunny", includeYoutube = youtubeCatalog).onSuccess {
             if (it.isNotEmpty()) {
                 hero = it.first()
                 rails = it.drop(1).take(20)
-                return@LaunchedEffect
             }
         }
-        repo.searchAll("depresion sonora").onSuccess {
+        repo.getRecentAll().onSuccess { recent = it.take(16) }
+        runCatching { heroFocus.requestFocus() }
+    }
+
+    LaunchedEffect(selectedCategory, youtubeCatalog) {
+        val q = categories.firstOrNull { it.label == selectedCategory }?.query ?: return@LaunchedEffect
+        repo.searchAll(q, includeYoutube = youtubeCatalog).onSuccess {
             if (it.isNotEmpty()) {
                 hero = it.first()
-                rails = it.take(20)
-                return@LaunchedEffect
+                rails = it.take(24)
             }
         }
-        repo.searchAll("top hits").onSuccess {
-            hero = it.firstOrNull()
-            rails = it.drop(1).take(20)
+    }
+
+    val scroll = rememberScrollState()
+    val cardBg = if (glass) Color(0xCC1A1A24) else Color(0xFF1A1A24)
+    val cardBorder = if (glass) Color.White.copy(alpha = 0.12f) else Color.Transparent
+
+    Box(Modifier.fillMaxSize().background(Color(0xFF07070C))) {
+        hero?.displayCoverUrl?.let { ambientCover ->
+            AsyncImage(
+                model = ambientCover,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxWidth().height(620.dp).align(Alignment.TopCenter)
+                    .graphicsLayer { alpha = 0.30f; scaleX = 1.18f; scaleY = 1.18f }
+                    .blur(42.dp)
+            )
         }
-    }
-
-    val exo = remember {
-        ExoPlayer.Builder(context).build().apply {
-            repeatMode = Player.REPEAT_MODE_ONE
-            volume = 0f
-            playWhenReady = true
-        }
-    }
-    DisposableEffect(Unit) { onDispose { exo.release() } }
-
-    LaunchedEffect(hero?.id, hero?.artist) {
-        val local = ArtistCanvas.uriFor(context, hero?.artist, hero?.id)
-        val uri = local ?: Uri.parse(FALLBACK_VIDEO)
-        runCatching {
-            exo.setMediaItem(MediaItem.fromUri(uri))
-            exo.prepare()
-            exo.play()
-            videoOk = true
-        }.onFailure { videoOk = false }
-    }
-
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 40.dp, vertical = 8.dp)) {
-        Text("POKKE TV", color = Color(0xFF7A7A88), fontSize = 12.sp, fontWeight = FontWeight.Bold)
-        Spacer(Modifier.height(8.dp))
-        Box(Modifier.fillMaxWidth().height(340.dp).clip(RoundedCornerShape(24.dp)).background(Color(0xFF101018))) {
-            if (videoOk) {
-                AndroidView(
-                    factory = { ctx ->
-                        PlayerView(ctx).apply {
-                            player = exo
-                            useController = false
-                            resizeMode = AspectRatioFrameLayout.RESIZE_MODE_ZOOM
-                            layoutParams = FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
-                        }
-                    },
-                    modifier = Modifier.fillMaxSize(),
-                    update = { it.player = exo }
-                )
-            } else {
-                hero?.coverUrl?.let { AsyncImage(it, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop) }
+        Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color(0x8807070C), Color(0xF007070C), Color(0xFF07070C)))))
+        Column(
+            Modifier
+                .fillMaxSize()
+                .verticalScroll(scroll)
+                .padding(horizontal = 48.dp, vertical = 28.dp)
+        ) {
+        // —— Hero with canvas video ——
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .height(340.dp)
+                .clip(RoundedCornerShape(20.dp))
+                .background(Color(0xFF12121A))
+                .focusRequester(heroFocus)
+                .tvFocusable(onClick = { hero?.let(onPlay) }, shape = RoundedCornerShape(20.dp), scaleFocused = 1.02f)
+        ) {
+            val h = hero
+            if (h != null) {
+                HeroCanvasBackdrop(song = h)
             }
-            Box(Modifier.fillMaxSize().background(Brush.horizontalGradient(listOf(Color.Black.copy(0.85f), Color.Black.copy(0.2f), Color.Transparent))))
-            Column(Modifier.align(Alignment.CenterStart).padding(36.dp)) {
-                Text("DESTACADO", color = Color(0xFF3797F0), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(Color.Transparent, Color(0xCC0B0B10), Color(0xF00B0B10))
+                        )
+                    )
+            )
+            Column(
+                Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(28.dp)
+            ) {
+                Text("DESTACADO", color = Color.White.copy(0.55f), fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                 Spacer(Modifier.height(6.dp))
-                Text(hero?.title ?: "Explora música", color = Color.White, fontSize = 36.sp, fontWeight = FontWeight.Bold)
-                Text(listOfNotNull(hero?.artist, hero?.album).joinToString(" • "), color = Color(0xFFC8C8D0), fontSize = 18.sp)
-                Spacer(Modifier.height(20.dp))
+                Text(
+                    hero?.title ?: "Pokke TV",
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 32.sp,
+                    maxLines = 2
+                )
+                Text(
+                    hero?.artist ?: "Elige una categoria o reproduce",
+                    color = Color(0xFFC8C8D0),
+                    fontSize = 18.sp
+                )
+                Spacer(Modifier.height(16.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                     Button(
                         onClick = { hero?.let(onPlay) },
                         colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black),
                         shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier.height(48.dp).tvFocusable(onClick = { hero?.let(onPlay) }, shape = RoundedCornerShape(12.dp))
-                    ) { Text("▶  Reproducir", fontWeight = FontWeight.Bold, fontSize = 16.sp) }
+                        modifier = Modifier
+                            .height(48.dp)
+                            .tvFocusable(onClick = { hero?.let(onPlay) }, shape = RoundedCornerShape(12.dp))
+                    ) {
+                        Icon(Icons.Default.PlayArrow, null, Modifier.size(22.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("Reproducir", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    }
                     OutlinedButton(
-                        onClick = {},
+                        onClick = onOpenPlayer,
                         shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier.height(48.dp).tvFocusable(onClick = {}, shape = RoundedCornerShape(12.dp))
-                    ) { Text("+ Biblioteca", color = Color.White, fontSize = 16.sp) }
+                        modifier = Modifier
+                            .height(48.dp)
+                            .tvFocusable(onClick = onOpenPlayer, shape = RoundedCornerShape(12.dp))
+                    ) { Text("Abrir reproductor", color = Color.White, fontSize = 16.sp) }
                 }
             }
         }
-        Spacer(Modifier.height(32.dp))
-        Text("Categorías", color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 20.sp)
-        Spacer(Modifier.height(14.dp))
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-            items(categories) { cat ->
-                Box(
-                    Modifier.tvFocusable(onClick = {}, shape = RoundedCornerShape(16.dp))
-                        .background(Color(0xFF1A1A24), RoundedCornerShape(16.dp))
-                        .padding(horizontal = 28.dp, vertical = 18.dp)
-                ) { Text(cat, color = Color.White, fontSize = 17.sp) }
+
+        // Now playing
+        current?.let { song ->
+            Spacer(Modifier.height(28.dp))
+            Text("Reproduciendo", color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 20.sp)
+            Spacer(Modifier.height(12.dp))
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(cardBg)
+                    .border(1.dp, cardBorder, RoundedCornerShape(16.dp))
+                    .tvFocusable(onClick = onOpenPlayer, shape = RoundedCornerShape(16.dp), scaleFocused = 1.03f)
+                    .padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                AsyncImage(
+                    song.displayCoverUrl ?: song.coverUrl, null,
+                    Modifier.size(72.dp).clip(RoundedCornerShape(12.dp)).background(Color(0xFF222)),
+                    contentScale = ContentScale.Crop
+                )
+                Spacer(Modifier.width(18.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(song.title, color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 18.sp, maxLines = 1)
+                    Text(song.artist, color = Color(0xFF9A9AA3), fontSize = 15.sp, maxLines = 1)
+                }
             }
         }
-        Spacer(Modifier.height(32.dp))
-        Text("Para ti", color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 20.sp)
-        Spacer(Modifier.height(14.dp))
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(18.dp), contentPadding = PaddingValues(bottom = 120.dp)) {
-            items(rails, key = { it.id }) { song ->
-                Column(
-                    Modifier.width(160.dp).tvFocusable(onClick = { onPlay(song) }, shape = RoundedCornerShape(14.dp), scaleFocused = 1.1f).padding(6.dp)
+
+        // Categories (SVG/vector icons, no emoji)
+        Spacer(Modifier.height(28.dp))
+        Text("Categorias", color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 20.sp)
+        Spacer(Modifier.height(12.dp))
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            items(categories, key = { it.label }) { cat ->
+                val selected = selectedCategory == cat.label
+                Row(
+                    Modifier
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(if (selected) Color.White else cardBg)
+                        .border(1.dp, if (selected) Color.White else cardBorder, RoundedCornerShape(14.dp))
+                        .tvFocusable(
+                            onClick = { selectedCategory = cat.label },
+                            shape = RoundedCornerShape(14.dp),
+                            scaleFocused = 1.08f
+                        )
+                        .padding(horizontal = 18.dp, vertical = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    AsyncImage(song.coverUrl, null, Modifier.size(148.dp).clip(RoundedCornerShape(12.dp)).background(Color(0xFF222)), contentScale = ContentScale.Crop)
-                    Spacer(Modifier.height(10.dp))
-                    Text(song.title, color = Color.White, maxLines = 1, fontSize = 14.sp, fontWeight = FontWeight.Medium)
-                    Text(song.artist, color = Color(0xFF9A9AA3), maxLines = 1, fontSize = 13.sp)
+                    Icon(
+                        cat.icon, null,
+                        tint = if (selected) Color.Black else Color.White,
+                        modifier = Modifier.size(22.dp)
+                    )
+                    Spacer(Modifier.width(10.dp))
+                    Text(
+                        cat.label,
+                        color = if (selected) Color.Black else Color.White,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 16.sp
+                    )
                 }
             }
         }
+
+        // Rails for category / search
+        Spacer(Modifier.height(28.dp))
+        Text(selectedCategory, color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 20.sp)
+        Spacer(Modifier.height(12.dp))
+        LazyRow(
+            horizontalArrangement = Arrangement.spacedBy(18.dp),
+            contentPadding = PaddingValues(bottom = 8.dp)
+        ) {
+            items(rails, key = { it.id }) { song ->
+                TvSongCard(song, cardBg, cardBorder, onPlay)
+            }
+        }
+
+        // Recent
+        if (recent.isNotEmpty()) {
+            Spacer(Modifier.height(24.dp))
+            Text("Recientes", color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 20.sp)
+            Spacer(Modifier.height(12.dp))
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(18.dp),
+                contentPadding = PaddingValues(bottom = 120.dp)
+            ) {
+                items(recent, key = { "r_" + it.id }) { song ->
+                    TvSongCard(song, cardBg, cardBorder, onPlay)
+                }
+            }
+        } else {
+            Spacer(Modifier.height(120.dp))
+        }
+    }
+}
+}
+
+@OptIn(UnstableApi::class)
+@Composable
+private fun HeroCanvasBackdrop(song: Song) {
+    val context = LocalContext.current
+    val canvasUri = remember(song.id, song.artist, song.animatedCoverUrl) {
+        val animated = song.animatedCoverUrl?.takeIf { it.isNotBlank() }
+        when {
+            animated != null && (animated.endsWith(".mp4", true) || animated.endsWith(".webm", true) || animated.contains("/video")) ->
+                Uri.parse(animated)
+            else -> ArtistCanvas.uriFor(context, song.artist, song.id)
+        }
+    }
+    if (canvasUri != null) {
+        val exo = remember(canvasUri) {
+            ExoPlayer.Builder(context).build().apply {
+                setMediaItem(MediaItem.fromUri(canvasUri))
+                repeatMode = Player.REPEAT_MODE_ONE
+                volume = 0f
+                prepare()
+                playWhenReady = true
+            }
+        }
+        DisposableEffect(exo) { onDispose { exo.release() } }
+        AndroidView(
+            factory = { ctx ->
+                PlayerView(ctx).apply {
+                    useController = false
+                    resizeMode = AspectRatioFrameLayout.RESIZE_MODE_ZOOM
+                    player = exo
+                    layoutParams = FrameLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.MATCH_PARENT
+                    )
+                }
+            },
+            modifier = Modifier.fillMaxSize()
+        )
+    } else {
+        AsyncImage(
+            song.displayCoverUrl ?: song.coverUrl, null,
+            Modifier.fillMaxSize(),
+            contentScale = ContentScale.Crop
+        )
+    }
+}
+
+@Composable
+private fun TvSongCard(
+    song: Song,
+    cardBg: Color,
+    cardBorder: Color,
+    onPlay: (Song) -> Unit
+) {
+    Column(
+        Modifier
+            .width(168.dp)
+            .tvFocusable(onClick = { onPlay(song) }, shape = RoundedCornerShape(14.dp), scaleFocused = 1.08f)
+            .padding(6.dp)
+    ) {
+        AsyncImage(
+            song.displayCoverUrl ?: song.coverUrl, null,
+            Modifier
+                .size(156.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(Color(0xFF222))
+                .border(1.dp, cardBorder, RoundedCornerShape(12.dp)),
+            contentScale = ContentScale.Crop
+        )
+        Spacer(Modifier.height(8.dp))
+        Text(song.title, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 2)
+        Text(song.artist, color = Color(0xFF9A9AA3), fontSize = 12.sp, maxLines = 1)
+    }
     }
 }

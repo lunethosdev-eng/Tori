@@ -1,6 +1,8 @@
 package com.pokke.music.tv.ui.player
 
 import androidx.compose.foundation.background
+import androidx.compose.ui.draw.blur
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -43,7 +45,7 @@ fun TvFullPlayerScreen(onBack: () -> Unit) {
 
     Box(Modifier.fillMaxSize()) {
         song?.coverUrl?.let {
-            AsyncImage(it, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+            AsyncImage(it, null, Modifier.fillMaxSize().graphicsLayer { alpha = 0.72f; scaleX = 1.08f; scaleY = 1.08f }.blur(34.dp), contentScale = ContentScale.Crop)
             Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color.Black.copy(0.55f), Color.Black.copy(0.92f)))))
         } ?: Box(Modifier.fillMaxSize().background(Color(0xFF0B0B10)))
 

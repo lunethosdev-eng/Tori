@@ -19,7 +19,14 @@ data class Song(
     val durationMs: Long get() = durationSeconds * 1000L
     val displayCoverUrl: String?
         get() = coverUrl?.takeIf(String::isNotBlank)
+            ?: animatedCoverUrl?.takeIf(::isStillArtworkImage)
             ?: youtubeId?.takeIf(String::isNotBlank)?.let { "https://i.ytimg.com/vi/$it/hqdefault.jpg" }
+
+    private fun isStillArtworkImage(url: String): Boolean {
+        val path = android.net.Uri.parse(url).lastPathSegment.orEmpty().substringBefore('?').lowercase()
+        return path.endsWith(".jpg") || path.endsWith(".jpeg") || path.endsWith(".png") ||
+            path.endsWith(".webp") || path.endsWith(".avif")
+    }
 }
 
 data class LyricLine(val timeMs: Long, val text: String)
@@ -44,7 +51,10 @@ data class Playlist(
     val coverUrl: String? = null,
     val description: String? = null,
     val isPublic: Boolean = false,
-    val songCount: Int = 0
+    val songCount: Int = 0,
+    val primaryColor: String = "#6750A4",
+    val secondaryColor: String = "#26324A",
+    val visualStyle: String = "gradient"
 )
 
 data class UserProfile(
@@ -85,5 +95,13 @@ data class UserProfile(
     val aboutExtra: String? = null,
     val isOwner: Boolean = false,
     val searchCardBannerUrl: String? = null,
-    val customBgUrl: String? = null
+    val customBgUrl: String? = null,
+    val nameplateId: String? = null,
+    val nameplateImageUrl: String? = null,
+    val nameplatePrimaryColor: String? = null,
+    val nameplateSecondaryColor: String? = null,
+    val nameplateStyle: String? = "aurora",
+    val nameFont: String? = "sans",
+    val nameColor: String? = "#F3F2FA",
+    val profileCardOrder: String? = "listening,badges"
 )

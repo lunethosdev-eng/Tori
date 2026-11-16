@@ -12,6 +12,7 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.layout.Box
@@ -53,6 +54,8 @@ import com.pokke.music.ui.backdrop.drawBackdrop
 import com.pokke.music.ui.backdrop.effects.blur
 import com.pokke.music.player.PlayerController
 import com.pokke.music.ui.liquid.LocalAppBackdrop
+import com.pokke.music.ui.liquid.pokkePressMotion
+import com.pokke.music.ui.liquid.LocalGlassPerformanceMode
 
 /**
  * Floating pill mini-player (Apple Music style).
@@ -72,6 +75,8 @@ fun MiniPlayerBar(
     val bitChordDock = com.music.bitchord.ui.player.LocalPlayerDock.current
     val playerPull = LocalMiniPlayerPull.current
     val surfaceColor = MaterialTheme.colorScheme.surface
+    val performanceMode = LocalGlassPerformanceMode.current
+    val tapInteraction = androidx.compose.runtime.remember { MutableInteractionSource() }
     val song by PlayerController.currentSong.collectAsState()
     val playing by PlayerController.isPlaying.collectAsState()
     val position by PlayerController.positionMs.collectAsState()
@@ -94,18 +99,18 @@ fun MiniPlayerBar(
             Modifier
                 .fillMaxWidth()
                 .padding(horizontal = if (compact) 28.dp else 16.dp)
-                .shadow(if (glass) 18.dp else 8.dp, RoundedCornerShape(28.dp), clip = false)
-                .clip(RoundedCornerShape(28.dp))
+                .shadow(if (glass) 18.dp else 8.dp, RoundedCornerShape(30.dp), clip = false)
+                .clip(RoundedCornerShape(30.dp))
                 .then(
                     if (glass && backdrop != null) {
                         Modifier
                             .drawBackdrop(
                                 backdrop = backdrop,
-                                shape = { RoundedCornerShape(28.dp) },
-                                effects = { blur(16f.dp.toPx()) },
+                                shape = { RoundedCornerShape(30.dp) },
+                                effects = { blur((if (performanceMode) 10f else 18f).dp.toPx()) },
                                 onDrawSurface = { drawRect(surfaceColor.copy(alpha = 0.76f)) }
                             )
-                            .border(0.7.dp, Color.White.copy(0.24f), RoundedCornerShape(28.dp))
+                            .border(0.8.dp, MaterialTheme.colorScheme.primary.copy(0.40f), RoundedCornerShape(30.dp))
                     } else {
                         Modifier.background(MaterialTheme.colorScheme.surface)
                     }
@@ -120,7 +125,8 @@ fun MiniPlayerBar(
                         },
                     )
                 }
-                .clickable(onClick = onOpenPlayer)
+                .pokkePressMotion(tapInteraction, enabled = true, pressedScale = 0.985f)
+                .clickable(interactionSource = tapInteraction, indication = null, onClick = onOpenPlayer)
                 .padding(horizontal = 10.dp, vertical = if (compact) 8.dp else 10.dp)
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {

@@ -56,7 +56,7 @@ fun TvAuthScreen(auth: AuthRepository, onDone: () -> Unit) {
                         onClick = {
                             scope.launch {
                                 busy = true
-                                auth.login(email.trim(), password)
+                                auth.signIn(email.trim(), password)
                                     .onSuccess { onDone() }
                                     .onFailure { message = it.message }
                                 busy = false

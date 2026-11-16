@@ -14,6 +14,7 @@ object KokoroConfig {
     const val PLAYLISTS = "/rest/v1/playlists"
     const val FAVORITES = "/rest/v1/favorites"
     const val USER_SETTINGS = "/rest/v1/user_settings"
+    const val TORI_USER_APP_STATE = "/rest/v1/tori_user_app_state"
     const val USER_EMBLEMS = "/rest/v1/user_emblems"
     const val MUSIC_SOURCES = "/rest/v1/music_sources"
     const val AUTH_SIGNUP = "/auth/v1/signup"

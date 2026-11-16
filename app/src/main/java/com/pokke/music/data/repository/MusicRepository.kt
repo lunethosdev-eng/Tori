@@ -4,6 +4,7 @@ import com.pokke.music.data.model.Album
 import com.pokke.music.data.model.Artist
 import com.pokke.music.data.model.Song
 import com.pokke.music.data.remote.UkiyoConfig
+import com.pokke.music.data.remote.CoverUrls
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
@@ -199,16 +200,21 @@ class MusicRepository {
 
     private fun parseSong(row: JSONObject): Song {
         val youtubeId = row.optString("youtube_id").nullable()
-        val cover = row.optString("cover_url").nullable()
-            ?: youtubeId?.let { "https://i.ytimg.com/vi/$it/hqdefault.jpg" }
+        val cover = CoverUrls.best(row.optString("cover_url").nullable(), youtubeId, UkiyoConfig.SUPABASE_URL)
+        val animated = CoverUrls.absolute(row.optString("animated_cover_url").nullable(), UkiyoConfig.SUPABASE_URL)
+        val audioRaw = row.optString("audio_url").nullable()
+        val audio = audioRaw?.let {
+            if (it.startsWith("http") || it.startsWith("file") || it.startsWith("content")) it
+            else CoverUrls.absolute(it, UkiyoConfig.SUPABASE_URL) ?: it
+        }
         return Song(
             id = row.optString("id"),
             title = row.optString("title").ifBlank { "Sin título" },
             artist = row.optString("artist").ifBlank { "Artista desconocido" },
             album = row.optString("album").nullable(),
             coverUrl = cover,
-            animatedCoverUrl = row.optString("animated_cover_url").nullable(),
-            audioUrl = row.optString("audio_url").nullable(),
+            animatedCoverUrl = animated,
+            audioUrl = audio,
             durationSeconds = row.optInt("duration_seconds", 0),
             lyricsText = row.optString("lyrics_text").nullable(),
             lyricsUrl = row.optString("lyrics_url").nullable(),

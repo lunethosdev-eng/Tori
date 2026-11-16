@@ -7,6 +7,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import com.pokke.music.ui.liquid.pokkePressMotion
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -14,6 +15,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Clear
@@ -47,6 +51,7 @@ import com.pokke.music.data.model.Song
 import com.pokke.music.data.repository.MusicRepository
 import com.pokke.music.data.repository.MultiMusicRepository
 import com.pokke.music.data.repository.AuthRepository
+import com.pokke.music.data.preferences.UserPreferences
 import kotlinx.coroutines.launch
 import com.pokke.music.ui.theme.PokkeBlack
 import kotlinx.coroutines.delay
@@ -66,6 +71,11 @@ fun SearchScreen(
 ) {
     val repo = remember { MusicRepository() }
     val multiRepo = remember { MultiMusicRepository() }
+    val context = LocalContext.current
+    val prefs = remember { UserPreferences(context) }
+    val ytCatalogEnabled by prefs.youtubeCatalogEnabled.collectAsState(initial = false)
+    val liquidGlass by prefs.liquidGlassEnabled.collectAsState(initial = false)
+    val searchHistory by prefs.searchHistory.collectAsState(initial = emptyList())
     val session by authRepository.session.collectAsState()
     val scope = rememberCoroutineScope()
     var favoriteIds by remember { mutableStateOf<Set<String>>(emptySet()) }
@@ -99,7 +109,7 @@ fun SearchScreen(
         }
     }
 
-        LaunchedEffect(query) {
+        LaunchedEffect(query, ytCatalogEnabled) {
         detail = null
         if (query.isBlank()) {
             songs = emptyList(); artists = emptyList(); albums = emptyList(); users = emptyList()
@@ -110,7 +120,7 @@ fun SearchScreen(
         loading = true
         error = null
         // Unified: always load songs + users + artists together
-        val multi = multiRepo.searchAll(query)
+        val multi = multiRepo.searchAll(query, includeYoutube = ytCatalogEnabled)
         if (multi.isSuccess) songs = multi.getOrDefault(emptyList())
         else repo.searchSongs(query).onSuccess { songs = it }.onFailure { songs = emptyList() }
         repo.searchArtists(query).onSuccess { artists = it }.onFailure { artists = emptyList() }
@@ -131,7 +141,7 @@ fun SearchScreen(
     }
 
     Column(
-        modifier = Modifier.fillMaxSize().background(PokkeBlack).statusBarsPadding()
+        modifier = Modifier.fillMaxSize().animateContentSize().background(if (liquidGlass) Color(0xD609090B) else PokkeBlack).statusBarsPadding()
     ) {
         if (detail != null) {
             Row(
@@ -152,7 +162,9 @@ fun SearchScreen(
                 onQueryChange = { query = it },
                 expanded = searchExpanded,
                 onExpandedChange = { searchExpanded = it },
-                focusRequester = focusRequester
+                focusRequester = focusRequester,
+                glass = liquidGlass,
+                onSearch = { value -> scope.launch { prefs.addSearchHistory(value) } }
             )
         }
 
@@ -169,33 +181,79 @@ fun SearchScreen(
                     }
                 }
             }
-            query.isBlank() -> EmptyMessage("Busca canciones, artistas, álbumes o usuarios")
+            query.isBlank() -> {
+                Column(Modifier.fillMaxSize()) {
+                    Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        FilterChip(selected = true, enabled = false, onClick = { }, label = { Text("Ukiyo · Supabase") })
+                        FilterChip(selected = ytCatalogEnabled, onClick = { scope.launch { prefs.setYoutubeCatalogEnabled(!ytCatalogEnabled) } }, label = { Text(if (ytCatalogEnabled) "YouTube Music activo" else "Activar YouTube Music") })
+                    }
+                    if (searchHistory.isEmpty()) {
+                        EmptyMessage("Busca canciones, artistas, álbumes o usuarios")
+                    } else {
+                        Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 16.dp, top = 14.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Text("BÚSQUEDAS RECIENTES", color = Color.White.copy(.55f), fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                            Text("Borrar todo", color = Color(0xFFB8A6FF), fontSize = 12.sp, modifier = Modifier.clickable { scope.launch { prefs.clearSearchHistory() } }.padding(6.dp))
+                        }
+                        LazyColumn(contentPadding = PaddingValues(bottom = 112.dp)) {
+                            itemsIndexed(searchHistory, key = { _, item -> item }) { _, item ->
+                                Row(Modifier.fillMaxWidth().clickable { query = item; scope.launch { prefs.addSearchHistory(item) } }.padding(horizontal = 20.dp, vertical = 11.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.Search, null, tint = Color.White.copy(.45f), modifier = Modifier.size(18.dp))
+                                    Spacer(Modifier.width(12.dp))
+                                    Text(item, color = Color.White, modifier = Modifier.weight(1f), maxLines = 1)
+                                    IconButton(onClick = { scope.launch { prefs.removeSearchHistory(item) } }, modifier = Modifier.size(32.dp)) { Icon(Icons.Default.Clear, "Eliminar", tint = Color.White.copy(.4f), modifier = Modifier.size(16.dp)) }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
             songs.isEmpty() && artists.isEmpty() && albums.isEmpty() && users.isEmpty() ->
                 EmptyMessage("Sin resultados para \"$query\"")
             else -> {
                 LazyColumn(contentPadding = PaddingValues(bottom = 112.dp)) {
+                    item {
+                        Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            FilterChip(selected = true, enabled = false, onClick = { }, label = { Text("Ukiyo · Supabase") })
+                            FilterChip(selected = ytCatalogEnabled, onClick = { scope.launch { prefs.setYoutubeCatalogEnabled(!ytCatalogEnabled) } }, label = { Text(if (ytCatalogEnabled) "YouTube Music activo" else "Activar YouTube Music") })
+                        }
+                    }
+                    val autocomplete = (songs.take(3).map { it.title } + artists.take(2).map { it.name } + albums.take(2).map { it.name }).distinct().filter { it.isNotBlank() && !it.equals(query, true) }.take(5)
+                    if (autocomplete.isNotEmpty()) {
+                        item {
+                            Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
+                                Text("SUGERENCIAS", color = Color.White.copy(.5f), fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 8.dp))
+                                autocomplete.forEach { suggestion ->
+                                    Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable { query = suggestion; scope.launch { prefs.addSearchHistory(suggestion) } }.padding(vertical = 8.dp, horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(Icons.Default.Search, null, tint = Color.White.copy(.45f), modifier = Modifier.size(17.dp))
+                                        Spacer(Modifier.width(10.dp))
+                                        Text(suggestion, color = Color.White, fontSize = 14.sp)
+                                    }
+                                }
+                            }
+                        }
+                    }
                     if (users.isNotEmpty()) {
                         item { Text("USUARIOS", color = Color.White.copy(.5f), fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) }
                         itemsIndexed(users, key = { _, u -> "u-${u.id}" }) { _, user ->
-                            UserRow(user) { user.username?.let(onUserClick) }
+                            UserRow(user) { scope.launch { prefs.addSearchHistory(query) }; user.username?.let(onUserClick) }
                         }
                     }
                     if (artists.isNotEmpty()) {
                         item { Text("ARTISTAS", color = Color.White.copy(.5f), fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) }
                         itemsIndexed(artists, key = { _, a -> "a-${a.id.ifBlank { a.name }}" }) { _, artist ->
-                            ArtistRow(artist) { detail = SearchDetail(artist.name, isArtist = true) }
+                            ArtistRow(artist) { scope.launch { prefs.addSearchHistory(query) }; detail = SearchDetail(artist.name, isArtist = true) }
                         }
                     }
                     if (albums.isNotEmpty()) {
                         item { Text("ÁLBUMES", color = Color.White.copy(.5f), fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) }
                         itemsIndexed(albums, key = { _, al -> "al-${al.name}-${al.artist}" }) { _, album ->
-                            AlbumRow(album) { detail = SearchDetail(album.name, album.artist, isArtist = false) }
+                            AlbumRow(album) { scope.launch { prefs.addSearchHistory(query) }; detail = SearchDetail(album.name, album.artist, isArtist = false) }
                         }
                     }
                     if (songs.isNotEmpty()) {
                         item { Text("CANCIONES", color = Color.White.copy(.5f), fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) }
                         itemsIndexed(songs, key = { _, song -> song.id }) { index, song ->
-                            SongRow(song, favoriteIds.contains(song.id), { toggleFavorite(song) }) { onPlayQueue(songs, index) }
+                            SongRow(song, favoriteIds.contains(song.id), { toggleFavorite(song) }) { scope.launch { prefs.addSearchHistory(query) }; onPlayQueue(songs, index) }
                         }
                     }
                 }
@@ -231,8 +289,9 @@ private fun SearchField(query: String, onQueryChange: (String) -> Unit) {
 
 @Composable
 private fun SongRow(song: Song, isFavorite: Boolean, onFavoriteClick: () -> Unit, onClick: () -> Unit) {
+    val interaction = remember { MutableInteractionSource() }
     Row(
-        modifier = Modifier.fillMaxWidth().clickable(enabled = !song.audioUrl.isNullOrBlank(), onClick = onClick).padding(horizontal = 20.dp, vertical = 10.dp),
+        modifier = Modifier.fillMaxWidth().pokkePressMotion(interaction).clickable(interactionSource = interaction, indication = null, enabled = !song.audioUrl.isNullOrBlank() || !song.youtubeId.isNullOrBlank(), onClick = onClick).padding(horizontal = 20.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         CoverImage(song.displayCoverUrl, 52)
@@ -240,7 +299,7 @@ private fun SongRow(song: Song, isFavorite: Boolean, onFavoriteClick: () -> Unit
         Column(modifier = Modifier.weight(1f)) {
             Text(song.title, color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(
-                if (song.audioUrl.isNullOrBlank()) "${song.artist} · Audio no disponible" else song.artist,
+                if (song.audioUrl.isNullOrBlank() && song.youtubeId.isNullOrBlank()) "${song.artist} · Audio no disponible" else if (!song.youtubeId.isNullOrBlank() && song.album == "YouTube Music") "${song.artist} · YouTube Music" else song.artist,
                 color = Color.White.copy(alpha = .58f), fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis
             )
         }
@@ -253,7 +312,8 @@ private fun SongRow(song: Song, isFavorite: Boolean, onFavoriteClick: () -> Unit
 
 @Composable
 private fun ArtistRow(artist: Artist, onClick: () -> Unit) {
-    Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 20.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+    val interaction = remember { MutableInteractionSource() }
+    Row(Modifier.fillMaxWidth().pokkePressMotion(interaction).clickable(interactionSource = interaction, indication = null, onClick = onClick).padding(horizontal = 20.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
         CoverImage(artist.imageUrl, 52, circle = true)
         Spacer(Modifier.width(14.dp))
         Column {
@@ -265,7 +325,8 @@ private fun ArtistRow(artist: Artist, onClick: () -> Unit) {
 
 @Composable
 private fun AlbumRow(album: Album, onClick: () -> Unit) {
-    Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 20.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+    val interaction = remember { MutableInteractionSource() }
+    Row(Modifier.fillMaxWidth().pokkePressMotion(interaction).clickable(interactionSource = interaction, indication = null, onClick = onClick).padding(horizontal = 20.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
         CoverImage(album.coverUrl, 52)
         Spacer(Modifier.width(14.dp))
         Column(modifier = Modifier.weight(1f)) {
@@ -334,14 +395,21 @@ private fun UserRow(user: com.pokke.music.data.model.UserProfile, onClick: () ->
             CoverImage(user.avatarUrl, 44, circle = true)
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
-                Text(
-                    name,
-                    color = Color.White,
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+                val userNameColor = runCatching { Color(android.graphics.Color.parseColor(user.nameColor ?: "#FFFFFF")) }.getOrDefault(Color.White)
+                val userNameFont = when (user.nameFont) { "serif" -> androidx.compose.ui.text.font.FontFamily.Serif; "mono" -> androidx.compose.ui.text.font.FontFamily.Monospace; "cursive" -> androidx.compose.ui.text.font.FontFamily.Cursive; else -> androidx.compose.ui.text.font.FontFamily.SansSerif }
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                val serverPlateStart = runCatching { Color(android.graphics.Color.parseColor(user.nameplatePrimaryColor ?: "")) }.getOrNull()
+                val serverPlateEnd = runCatching { Color(android.graphics.Color.parseColor(user.nameplateSecondaryColor ?: "")) }.getOrNull()
+                val searchPlateBrush = if (!user.nameplateId.isNullOrBlank() && serverPlateStart != null && serverPlateEnd != null) Brush.horizontalGradient(listOf(serverPlateStart, serverPlateEnd)) else Brush.horizontalGradient(listOf(when (user.nameplateStyle) { "neon" -> Color(0xFF54318B); "royal" -> Color(0xFF715324); "cyber" -> Color(0xFF762A43); else -> Color.Transparent }, Color.Transparent))
+                Box(Modifier.clip(RoundedCornerShape(6.dp)).background(searchPlateBrush).padding(horizontal = 4.dp, vertical = 1.dp)) {
+                    if (!user.nameplateImageUrl.isNullOrBlank()) {
+                        AsyncImage(user.nameplateImageUrl, null, Modifier.matchParentSize(), contentScale = ContentScale.Crop)
+                        Box(Modifier.matchParentSize().background(Color.Black.copy(.35f)))
+                    }
+                    Text(name, color = userNameColor, fontFamily = userNameFont, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+                if (!user.nameplateId.isNullOrBlank()) Text("CUSTOM", color = cardAccent, fontSize = 8.sp, fontWeight = FontWeight.Bold)
+                }
                 Text(
                     handle,
                     color = Color.White.copy(alpha = 0.7f),
@@ -391,7 +459,9 @@ private fun CompactSearchBar(
     onQueryChange: (String) -> Unit,
     expanded: Boolean,
     onExpandedChange: (Boolean) -> Unit,
-    focusRequester: FocusRequester
+    focusRequester: FocusRequester,
+    glass: Boolean,
+    onSearch: (String) -> Unit
 ) {
     val height by animateDpAsState(if (expanded || query.isNotEmpty()) 52.dp else 44.dp, tween(220), label = "searchH")
     Row(
@@ -400,7 +470,7 @@ private fun CompactSearchBar(
             .padding(horizontal = 16.dp, vertical = 10.dp)
             .height(height)
             .clip(RoundedCornerShape(24.dp))
-            .background(Color(0xFF1C1C1E))
+            .background(if (glass) Color(0xAA1C1C1E) else Color(0xFF1C1C1E))
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null
@@ -422,6 +492,8 @@ private fun CompactSearchBar(
             singleLine = true,
             textStyle = TextStyle(color = Color.White, fontSize = 16.sp),
             cursorBrush = SolidColor(Color.White),
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+            keyboardActions = KeyboardActions(onSearch = { onSearch(query) }),
             modifier = Modifier
                 .weight(1f)
                 .focusRequester(focusRequester)

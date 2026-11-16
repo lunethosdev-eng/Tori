@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.pokke.music.player.PlayerController
+import com.pokke.music.ui.liquid.LiquidGlassPanel
 
 @Composable
 fun TvMiniPlayer(onOpen: () -> Unit, modifier: Modifier = Modifier) {
@@ -29,12 +30,13 @@ fun TvMiniPlayer(onOpen: () -> Unit, modifier: Modifier = Modifier) {
     val playing by PlayerController.isPlaying.collectAsState()
     val s = song ?: return
 
+    LiquidGlassPanel(
+        modifier = modifier.fillMaxWidth().padding(horizontal = 48.dp),
+        cornerRadius = 16.dp,
+        fallbackColor = Color(0xEE1A1A22)
+    ) {
     Row(
-        modifier
-            .fillMaxWidth()
-            .padding(horizontal = 48.dp)
-            .background(Color(0xEE1A1A22), RoundedCornerShape(16.dp))
-            .padding(horizontal = 16.dp, vertical = 10.dp),
+        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         AsyncImage(s.coverUrl, null, Modifier.size(48.dp).background(Color(0xFF333), RoundedCornerShape(8.dp)), contentScale = ContentScale.Crop)
@@ -49,5 +51,6 @@ fun TvMiniPlayer(onOpen: () -> Unit, modifier: Modifier = Modifier) {
         }
         IconButton(onClick = { PlayerController.playNext() }) { Icon(Icons.Default.SkipNext, null, tint = Color.White) }
         IconButton(onClick = onOpen) { Text("⤢", color = Color.White, fontSize = 18.sp) }
+    }
     }
 }

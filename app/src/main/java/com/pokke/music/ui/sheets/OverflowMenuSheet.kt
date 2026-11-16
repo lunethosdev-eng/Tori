@@ -1,36 +1,55 @@
 package com.pokke.music.ui.sheets
 
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Queue
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Timer
-import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.window.PopupPositionProvider
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
+import com.pokke.music.data.preferences.UserPreferences
 
 @Composable
 fun OverflowMenuSheet(
+    anchorRect: Rect? = null,
     onDismiss: () -> Unit,
     onShareSong: () -> Unit,
     onFavorite: () -> Unit,
@@ -43,52 +62,108 @@ fun OverflowMenuSheet(
     onSongInfo: () -> Unit,
     glass: Boolean = true
 ) {
-    // Floating panel anchored top-end (from the ⋯ button)
+    val context = LocalContext.current
+    val preferences = remember(context) { UserPreferences(context.applicationContext) }
+    // The menu must use the real app toggle, never infer Liquid Glass from the call-site default.
+    val liquidGlassEnabled by preferences.liquidGlassEnabled.collectAsState(initial = false)
+    val useLiquidMenu = liquidGlassEnabled && glass
+    var visible by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { visible = true }
+
+    val scaleX by animateFloatAsState(
+        targetValue = if (visible) 1f else if (useLiquidMenu) .72f else .94f,
+        animationSpec = tween(if (useLiquidMenu) 360 else 170), label = "menuScaleX"
+    )
+    val scaleY by animateFloatAsState(
+        targetValue = if (visible) 1f else if (useLiquidMenu) .30f else .94f,
+        animationSpec = tween(if (useLiquidMenu) 390 else 170), label = "menuScaleY"
+    )
+    val alpha by animateFloatAsState(if (visible) 1f else 0f, tween(if (useLiquidMenu) 220 else 130), label = "menuAlpha")
+    val radius by animateDpAsState(if (visible && useLiquidMenu) 22.dp else 18.dp, tween(330), label = "menuRadius")
+    val shape = RoundedCornerShape(topStart = radius, topEnd = 12.dp, bottomStart = radius, bottomEnd = radius)
+
+    val positionProvider = remember(anchorRect) { AnchorAwareMenuPositionProvider(anchorRect) }
     Popup(
-        alignment = Alignment.TopEnd,
-        offset = IntOffset((-12), 96),
+        popupPositionProvider = positionProvider,
         onDismissRequest = onDismiss,
         properties = PopupProperties(focusable = true)
     ) {
-        Column(
-            Modifier
-                .width(280.dp)
-                .shadow(24.dp, RoundedCornerShape(18.dp), clip = false)
-                .clip(RoundedCornerShape(18.dp))
+        Box(
+            Modifier.width(286.dp)
+                .graphicsLayer {
+                    this.alpha = alpha
+                    this.scaleX = scaleX
+                    this.scaleY = scaleY
+                    transformOrigin = TransformOrigin(1f, 0f)
+                    translationY = if (useLiquidMenu) (1f - scaleY) * -18f else 0f
+                }
+                .shadow(if (useLiquidMenu) 28.dp else 16.dp, shape, clip = false)
+                .clip(shape)
                 .then(
-                    if (glass) Modifier
-                        .background(Color(0xCC2A2A32))
-                        .border(0.7.dp, Color.White.copy(0.22f), RoundedCornerShape(18.dp))
-                    else Modifier.background(Color(0xF21C1C22))
+                    if (useLiquidMenu) Modifier
+                        .background(Brush.linearGradient(listOf(Color(0xF03B3B49), Color(0xE91D1D28), Color(0xF02D2939))))
+                        .border(1.dp, Brush.linearGradient(listOf(Color.White.copy(.36f), Color.White.copy(.08f), Color.White.copy(.22f))), shape)
+                    else Modifier
+                        .background(Color(0xF51D1D23))
+                        .border(.6.dp, Color.White.copy(.12f), shape)
                 )
                 .padding(vertical = 8.dp)
         ) {
-            MenuItem(Icons.Default.Share, "Compartir canción", onShareSong, glass)
-            MenuItem(Icons.Default.Favorite, "Agregar / quitar de favoritos", onFavorite, glass)
-            MenuItem(Icons.Default.Download, "Descargar para offline", onDownload, glass)
-            HorizontalDivider(color = Color.White.copy(.12f), modifier = Modifier.padding(vertical = 6.dp, horizontal = 12.dp))
-            MenuItem(Icons.Default.Queue, "Reproducir después", onPlayNext, glass)
-            MenuItem(Icons.Default.Queue, "Agregar a la cola", onAddToQueue, glass)
-            MenuItem(Icons.Default.Queue, "Agregar a una playlist", onAddToPlaylist, glass)
-            MenuItem(Icons.Default.Delete, "Quitar de la cola", onRemoveFromQueue, glass)
-            HorizontalDivider(color = Color.White.copy(.12f), modifier = Modifier.padding(vertical = 6.dp, horizontal = 12.dp))
-            MenuItem(Icons.Default.Timer, "Temporizador de apagado", onSleepTimer, glass)
-            MenuItem(Icons.Default.Info, "Información de la canción", onSongInfo, glass)
+            Column {
+                MenuItem(Icons.Default.Share, "Compartir canción", useLiquidMenu, onShareSong)
+                MenuItem(Icons.Default.Favorite, "Agregar / quitar de favoritos", useLiquidMenu, onFavorite)
+                MenuItem(Icons.Default.Download, "Descargar para offline", useLiquidMenu, onDownload)
+                HorizontalDivider(color = Color.White.copy(if (useLiquidMenu) .18f else .10f), modifier = Modifier.padding(vertical = 6.dp, horizontal = 12.dp))
+                MenuItem(Icons.Default.Queue, "Reproducir después", useLiquidMenu, onPlayNext)
+                MenuItem(Icons.Default.Queue, "Agregar a la cola", useLiquidMenu, onAddToQueue)
+                MenuItem(Icons.Default.Queue, "Agregar a una playlist", useLiquidMenu, onAddToPlaylist)
+                MenuItem(Icons.Default.Delete, "Quitar de la cola", useLiquidMenu, onRemoveFromQueue)
+                HorizontalDivider(color = Color.White.copy(if (useLiquidMenu) .18f else .10f), modifier = Modifier.padding(vertical = 6.dp, horizontal = 12.dp))
+                MenuItem(Icons.Default.Timer, "Temporizador de apagado", useLiquidMenu, onSleepTimer)
+                MenuItem(Icons.Default.Info, "Información de la canción", useLiquidMenu, onSongInfo)
+            }
         }
     }
 }
 
 @Composable
-private fun MenuItem(icon: ImageVector, title: String, onClick: () -> Unit, glass: Boolean) {
+private fun MenuItem(icon: ImageVector, label: String, liquid: Boolean, onClick: () -> Unit) {
     Row(
-        Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 12.dp),
+        Modifier.fillMaxWidth().clickable(onClick = onClick)
+            .background(if (liquid) Color.White.copy(alpha = .001f) else Color.Transparent)
+            .padding(horizontal = 16.dp, vertical = if (liquid) 12.dp else 11.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(icon, null, tint = Color.White.copy(if (glass) 0.95f else 0.9f), modifier = Modifier.size(20.dp))
+        Icon(icon, contentDescription = null, tint = Color.White.copy(alpha = .94f), modifier = Modifier.size(21.dp))
         Spacer(Modifier.width(14.dp))
-        Text(title, color = Color.White, fontSize = 14.sp)
+        Text(label, color = Color.White, fontSize = 14.sp)
+    }
+}
+
+
+/** Positions the popup from the actual overflow button bounds, clamped to the window. */
+private class AnchorAwareMenuPositionProvider(
+    private val anchor: Rect?,
+    private val gapPx: Int = 8
+) : PopupPositionProvider {
+    override fun calculatePosition(
+        anchorBounds: androidx.compose.ui.unit.IntRect,
+        windowSize: IntSize,
+        layoutDirection: LayoutDirection,
+        popupContentSize: IntSize
+    ): IntOffset {
+        val margin = 12
+        val target = anchor ?: Rect(
+            (windowSize.width - margin).toFloat(),
+            72f,
+            (windowSize.width - margin).toFloat(),
+            72f
+        )
+        val rightAligned = target.right.toInt() - popupContentSize.width
+        val x = rightAligned.coerceIn(margin, (windowSize.width - popupContentSize.width - margin).coerceAtLeast(margin))
+        val below = if (anchor == null) 96 else target.bottom.toInt() + gapPx
+        val above = target.top.toInt() - popupContentSize.height - gapPx
+        val y = if (below + popupContentSize.height <= windowSize.height - margin) below else above
+        return IntOffset(x, y.coerceIn(margin, (windowSize.height - popupContentSize.height - margin).coerceAtLeast(margin)))
     }
 }

@@ -1,7 +1,9 @@
 package com.pokke.music.ui.profile
 
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -15,6 +17,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.animation.animateContentSize
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -29,8 +32,8 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.pokke.music.data.model.LyricLine
 import com.pokke.music.data.model.Song
+import com.pokke.music.data.lyrics.PokkeLyricsRepository
 import com.pokke.music.player.PlayerController
-import kotlinx.coroutines.launch
 
 private fun formatMs(ms: Long): String {
     val total = (ms / 1000).toInt().coerceAtLeast(0)
@@ -120,16 +123,27 @@ fun ListeningCard(
     val song = if (live) current else fallbackSong
     if (song == null) return
 
+    val context = androidx.compose.ui.platform.LocalContext.current
+    var resolvedLyrics by remember(song.id) { mutableStateOf(song.lyrics) }
+    LaunchedEffect(song.id, showLyrics) {
+        resolvedLyrics = song.lyrics
+        if (showLyrics && resolvedLyrics.isEmpty()) {
+            val fetched = PokkeLyricsRepository.load(context = context, song = song)?.lines.orEmpty()
+            resolvedLyrics = fetched.ifEmpty {
+                song.lyricsText.orEmpty().lines().filter(String::isNotBlank)
+                    .mapIndexed { index, text -> LyricLine(index * 4000L, text) }
+            }
+        }
+    }
+
     val position = if (live) livePosition else fallbackPositionMs
     val duration = if (live) liveDuration else fallbackDurationMs.coerceAtLeast(1L)
 
     val progress = if (duration > 0) (position.toFloat() / duration).coerceIn(0f, 1f) else 0f
-    val lyric = remember(song.id, position, showLyrics) {
-        if (!showLyrics) null
-        else if (song.lyrics.isNotEmpty()) currentLyricLine(song.lyrics, position)
-        else null
+    val lyric = remember(song.id, position, showLyrics, resolvedLyrics) {
+        if (!showLyrics) null else currentLyricLine(resolvedLyrics, position)
     }
-    val nextT = remember(song.lyrics, lyric) { nextLyricTime(song.lyrics, lyric) }
+    val nextT = remember(resolvedLyrics, lyric) { nextLyricTime(resolvedLyrics, lyric) }
     val lineProgress = remember(lyric, position, nextT) {
         if (lyric == null) 0f
         else {
@@ -191,16 +205,23 @@ fun ListeningCard(
             Box(
                 Modifier
                     .fillMaxWidth()
+                    .animateContentSize()
                     .clip(RoundedCornerShape(12.dp))
                     .background(Color.Black.copy(alpha = 0.28f))
                     .padding(horizontal = 12.dp, vertical = 10.dp)
             ) {
-                KaraokeLyricText(
-                    text = lyric.text,
-                    progressInLine = lineProgress,
-                    accent = accent,
-                    ink = ink
-                )
+                AnimatedContent(
+                    targetState = lyric.text,
+                    transitionSpec = { fadeIn(tween(260)) togetherWith fadeOut(tween(180)) },
+                    label = "listeningCardLyric",
+                ) { displayedLine ->
+                    KaraokeLyricText(
+                        text = displayedLine,
+                        progressInLine = lineProgress,
+                        accent = accent,
+                        ink = ink,
+                    )
+                }
             }
         }
     }

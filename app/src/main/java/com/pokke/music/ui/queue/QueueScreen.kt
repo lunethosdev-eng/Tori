@@ -1,6 +1,10 @@
 package com.pokke.music.ui.queue
 
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -32,83 +36,98 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalContext
 import coil.compose.AsyncImage
 import com.pokke.music.data.model.Song
+import com.pokke.music.data.preferences.UserPreferences
 import com.pokke.music.player.PlayerController
 
 @Composable
 fun QueueScreen(onBack: () -> Unit) {
+    val context = LocalContext.current
+    val prefs = androidx.compose.runtime.remember(context) { UserPreferences(context.applicationContext) }
+    val glass by prefs.liquidGlassEnabled.collectAsState(initial = false)
     val current by PlayerController.currentSong.collectAsState()
     val isPlaying by PlayerController.isPlaying.collectAsState()
     val queue by PlayerController.queue.collectAsState()
     val currentIndex by PlayerController.currentIndex.collectAsState()
-    val cover = current?.coverUrl
-    val upcoming = queue.mapIndexedNotNull { index, song ->
-        if (index > currentIndex) index to song else null
-    }
+    val cover = current?.displayCoverUrl ?: current?.coverUrl
+    // Keep previous, current and upcoming entries in one timeline regardless of catalogue.
+    val entries = queue.mapIndexed { index, song -> index to song }
+    val upcomingCount = (queue.size - currentIndex - 1).coerceAtLeast(0)
+    val cardShape = RoundedCornerShape(24.dp)
 
-    Box(modifier = Modifier.fillMaxSize()) {
+    Box(modifier = Modifier.fillMaxSize().background(Color(0xFF08080B))) {
         if (!cover.isNullOrBlank()) {
             AsyncImage(
                 model = cover,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize().blur(70.dp).graphicsLayer { alpha = 0.30f }
+                modifier = Modifier.fillMaxSize().blur(if (glass) 76.dp else 64.dp).graphicsLayer { alpha = if (glass) .38f else .25f }
             )
         }
-        Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color(0xBB000000), Color(0xF0000000)))))
+        Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color(0xA908080B), Color(0xF508080B)))))
 
         Column(modifier = Modifier.fillMaxSize().statusBarsPadding()) {
             Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 16.dp),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column(Modifier.weight(1f)) {
-                    Text("Cola de reproducción", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
-                    Text("${queue.size} canciones", color = Color.White.copy(alpha = 0.55f), fontSize = 13.sp)
+                IconButton(onClick = onBack) {
+                    Icon(Icons.Default.Close, contentDescription = "Volver", tint = Color.White)
                 }
-                Text("Listo", color = Color.White.copy(alpha = 0.75f), modifier = Modifier.clickable(onClick = onBack).padding(8.dp))
+                Column(Modifier.weight(1f)) {
+                    Text("Cola de reproducción", color = Color.White, fontSize = 21.sp, fontWeight = FontWeight.Bold)
+                    Text("${queue.size} canciones · $upcomingCount siguientes", color = Color.White.copy(alpha = .58f), fontSize = 12.sp)
+                }
+                if (queue.isNotEmpty()) {
+                    Text("Vaciar", color = Color.White.copy(alpha = .76f), fontSize = 13.sp,
+                        modifier = Modifier.clip(RoundedCornerShape(14.dp)).clickable { PlayerController.clearQueue() }.padding(horizontal = 12.dp, vertical = 9.dp))
+                }
             }
 
-            if (current != null) {
-                Text("REPRODUCIENDO AHORA", color = Color.White.copy(alpha = 0.55f), fontSize = 11.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp))
-                QueueSongRow(
-                    song = current!!,
-                    active = true,
-                    playing = isPlaying,
-                    onClick = { PlayerController.togglePlayPause() },
-                    onRemove = null,
-                    onMoveUp = null,
-                    onMoveDown = null
-                )
+            if (glass) {
+                Column(
+                    Modifier.fillMaxWidth().padding(horizontal = 16.dp).clip(cardShape)
+                        .background(Brush.linearGradient(listOf(Color(0xB52C2D37), Color(0x85202029), Color(0xA52B2635))))
+                        .border(1.dp, Color.White.copy(alpha = .16f), cardShape)
+                        .padding(horizontal = 4.dp, vertical = 8.dp)
+                ) {
+                    CurrentTrack(current, isPlaying)
+                }
+            } else {
+                CurrentTrack(current, isPlaying)
             }
 
-            Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text("A CONTINUACIÓN", color = Color.White.copy(alpha = 0.62f), fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
-                Spacer(Modifier.width(8.dp))
-                Text("${upcoming.size}", color = Color.White.copy(alpha = 0.42f), fontSize = 11.sp)
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 22.dp, vertical = 15.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("A CONTINUACIÓN", color = Color.White.copy(alpha = .72f), fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.1.sp)
+                Spacer(Modifier.width(9.dp))
+                Text("$upcomingCount", color = Color.White.copy(alpha = .48f), fontSize = 11.sp)
+                Spacer(Modifier.weight(1f))
+                Text(if (glass) "LIQUID GLASS" else "ESTÁNDAR", color = Color.White.copy(alpha = .35f), fontSize = 9.sp, letterSpacing = .8.sp)
             }
 
-            LazyColumn(modifier = Modifier.weight(1f)) {
-                if (upcoming.isEmpty()) {
+            LazyColumn(modifier = Modifier.weight(1f), contentPadding = PaddingValues(bottom = 12.dp)) {
+                if (entries.isEmpty()) {
                     item {
-                        Text(
-                            "No hay más canciones en la cola",
-                            color = Color.White.copy(alpha = 0.45f),
-                            fontSize = 13.sp,
-                            modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp)
-                        )
+                        Text("Tu cola está vacía. Añade canciones desde cualquier catálogo de Pokke.",
+                            color = Color.White.copy(alpha = .48f), fontSize = 13.sp,
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 22.dp, vertical = 18.dp))
                     }
                 }
-                items(upcoming, key = { it.first }) { (index, song) ->
+                items(entries, key = { (index, song) -> "${index}_${song.id}" }) { (index, song) ->
                     QueueSongRow(
                         song = song,
-                        active = false,
-                        playing = false,
+                        active = index == currentIndex,
+                        playing = index == currentIndex && isPlaying,
+                        glass = glass,
                         onClick = { PlayerController.playQueueItem(index) },
-                        onRemove = { PlayerController.removeQueueItem(index) },
+                        onRemove = if (index != currentIndex) ({ PlayerController.removeQueueItem(index) }) else null,
                         onMoveUp = if (index > currentIndex + 1) ({ PlayerController.moveQueueItem(index, index - 1) }) else null,
-                        onMoveDown = if (index < queue.lastIndex) ({ PlayerController.moveQueueItem(index, index + 1) }) else null
+                        onMoveDown = if (index > currentIndex && index < queue.lastIndex) ({ PlayerController.moveQueueItem(index, index + 1) }) else null
                     )
                 }
             }
@@ -127,9 +146,30 @@ fun QueueScreen(onBack: () -> Unit) {
                 IconButton(onClick = { PlayerController.playNext() }) {
                     Icon(Icons.Default.SkipNext, contentDescription = "Siguiente", tint = Color.White, modifier = Modifier.size(30.dp))
                 }
-                IconButton(onClick = { PlayerController.clearQueue() }) {
-                    Icon(Icons.Default.Close, contentDescription = "Vaciar cola", tint = Color.White.copy(alpha = 0.7f))
+            }
+        }
+    }
+}
+
+@Composable
+private fun CurrentTrack(song: Song?, isPlaying: Boolean) {
+    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp).animateContentSize()) {
+        Text("REPRODUCIENDO AHORA", color = Color.White.copy(alpha = .52f), fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+        Spacer(Modifier.height(8.dp))
+        if (song == null) {
+            Text("No hay ninguna canción activa", color = Color.White.copy(alpha = .48f), fontSize = 13.sp)
+        } else {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.size(54.dp).clip(RoundedCornerShape(11.dp)).background(Color(0xFF292932))) {
+                    val artwork = song.displayCoverUrl ?: song.coverUrl
+                    if (!artwork.isNullOrBlank()) AsyncImage(artwork, null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
                 }
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(song.title, color = Color(0xFFB7F0C4), fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(song.artist, color = Color.White.copy(alpha = .58f), fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+                Icon(if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow, contentDescription = null, tint = Color(0xFFB7F0C4), modifier = Modifier.size(23.dp))
             }
         }
     }
@@ -140,27 +180,34 @@ private fun QueueSongRow(
     song: Song,
     active: Boolean,
     playing: Boolean,
+    glass: Boolean,
     onClick: () -> Unit,
     onRemove: (() -> Unit)?,
     onMoveUp: (() -> Unit)?,
     onMoveDown: (() -> Unit)?
 ) {
+    val targetAlpha = if (active) 1f else .68f
+    val alpha by animateFloatAsState(targetValue = targetAlpha, animationSpec = tween(220), label = "queueRowAlpha")
+    val shape = RoundedCornerShape(15.dp)
     Row(
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 8.dp),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 3.dp)
+            .clip(shape)
+            .then(if (active && glass) Modifier.background(Color.White.copy(alpha = .10f)).border(1.dp, Color.White.copy(alpha = .13f), shape) else Modifier)
+            .clickable(onClick = onClick).padding(horizontal = 8.dp, vertical = 7.dp).graphicsLayer { this.alpha = alpha },
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Box(Modifier.size(48.dp).clip(RoundedCornerShape(7.dp)).background(Color(0xFF292929))) {
-            if (!song.coverUrl.isNullOrBlank()) {
-                AsyncImage(model = song.coverUrl, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
-            }
+        Box(Modifier.size(46.dp).clip(RoundedCornerShape(8.dp)).background(Color(0xFF292929))) {
+            val artwork = song.displayCoverUrl ?: song.coverUrl
+            if (!artwork.isNullOrBlank()) AsyncImage(model = artwork, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
         }
-        Spacer(Modifier.width(12.dp))
+        Spacer(Modifier.width(11.dp))
         Column(Modifier.weight(1f)) {
-            Text(song.title, color = if (active) Color(0xFF9BE7B0) else Color.White, fontSize = 14.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(song.artist, color = Color.White.copy(alpha = 0.58f), fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(song.title, color = if (active) Color(0xFFB7F0C4) else Color.White, fontSize = 13.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(song.artist, color = Color.White.copy(alpha = .52f), fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
-        if (onMoveUp != null) IconButton(onClick = onMoveUp) { Icon(Icons.Default.ArrowUpward, contentDescription = "Subir", tint = Color.White.copy(alpha = 0.6f)) }
-        if (onMoveDown != null) IconButton(onClick = onMoveDown) { Icon(Icons.Default.ArrowDownward, contentDescription = "Bajar", tint = Color.White.copy(alpha = 0.6f)) }
-        if (onRemove != null) IconButton(onClick = onRemove) { Icon(Icons.Default.Close, contentDescription = "Quitar", tint = Color.White.copy(alpha = 0.6f)) }
+        if (playing) Text("EN CURSO", color = Color(0xFFB7F0C4), fontSize = 9.sp, fontWeight = FontWeight.Bold)
+        if (onMoveUp != null) IconButton(onClick = onMoveUp) { Icon(Icons.Default.ArrowUpward, contentDescription = "Subir", tint = Color.White.copy(alpha = .62f), modifier = Modifier.size(18.dp)) }
+        if (onMoveDown != null) IconButton(onClick = onMoveDown) { Icon(Icons.Default.ArrowDownward, contentDescription = "Bajar", tint = Color.White.copy(alpha = .62f), modifier = Modifier.size(18.dp)) }
+        if (onRemove != null) IconButton(onClick = onRemove) { Icon(Icons.Default.Close, contentDescription = "Quitar", tint = Color.White.copy(alpha = .62f), modifier = Modifier.size(18.dp)) }
     }
 }

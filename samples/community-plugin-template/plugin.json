@@ -1,0 +1,20 @@
+{
+  "id": "community.my-first-plugin",
+  "name": "My First Tori Plugin",
+  "version": "1.0.0",
+  "type": "ui",
+  "minAppVersion": "1.0.0",
+  "permissions": ["ui.home_widgets", "ui.theme"],
+  "ui": {
+    "theme": {
+      "motionAsset": "assets/animations/motion.json"
+    },
+    "homeCards": [
+      {
+        "title": "My first card",
+        "subtitle": "A declarative Home contribution",
+        "action": "open:library"
+      }
+    ]
+  }
+}
