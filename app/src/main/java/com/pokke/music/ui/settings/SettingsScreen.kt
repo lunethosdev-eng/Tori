@@ -563,24 +563,96 @@ fun SettingsScreen(
             var devices by remember { mutableStateOf<List<DeviceLinkRepository.LinkedDevice>>(emptyList()) }
             var deviceError by remember { mutableStateOf<String?>(null) }
             var loadingDevices by remember { mutableStateOf(true) }
+            var securityEvents by remember { mutableStateOf<List<DeviceLinkRepository.SecurityEvent>>(emptyList()) }
+            var blockedDevices by remember { mutableStateOf<List<DeviceLinkRepository.LinkedDevice>>(emptyList()) }
+            var pendingAction by remember { mutableStateOf<Pair<String, String>?>(null) }
             LaunchedEffect(deviceRepo) {
                 deviceRepo.linkedDevices().onSuccess { devices = it }.onFailure { deviceError = it.message }
+                deviceRepo.securityHistory().onSuccess { securityEvents = it }
+                deviceRepo.blockedDevices().onSuccess { blockedDevices = it }
                 loadingDevices = false
             }
-            Text("El teléfono principal se identifica automáticamente y no puede cerrarse desde esta lista.", color = Color.White.copy(.55f), fontSize = 12.sp, modifier = Modifier.padding(horizontal = 22.dp, vertical = 6.dp))
+            Text("El teléfono principal es el propietario de la cuenta. Ningún dispositivo secundario puede cerrar su sesión.", color = Color.White.copy(.58f), fontSize = 12.sp, modifier = Modifier.padding(horizontal = 22.dp, vertical = 6.dp))
             if (loadingDevices) CircularProgressIndicator(modifier = Modifier.padding(22.dp))
             deviceError?.let { Text(it, color = Color(0xFFFF8A80), modifier = Modifier.padding(22.dp)) }
-            if (!loadingDevices && devices.isEmpty() && deviceError == null) Text("Todavía no hay dispositivos vinculados. Inicia sesión y vincula tu TV desde su pantalla de perfil.", color = Color.White.copy(.6f), modifier = Modifier.padding(22.dp))
+            if (!loadingDevices && devices.isEmpty() && deviceError == null) Text("Todavía no hay dispositivos vinculados. Vincula tu TV desde su pantalla de perfil.", color = Color.White.copy(.6f), modifier = Modifier.padding(22.dp))
             devices.forEach { device ->
-                Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 5.dp).background(Color(0xFF17171E), RoundedCornerShape(14.dp)).padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) {
-                        Text(device.name, color = Color.White, fontWeight = FontWeight.SemiBold)
-                        Text(if (device.isPrimary) "Teléfono principal" else if (device.kind == "android_tv") "Android TV" else "Teléfono", color = Color.White.copy(.55f), fontSize = 12.sp)
+                Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 5.dp).background(Color(0xFF17171E), RoundedCornerShape(14.dp)).padding(14.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text(device.name, color = Color.White, fontWeight = FontWeight.SemiBold)
+                            Text(if (device.isPrimary) "Teléfono principal · Propietario" else if (device.kind == "android_tv") "Android TV" else "Teléfono secundario", color = Color.White.copy(.55f), fontSize = 12.sp)
+                        }
+                        if (device.isPrimary) Text("PROTEGIDO", color = Color(0xFF9BE7B0), fontSize = 10.sp, fontWeight = FontWeight.Bold)
                     }
                     if (!device.isPrimary) {
-                        TextButton(onClick = { scope.launch { deviceRepo.blockDevice(device.id).onSuccess { devices = devices.filterNot { it.id == device.id } }.onFailure { deviceError = it.message } } }) { Text("Bloquear", color = Color(0xFFFF7777)) }
-                        TextButton(onClick = { scope.launch { deviceRepo.revokeDevice(device.id).onSuccess { devices = devices.filterNot { it.id == device.id } }.onFailure { deviceError = it.message } } }) { Text("Cerrar sesión", color = Color(0xFFFFB0B0)) }
+                        HorizontalDivider(color = Color.White.copy(.08f), modifier = Modifier.padding(vertical = 8.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Column(Modifier.weight(1f)) {
+                                Text("Dispositivo de confianza", color = Color.White, fontSize = 13.sp)
+                                Text("Marcar este dispositivo como reconocido", color = Color.White.copy(.48f), fontSize = 11.sp)
+                            }
+                            Switch(checked = device.trusted, onCheckedChange = { enabled ->
+                                scope.launch { deviceRepo.updateDevicePermissions(device.id, enabled, device.canCloseOtherSessions).onSuccess { devices = devices.map { if (it.id == device.id) it.copy(trusted = enabled) else it } }.onFailure { deviceError = it.message } }
+                            })
+                        }
+                        if (device.kind == "android_tv") {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Column(Modifier.weight(1f)) {
+                                    Text("Puede cerrar sesiones secundarias", color = Color.White, fontSize = 13.sp)
+                                    Text("Nunca puede cerrar la sesión del teléfono principal", color = Color.White.copy(.48f), fontSize = 11.sp)
+                                }
+                                Switch(checked = device.canCloseOtherSessions, onCheckedChange = { enabled ->
+                                    scope.launch { deviceRepo.updateDevicePermissions(device.id, device.trusted, enabled).onSuccess { devices = devices.map { if (it.id == device.id) it.copy(canCloseOtherSessions = enabled) else it } }.onFailure { deviceError = it.message } }
+                                })
+                            }
+                        }
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                            TextButton(onClick = { pendingAction = device.id to "block" }) { Text("Bloquear", color = Color(0xFFFF7777)) }
+                            TextButton(onClick = { pendingAction = device.id to "revoke" }) { Text("Desvincular", color = Color(0xFFFFB0B0)) }
+                        }
                     }
+                }
+            }
+            Section("LISTA DE DISPOSITIVOS BLOQUEADOS")
+            if (blockedDevices.isEmpty()) Text("La blacklist está vacía.", color = Color.White.copy(.5f), fontSize = 12.sp, modifier = Modifier.padding(horizontal = 22.dp, vertical = 8.dp))
+            blockedDevices.forEach { blocked ->
+                Row(Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 4.dp).background(Color(0xFF211719), RoundedCornerShape(12.dp)).padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text(blocked.name, color = Color.White, fontSize = 13.sp)
+                        Text("Bloqueado · ${blocked.kind}", color = Color(0xFFFF9A9A), fontSize = 11.sp)
+                    }
+                    TextButton(onClick = { scope.launch {
+                        deviceRepo.unblockDevice(blocked.id).onSuccess { blockedDevices = blockedDevices.filterNot { it.id == blocked.id }; deviceRepo.securityHistory().onSuccess { securityEvents = it } }
+                            .onFailure { deviceError = it.message }
+                    } }) { Text("Quitar bloqueo") }
+                }
+            }
+            if (pendingAction != null) {
+                val target = devices.firstOrNull { it.id == pendingAction!!.first }
+                val isBlock = pendingAction!!.second == "block"
+                AlertDialog(
+                    onDismissRequest = { pendingAction = null },
+                    title = { Text(if (isBlock) "Bloquear dispositivo" else "Cerrar sesión y desvincular") },
+                    text = { Text("¿Confirmas esta acción para ${target?.name ?: "este dispositivo"}? El teléfono principal está protegido y no puede modificarse desde aquí.") },
+                    confirmButton = { TextButton(onClick = {
+                        val action = pendingAction!!; pendingAction = null
+                        scope.launch {
+                            val result = if (isBlock) deviceRepo.blockDevice(action.first) else deviceRepo.revokeDevice(action.first)
+                            result.onSuccess { devices = devices.filterNot { it.id == action.first }; if (isBlock) deviceRepo.blockedDevices().onSuccess { blockedDevices = it }; deviceRepo.securityHistory().onSuccess { securityEvents = it } }
+                                .onFailure { deviceError = it.message }
+                        }
+                    }) { Text(if (isBlock) "Bloquear" else "Desvincular") } },
+                    dismissButton = { TextButton(onClick = { pendingAction = null }) { Text("Cancelar") } }
+                )
+            }
+            Section("HISTORIAL DE SEGURIDAD")
+            if (securityEvents.isEmpty()) Text("No hay actividad de seguridad registrada todavía.", color = Color.White.copy(.5f), fontSize = 12.sp, modifier = Modifier.padding(horizontal = 22.dp, vertical = 8.dp))
+            securityEvents.forEach { event ->
+                Column(Modifier.fillMaxWidth().padding(horizontal = 22.dp, vertical = 6.dp)) {
+                    Text(event.eventType.replace('_', ' ').replaceFirstChar { it.uppercase() }, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                    Text("${event.deviceName} · ${event.details}", color = Color.White.copy(.52f), fontSize = 11.sp)
+                    Text(event.createdAt, color = Color.White.copy(.35f), fontSize = 10.sp)
                 }
             }
         }
