@@ -18,6 +18,9 @@ import java.net.URLEncoder
 
 /** Kokoro account, profile, favorites and playlist repository. */
 class AuthRepository(context: Context) {
+    private companion object {
+        const val POLIC_API_BASE = "https://polic.onrender.com"
+    }
     data class AuthSession(
         val accessToken: String,
         val refreshToken: String?,
@@ -87,6 +90,103 @@ class AuthRepository(context: Context) {
             store.clear()
             _session.value = null
         }
+    }
+
+    /** Starts the official Discord OAuth2 flow through the Pokke backend. */
+    suspend fun startDiscordOAuth(): Result<String> = withContext(Dispatchers.IO) {
+        runCatching {
+            val s = requireSession()
+            val response = policRequest(
+                "/api/auth/discord?userId=${encode(s.userId)}",
+                "GET", s.accessToken
+            )
+            val json = JSONObject(response)
+            json.optString("authorizationUrl").takeIf { it.startsWith("https://discord.com/oauth2/authorize") }
+                ?: throw IOException("El servidor no devolvió una URL OAuth2 válida")
+        }
+    }
+
+    /** Reads the currently stored profile-card theme from POLIC. */
+    suspend fun getPolicTheme(): Result<JSONObject> = withContext(Dispatchers.IO) {
+        runCatching {
+            val s = requireSession()
+            JSONObject(policRequest("/api/users/${encode(s.userId)}/theme", "GET", s.accessToken))
+        }
+    }
+
+    /** Applies the theme returned by POLIC to the signed-in Pokke profile. */
+    suspend fun applyPolicTheme(): Result<Unit> = withContext(Dispatchers.IO) {
+        runCatching {
+            val s = requireSession()
+            val remote = JSONObject(policRequest("/api/users/${encode(s.userId)}/theme", "GET", s.accessToken))
+            val body = JSONObject().apply {
+                remote.optString("backgroundColor").takeIf { it.matches(Regex("#[0-9a-fA-F]{6}")) }?.let { put("primary_color", it) }
+                remote.optString("secondaryColor").takeIf { it.matches(Regex("#[0-9a-fA-F]{6}")) }?.let { put("secondary_color", it) }
+                remote.optString("textColor").takeIf { it.matches(Regex("#[0-9a-fA-F]{6}")) }?.let { put("name_color", it) }
+                remote.optString("accentColor").takeIf { it.matches(Regex("#[0-9a-fA-F]{6}")) }?.let { put("accent_color", it) }
+                remote.optString("cardStyle").takeIf { it in setOf("glass", "solid", "minimal", "gradient") }?.let { put("card_style", it) }
+                if (remote.has("gradientEnabled")) put("gradient_enabled", remote.optBoolean("gradientEnabled"))
+                remote.optString("nameplateStyle").takeIf { it in setOf("aurora", "neon", "royal", "minimal", "cyber") }?.let { put("nameplate_style", it) }
+                remote.optString("nameFont").takeIf { it in setOf("sans", "serif", "mono", "cursive") }?.let { put("name_font", it) }
+                remote.optString("bannerUrl").takeIf { it.startsWith("https://") }?.let { put("search_card_banner_url", it) }
+                remote.optString("backgroundUrl").takeIf { it.startsWith("https://") }?.let { put("custom_bg_url", it) }
+            }
+            request(KokoroConfig.PROFILES, "PATCH", s, params = mapOf("id" to "eq.${s.userId}"), body = body.toString(), prefer = "return=minimal")
+            Unit
+        }
+    }
+
+    /** Pushes the current Pokke profile-card design to POLIC/Supabase. */
+    suspend fun syncPolicTheme(): Result<Unit> = withContext(Dispatchers.IO) {
+        runCatching {
+            val s = requireSession()
+            val profileRows = JSONArray(request(KokoroConfig.PROFILES, "GET", s, params = mapOf(
+                "id" to "eq.${s.userId}", "select" to "*", "limit" to "1"
+            )))
+            if (profileRows.length() == 0) throw IOException("No se encontró el perfil de Pokke")
+            val p = parseProfile(profileRows.getJSONObject(0))
+            val theme = JSONObject().apply {
+                put("themeId", p.theme ?: "default")
+                put("backgroundColor", p.primaryColor ?: "#1e1e2e")
+                put("secondaryColor", p.secondaryColor ?: "#313244")
+                put("textColor", p.nameColor ?: "#cdd6f4")
+                put("accentColor", p.accentColor ?: "#5865F2")
+                put("cardStyle", p.cardStyle ?: "glass")
+                put("gradientEnabled", p.gradientEnabled)
+                put("nameplateStyle", p.nameplateStyle ?: "aurora")
+                put("nameFont", p.nameFont ?: "sans")
+                put("bannerUrl", p.searchCardBannerUrl ?: p.bannerUrl ?: JSONObject.NULL)
+                put("backgroundUrl", p.customBgUrl ?: JSONObject.NULL)
+                put("updatedAt", java.time.Instant.now().toString())
+            }
+            policRequest("/api/users/${encode(s.userId)}/theme", "PUT", s.accessToken, theme.toString())
+            Unit
+        }
+    }
+
+    private fun policRequest(path: String, method: String, accessToken: String, body: String? = null): String {
+        val connection = (URL("$POLIC_API_BASE$path").openConnection() as HttpURLConnection).apply {
+            requestMethod = method
+            connectTimeout = 15_000
+            readTimeout = 25_000
+            setRequestProperty("Authorization", "Bearer $accessToken")
+            setRequestProperty("Accept", "application/json")
+            if (body != null) {
+                doOutput = true
+                setRequestProperty("Content-Type", "application/json; charset=utf-8")
+            }
+        }
+        try {
+            if (body != null) connection.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
+            val status = connection.responseCode
+            val response = (if (status in 200..299) connection.inputStream else connection.errorStream)
+                ?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }.orEmpty()
+            if (status !in 200..299) {
+                val message = runCatching { JSONObject(response).optString("error") }.getOrNull().orEmpty()
+                throw IOException("POLIC respondió HTTP $status${message.takeIf { it.isNotBlank() }?.let { ": $it" } ?: ""}")
+            }
+            return response
+        } finally { connection.disconnect() }
     }
 
     suspend fun getProfile(): Result<UserProfile?> = withContext(Dispatchers.IO) {
@@ -207,7 +307,26 @@ class AuthRepository(context: Context) {
             }
             val rows = JSONArray(request(KokoroConfig.PROFILES, "POST", s, params = mapOf("on_conflict" to "id"), body = body.toString(), prefer = "resolution=merge-duplicates,return=representation"))
             if (rows.length() == 0) throw IOException("Pokke Users no devolvió el perfil actualizado")
-            parseProfile(rows.getJSONObject(0))
+            val updatedProfile = parseProfile(rows.getJSONObject(0))
+            // Theme sync is best-effort: POLIC downtime must never block saving the Pokke profile.
+            runCatching {
+                val theme = JSONObject().apply {
+                    put("themeId", updatedProfile.theme ?: "default")
+                    put("backgroundColor", updatedProfile.primaryColor ?: "#1e1e2e")
+                    put("secondaryColor", updatedProfile.secondaryColor ?: "#313244")
+                    put("textColor", updatedProfile.nameColor ?: "#cdd6f4")
+                    put("accentColor", updatedProfile.accentColor ?: "#5865F2")
+                    put("cardStyle", updatedProfile.cardStyle ?: "glass")
+                    put("gradientEnabled", updatedProfile.gradientEnabled)
+                    put("nameplateStyle", updatedProfile.nameplateStyle ?: "aurora")
+                    put("nameFont", updatedProfile.nameFont ?: "sans")
+                    put("bannerUrl", updatedProfile.searchCardBannerUrl ?: updatedProfile.bannerUrl ?: JSONObject.NULL)
+                    put("backgroundUrl", updatedProfile.customBgUrl ?: JSONObject.NULL)
+                    put("updatedAt", java.time.Instant.now().toString())
+                }
+                policRequest("/api/users/${encode(s.userId)}/theme", "PUT", s.accessToken, theme.toString())
+            }
+            updatedProfile
         }
     }
 
