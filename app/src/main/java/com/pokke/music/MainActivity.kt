@@ -22,6 +22,8 @@ import com.pokke.music.data.preferences.UserPreferences
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.launch
+import androidx.lifecycle.lifecycleScope
+import android.widget.Toast
 import com.pokke.music.data.repository.AuthRepository
 import com.pokke.music.ui.onboarding.OnboardingScreen
 import androidx.compose.ui.platform.LocalContext
@@ -31,7 +33,8 @@ class MainActivity : ComponentActivity() {
     private var pluginDeepLinkUri by mutableStateOf<Uri?>(null)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        pluginDeepLinkUri = intent?.data
+        pluginDeepLinkUri = intent?.data?.takeIf { it.host == "plugin" }
+        handleDiscordCallback(intent?.data)
         PlayerController.init(this)
         PokkeAndroidPlayerHost.install(applicationContext)
         PokkeCanvasPlayerHost.install(applicationContext)
@@ -68,8 +71,23 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        pluginDeepLinkUri = intent.data
+        pluginDeepLinkUri = intent.data?.takeIf { it.host == "plugin" }
+        handleDiscordCallback(intent.data)
     }
+
+    private fun handleDiscordCallback(uri: Uri?) {
+        if (uri?.scheme != "pokke" || uri.host != "discord" || uri.path != "/callback") return
+        val success = uri.getQueryParameter("status") == "success"
+        lifecycleScope.launch {
+            UserPreferences(this@MainActivity).setDiscordPolicLinked(success)
+            Toast.makeText(
+                this@MainActivity,
+                if (success) "Discord se vinculó con Pokke" else "No se pudo vincular Discord",
+                Toast.LENGTH_LONG
+            ).show()
+        }
+    }
+
     override fun onDestroy() {
         if (isFinishing) PlayerController.release()
         super.onDestroy()
