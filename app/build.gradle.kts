@@ -93,6 +93,7 @@ val newPipeExtractorStripped = tasks.register<org.gradle.api.tasks.bundling.Jar>
 }
 
 dependencies {
+    implementation("com.google.zxing:core:3.5.3")
     implementation("androidx.multidex:multidex:2.0.1")
     implementation(project(":bitchord-sharedui"))
     newPipeExtractorRaw("com.github.TeamNewPipe:NewPipeExtractor:v0.26.3")
