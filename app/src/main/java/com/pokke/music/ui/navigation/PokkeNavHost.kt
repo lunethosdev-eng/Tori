@@ -116,6 +116,7 @@ sealed class Screen(val route: String) {
     data object Queue : Screen("queue")
     data object Lyrics : Screen("lyrics")
     data object Settings : Screen("settings")
+    data object RemoteControl : Screen("remote_control")
     data object Admin : Screen("admin")
     data object StoryPublish : Screen("story_publish")
     data object Maps : Screen("maps")
@@ -417,8 +418,12 @@ fun PokkeNavHost(pluginDeepLinkUri: Uri? = null, onPluginDeepLinkHandled: () -> 
                     authRepository = auth,
                     pluginDeepLinkUri = pluginDeepLinkUri,
                     onPluginDeepLinkHandled = onPluginDeepLinkHandled,
-                    onRestartOnboarding = onRestartOnboarding
+                    onRestartOnboarding = onRestartOnboarding,
+                    onOpenRemoteControl = { nav.navigate(Screen.RemoteControl.route) }
                 )
+            }
+            composable(Screen.RemoteControl.route) {
+                com.pokke.music.ui.remote.RemoteControlScreen(onBack = { nav.popBackStack() })
             }
             composable(Screen.Admin.route) {
                 AdminPanelScreen(repository = auth, onBack = { nav.popBackStack() })
