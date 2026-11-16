@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import com.pokke.music.ui.motion.MotionSettings
 import org.json.JSONObject
+import org.json.JSONArray
 
 val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "pokke_prefs")
 
@@ -74,6 +75,45 @@ class UserPreferences(private val context: Context) {
         private val MOTION_HAPTICS = booleanPreferencesKey("tori_motion_haptics")
         private val MOTION_REDUCE = booleanPreferencesKey("tori_motion_reduce")
         private val SEARCH_HISTORY = stringPreferencesKey("search_history_v1")
+        private val ONBOARDING_COMPLETED = booleanPreferencesKey("onboarding_completed_v1")
+        private val ONBOARDING_DRAFT = stringPreferencesKey("onboarding_draft_v1")
+        private val ONBOARDING_NICKNAME = stringPreferencesKey("onboarding_nickname_v1")
+        private val ONBOARDING_ARTISTS = stringPreferencesKey("onboarding_artists_v1")
+    }
+
+    val onboardingCompleted: Flow<Boolean> = context.dataStore.data.map { values ->
+        // Existing installs already have persisted preferences; don't force an upgrade onboarding on them.
+        values[ONBOARDING_COMPLETED] ?: values.asMap().isNotEmpty()
+    }
+    val onboardingDraft: Flow<String> = context.dataStore.data.map { it[ONBOARDING_DRAFT] ?: "{}" }
+    val onboardingNickname: Flow<String> = context.dataStore.data.map { it[ONBOARDING_NICKNAME] ?: "" }
+    val onboardingArtists: Flow<String> = context.dataStore.data.map { it[ONBOARDING_ARTISTS] ?: "[]" }
+
+    suspend fun saveOnboardingDraft(raw: String) { context.dataStore.edit { it[ONBOARDING_DRAFT] = raw.take(16000) } }
+    suspend fun completeOnboarding(nickname: String, artistsJson: String) {
+        context.dataStore.edit {
+            it[ONBOARDING_NICKNAME] = nickname.trim().take(32)
+            it[ONBOARDING_ARTISTS] = artistsJson.take(12000)
+            it[ONBOARDING_COMPLETED] = true
+            it[ONBOARDING_DRAFT] = "{}"
+        }
+    }
+    suspend fun reopenOnboarding() {
+        context.dataStore.edit { values ->
+            val draft = JSONObject().apply {
+                put("step", 0)
+                put("nickname", values[ONBOARDING_NICKNAME] ?: "")
+                put("providerIndex", 0)
+                put("providers", JSONArray().apply {
+                    if (values[SPOTIFY_LOGIN] == true) put("spotify")
+                    if (values[YTMUSIC_LOGIN] == true) put("ytmusic")
+                    if (values[DISCORD_LOGIN] == true) put("discord")
+                })
+                put("artists", runCatching { JSONArray(values[ONBOARDING_ARTISTS] ?: "[]") }.getOrDefault(JSONArray()))
+            }
+            values[ONBOARDING_DRAFT] = draft.toString()
+            values[ONBOARDING_COMPLETED] = false
+        }
     }
 
     val externalAccountsEnabled: Flow<Boolean> = context.dataStore.data.map { it[EXTERNAL_ACCOUNTS] ?: false }
