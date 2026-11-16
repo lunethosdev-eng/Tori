@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.pokke.music.data.model.Song
 import com.pokke.music.data.repository.MultiMusicRepository
+import com.pokke.music.remote.TvRemoteBus
 
 @Composable
 fun TvSearchScreen(onPlay: (Song) -> Unit) {
@@ -29,6 +30,10 @@ fun TvSearchScreen(onPlay: (Song) -> Unit) {
     var query by remember { mutableStateOf("") }
     var results by remember { mutableStateOf<List<Song>>(emptyList()) }
     val cats = listOf("🎸 Rock", "🎧 Pop", "🏙️ Urbano", "🎹 Lo-Fi")
+
+    LaunchedEffect(Unit) {
+        TvRemoteBus.searchText.collect { value -> if (value != null) query = value }
+    }
 
     LaunchedEffect(query) {
         if (query.length < 2) { results = emptyList(); return@LaunchedEffect }
