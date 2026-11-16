@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.sp
 import com.pokke.music.data.preferences.UserPreferences
 import com.pokke.music.ui.settings.ExternalAccountsSection
 import com.pokke.music.data.repository.AuthRepository
+import com.pokke.music.data.pairing.DeviceLinkRepository
 import kotlinx.coroutines.launch
 import com.pokke.music.ui.liquid.LocalAppBackdrop
 import com.pokke.music.ui.liquid.LiquidToggle
@@ -68,6 +69,7 @@ fun SettingsScreen(
         "search" -> "Búsqueda y letras"
         "accounts" -> "Cuentas y tema"
         "privacy" -> "Privacidad y perfil"
+        "devices" -> "Dispositivos vinculados"
         "playback" -> "Reproducción"
         "plugins" -> "Tienda de plugins"
         "experimental" -> "Funciones experimentales"
@@ -111,6 +113,7 @@ fun SettingsScreen(
                 SettingsCategoryCard("Búsqueda y letras", "Catálogos activos, historial y estilo de letras", "search") { selectedCategory = it }
                 SettingsCategoryCard("Cuentas externas y tema", "Conexiones externas, tema y colores", "accounts") { selectedCategory = it }
                 SettingsCategoryCard("Privacidad y perfil", "Visibilidad de tu actividad", "privacy") { selectedCategory = it }
+                SettingsCategoryCard("Dispositivos vinculados", "Ver y cerrar sesiones de tus teléfonos y televisores", "devices") { selectedCategory = it }
                 SettingsCategoryCard("Reproducción", "Opciones de reproducción y gapless", "playback") { selectedCategory = it }
                 SettingsCategoryCard("Tienda de plugins", "Extiende Pokke con módulos compatibles", "plugins") { selectedCategory = it }
                 SettingsCategoryCard("Funciones experimentales", "Funciones alfa y controles opcionales", "experimental") { selectedCategory = it }
@@ -554,6 +557,34 @@ fun SettingsScreen(
         )
 
         }
+        if (selectedCategory == "devices") {
+            Section("TUS DISPOSITIVOS")
+            val deviceRepo = remember(authRepository) { DeviceLinkRepository(authRepository) }
+            var devices by remember { mutableStateOf<List<DeviceLinkRepository.LinkedDevice>>(emptyList()) }
+            var deviceError by remember { mutableStateOf<String?>(null) }
+            var loadingDevices by remember { mutableStateOf(true) }
+            LaunchedEffect(deviceRepo) {
+                deviceRepo.linkedDevices().onSuccess { devices = it }.onFailure { deviceError = it.message }
+                loadingDevices = false
+            }
+            Text("El teléfono principal se identifica automáticamente y no puede cerrarse desde esta lista.", color = Color.White.copy(.55f), fontSize = 12.sp, modifier = Modifier.padding(horizontal = 22.dp, vertical = 6.dp))
+            if (loadingDevices) CircularProgressIndicator(modifier = Modifier.padding(22.dp))
+            deviceError?.let { Text(it, color = Color(0xFFFF8A80), modifier = Modifier.padding(22.dp)) }
+            if (!loadingDevices && devices.isEmpty() && deviceError == null) Text("Todavía no hay dispositivos vinculados. Inicia sesión y vincula tu TV desde su pantalla de perfil.", color = Color.White.copy(.6f), modifier = Modifier.padding(22.dp))
+            devices.forEach { device ->
+                Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 5.dp).background(Color(0xFF17171E), RoundedCornerShape(14.dp)).padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text(device.name, color = Color.White, fontWeight = FontWeight.SemiBold)
+                        Text(if (device.isPrimary) "Teléfono principal" else if (device.kind == "android_tv") "Android TV" else "Teléfono", color = Color.White.copy(.55f), fontSize = 12.sp)
+                    }
+                    if (!device.isPrimary) {
+                        TextButton(onClick = { scope.launch { deviceRepo.blockDevice(device.id).onSuccess { devices = devices.filterNot { it.id == device.id } }.onFailure { deviceError = it.message } } }) { Text("Bloquear", color = Color(0xFFFF7777)) }
+                        TextButton(onClick = { scope.launch { deviceRepo.revokeDevice(device.id).onSuccess { devices = devices.filterNot { it.id == device.id } }.onFailure { deviceError = it.message } } }) { Text("Cerrar sesión", color = Color(0xFFFFB0B0)) }
+                    }
+                }
+            }
+        }
+
         if (selectedCategory == "playback") {
         Section("REPRODUCCIÓN")
         LiquidOrMaterialToggle(
