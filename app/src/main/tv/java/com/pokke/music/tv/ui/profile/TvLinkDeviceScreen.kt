@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.sp
 import com.pokke.music.data.pairing.DeviceLinkRepository
 import com.pokke.music.tv.ui.components.tvFocusable
 import com.pokke.music.util.QrBitmap
+import com.pokke.music.remote.TvRemoteServer
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -67,6 +68,10 @@ fun TvLinkDeviceScreen(onBack: () -> Unit) {
             Text("PIN  $pin", color = Color(0xFFB9D7FF), fontSize = 22.sp, fontWeight = FontWeight.SemiBold)
             Spacer(Modifier.height(18.dp))
             Text(status, color = if (approved) Color(0xFF9BE7B0) else Color.White.copy(alpha = alpha + .2f), fontSize = 14.sp)
+            Spacer(Modifier.height(18.dp))
+            Text("CONTROL REMOTO EN RED LOCAL", color = Color(0xFF9999A5), fontSize = 11.sp)
+            Text(TvRemoteServer.accessCode.ifBlank { "Iniciando…" }, color = Color(0xFFB9D7FF), fontSize = 27.sp, fontWeight = FontWeight.Bold)
+            Text("En tu teléfono: Control remoto → Buscar TV → introduce este código. No compartas este código fuera de tu red.", color = Color(0xFFB7B7C2), fontSize = 12.sp)
             if (approved) {
                 Spacer(Modifier.height(14.dp))
                 val closeOtherSessions: () -> Unit = {
