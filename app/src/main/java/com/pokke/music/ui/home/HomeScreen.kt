@@ -1,5 +1,7 @@
 package com.pokke.music.ui.home
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -48,8 +50,10 @@ import com.pokke.music.player.PlayerController
 import androidx.compose.ui.platform.LocalContext
 import java.util.Calendar
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.firstOrNull
 import com.pokke.music.ui.liquid.LocalAppBackdrop
 import com.pokke.music.ui.liquid.pokkePressMotion
+import org.json.JSONArray
 
 /**
  * Rediseño del Home de Pokke.
@@ -86,6 +90,22 @@ fun HomeScreen(
     val sectionOrder by prefs.homeSectionOrder.collectAsState("now_playing,quick_access,recent,recommendations,library")
     val layout by prefs.homeLayout.collectAsState("comfortable")
     val density by prefs.homeDensity.collectAsState("medium")
+    val favoriteArtistsRaw by prefs.onboardingArtists.collectAsState("[]")
+    val favoriteArtists = remember(favoriteArtistsRaw) {
+        runCatching {
+            val array = JSONArray(favoriteArtistsRaw)
+            buildList {
+                for (index in 0 until array.length()) {
+                    val item = array.optJSONObject(index) ?: continue
+                    val id = item.optLong("id", -1L)
+                    val name = item.optString("name").trim()
+                    if (id > 0 && name.isNotBlank()) {
+                        add(Triple(id, name, item.optString("image").takeIf { it.startsWith("https://") || it.startsWith("http://") }))
+                    }
+                }
+            }.take(20)
+        }.getOrDefault(emptyList())
+    }
 
     val backdrop = LocalAppBackdrop.current
 
@@ -117,8 +137,9 @@ fun HomeScreen(
 
     LaunchedEffect(Unit) {
         multi.getRecentAll().onSuccess { recent = it.take(40) }
+        val onboardingName = prefs.onboardingNickname.firstOrNull().orEmpty()
         authRepository.getProfile().onSuccess {
-            displayName = it?.displayName?.ifBlank { null } ?: it?.username ?: "tú"
+            displayName = it?.displayName?.ifBlank { null } ?: it?.username?.ifBlank { null } ?: onboardingName.ifBlank { "tú" }
         }
         headerTitle = "$greetingBase, $displayName"
         showGreeting = true
@@ -146,7 +167,12 @@ fun HomeScreen(
     val nativePluginHomeCards = remember { ToriPluginRegistry.homeCards() }
 
     val orderedSections = remember(sectionOrder) {
-        sectionOrder.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+        val configured = sectionOrder.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+        if ("favorite_artists" in configured) configured
+        else configured.toMutableList().apply {
+            val quickIndex = indexOf("quick_access")
+            add(if (quickIndex >= 0) quickIndex + 1 else 0, "favorite_artists")
+        }
     }
 
     Box(Modifier.fillMaxSize().animateContentSize().background(pluginBackgroundColor ?: MaterialTheme.colorScheme.background)) {
@@ -311,6 +337,45 @@ fun HomeScreen(
                                 onOpenLibrary = onOpenLibrary,
                                 onOpenSearch = onOpenSearch
                             )
+                        }
+                    }
+                    "favorite_artists" -> if (favoriteArtists.isNotEmpty()) {
+                        item(key = "favorite_artists_header") {
+                            SectionTitle("Tus artistas", sectionTop)
+                        }
+                        item(key = "favorite_artists_row") {
+                            LazyRow(
+                                contentPadding = PaddingValues(horizontal = 16.dp),
+                                horizontalArrangement = Arrangement.spacedBy(rowGap)
+                            ) {
+                                items(favoriteArtists, key = { it.first }) { artist ->
+                                    Column(
+                                        Modifier.width(coverSize).clickable {
+                                            runCatching {
+                                                ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://www.deezer.com/artist/${artist.first}")))
+                                            }
+                                        },
+                                        horizontalAlignment = Alignment.CenterHorizontally
+                                    ) {
+                                        AsyncImage(
+                                            model = artist.third,
+                                            contentDescription = "Artista ${artist.second}",
+                                            contentScale = ContentScale.Crop,
+                                            modifier = Modifier.size(coverSize).clip(CircleShape)
+                                                .background(MaterialTheme.colorScheme.surfaceVariant)
+                                        )
+                                        Spacer(Modifier.height(7.dp))
+                                        Text(
+                                            artist.second,
+                                            color = MaterialTheme.colorScheme.onSurface,
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Medium,
+                                            maxLines = 2,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+                                }
+                            }
                         }
                     }
                     "recent" -> if (showRecent && recent.isNotEmpty()) {
