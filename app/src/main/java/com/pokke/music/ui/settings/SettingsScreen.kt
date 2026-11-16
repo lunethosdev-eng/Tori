@@ -496,7 +496,7 @@ fun SettingsScreen(
         }
         if (selectedCategory == "accounts") {
         Section("CUENTAS EXTERNAS")
-        ExternalAccountsSection(prefs)
+        ExternalAccountsSection(prefs, authRepository)
 
         Text(
             "Tema",
