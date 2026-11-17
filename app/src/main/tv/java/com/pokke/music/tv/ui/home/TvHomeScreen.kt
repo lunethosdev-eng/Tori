@@ -156,7 +156,7 @@ fun TvHomeScreen(onPlay: (Song) -> Unit, onOpenPlayer: () -> Unit) {
                     .align(Alignment.BottomStart)
                     .padding(28.dp)
             ) {
-                Text("DESTACADO", color = Color.White.copy(0.55f), fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                Text("DESTACADO", color = Color.White.copy(0.55f), fontSize = 13.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 1.2.sp)
                 Spacer(Modifier.height(6.dp))
                 Text(
                     hero?.title ?: "Pokke TV",
@@ -261,8 +261,16 @@ fun TvHomeScreen(onPlay: (Song) -> Unit, onOpenPlayer: () -> Unit) {
 
         // Rails for category / search
         Spacer(Modifier.height(28.dp))
-        Text(selectedCategory, color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 20.sp)
-        Spacer(Modifier.height(12.dp))
+        Text(
+            selectedCategory.uppercase(),
+            color = Color.White.copy(0.55f),
+            fontWeight = FontWeight.SemiBold,
+            fontSize = 13.sp,
+            letterSpacing = 1.2.sp
+        )
+        Spacer(Modifier.height(10.dp))
+        Text(selectedCategory, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 24.sp)
+        Spacer(Modifier.height(14.dp))
         LazyRow(
             horizontalArrangement = Arrangement.spacedBy(18.dp),
             contentPadding = PaddingValues(bottom = 8.dp)
@@ -274,9 +282,17 @@ fun TvHomeScreen(onPlay: (Song) -> Unit, onOpenPlayer: () -> Unit) {
 
         // Recent
         if (recent.isNotEmpty()) {
-            Spacer(Modifier.height(24.dp))
-            Text("Recientes", color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 20.sp)
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(28.dp))
+            Text(
+                "RECIENTES",
+                color = Color.White.copy(0.55f),
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 13.sp,
+                letterSpacing = 1.2.sp
+            )
+            Spacer(Modifier.height(10.dp))
+            Text("Escuchado hace poco", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 24.sp)
+            Spacer(Modifier.height(14.dp))
             LazyRow(
                 horizontalArrangement = Arrangement.spacedBy(18.dp),
                 contentPadding = PaddingValues(bottom = 120.dp)
@@ -361,7 +377,7 @@ private fun TvSongCard(
             contentScale = ContentScale.Crop
         )
         Spacer(Modifier.height(8.dp))
-        Text(song.title, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 2)
+        Text(song.title, color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, maxLines = 2)
         Text(song.artist, color = Color(0xFF9A9AA3), fontSize = 12.sp, maxLines = 1)
     }
 }
