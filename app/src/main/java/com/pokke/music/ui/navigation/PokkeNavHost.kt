@@ -1,3 +1,5 @@
+import androidx.navigation.NavType
+import androidx.navigation.navArgument
 package com.pokke.music.ui.navigation
 
 import androidx.compose.animation.AnimatedVisibility
@@ -58,6 +60,7 @@ import com.pokke.music.ui.player.BitChordNowPlayingHost
 import com.pokke.music.ui.player.PlayerScreenPersistenceGate
 import com.pokke.music.ui.player.LyricsScreen
 import com.pokke.music.ui.queue.QueueScreen
+import com.pokke.music.ui.artist.ArtistScreen
 import com.pokke.music.ui.search.SearchScreen
 import com.pokke.music.ui.settings.SettingsScreen
 import com.pokke.music.ui.admin.AdminPanelScreen
@@ -120,6 +123,9 @@ sealed class Screen(val route: String) {
     data object Admin : Screen("admin")
     data object StoryPublish : Screen("story_publish")
     data object Maps : Screen("maps")
+    data object Artist : Screen("artist/{name}") {
+        fun create(name: String) = "artist/${android.net.Uri.encode(name.trim())}"
+    }
 }
 
 private data class NavItem(val screen: Screen, val selected: ImageVector, val normal: ImageVector)
@@ -411,6 +417,22 @@ fun PokkeNavHost(pluginDeepLinkUri: Uri? = null, onPluginDeepLinkHandled: () -> 
             composable(Screen.StoryPublish.route) {
                 StoryPublisherScreen(authRepository = auth, onBack = { nav.popBackStack() }, onPublished = { nav.popBackStack() })
             }
+            
+            composable(
+                route = Screen.Artist.route,
+                arguments = listOf(navArgument("name") { type = NavType.StringType })
+            ) { entry ->
+                val name = android.net.Uri.decode(entry.arguments?.getString("name").orEmpty())
+                ArtistScreen(
+                    artistName = name.ifBlank { "Artista" },
+                    onBack = { nav.popBackStack() },
+                    onSongClick = { song ->
+                        PlayerController.playSong(song)
+                        nav.navigate(Screen.Player.route)
+                    }
+                )
+            }
+
             composable(Screen.Settings.route) {
                 SettingsScreen(
                     onBack = { nav.popBackStack() },
