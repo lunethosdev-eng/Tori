@@ -5,15 +5,9 @@ import com.pokke.music.data.model.Song
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-/**
- * Resuelve covers faltantes en background y los cachea en memoria.
- * Evita mostrar solo el icono de nota cuando el servidor no trae cover_url.
- */
 object CoverResolver {
     private val cache = LruCache<String, String>(120)
-
     fun cached(songId: String): String? = cache.get(songId)
-
     suspend fun resolve(song: Song): String? = withContext(Dispatchers.IO) {
         cached(song.id)?.let { return@withContext it }
         song.displayCoverUrl?.let {
@@ -26,9 +20,7 @@ object CoverResolver {
             title = song.title,
             artist = song.artist
         )
-        if (!resolved.isNullOrBlank()) {
-            cache.put(song.id, resolved)
-        }
+        if (!resolved.isNullOrBlank()) cache.put(song.id, resolved)
         resolved
     }
 }
