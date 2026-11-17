@@ -171,7 +171,7 @@ fun LibraryScreen(
                         ),
                         contentAlignment = Alignment.Center
                     ) {
-                        if (!playlist.coverUrl.isNullOrBlank()) AsyncImage(playlist.coverUrl, null, Modifier.fillMaxSize())
+                        if (!playlist.coverUrl.isNullOrBlank()) AsyncImage(model = playlist.coverUrl, contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
                         else Icon(Icons.Default.QueueMusic, null, tint = Color.White.copy(.9f), modifier = Modifier.size(52.dp))
                     }
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(7.dp)) {
@@ -493,7 +493,12 @@ private fun PlaylistGridCard(
             contentAlignment = Alignment.Center
         ) {
             if (!playlist.coverUrl.isNullOrBlank()) {
-                AsyncImage(playlist.coverUrl, null, Modifier.fillMaxSize())
+                AsyncImage(
+                    model = playlist.coverUrl,
+                    contentDescription = playlist.name,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
+                )
             } else {
                 Icon(Icons.Default.QueueMusic, null, tint = Color.White.copy(.9f), modifier = Modifier.size(42.dp))
             }
