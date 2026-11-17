@@ -13,7 +13,9 @@ import kotlinx.coroutines.withContext
  */
 @Composable
 fun rememberResolvedCover(song: Song?): String? {
-    var url by remember(song?.id) { mutableStateOf(song?.displayCoverUrl ?: CoverResolver.cached(song?.id ?: "")) }
+    var url by remember(song?.id) {
+        mutableStateOf(song?.displayCoverUrl ?: song?.id?.let { CoverResolver.cached(it) })
+    }
     LaunchedEffect(song?.id) {
         if (song == null) {
             url = null
