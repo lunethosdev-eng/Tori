@@ -60,8 +60,10 @@ fun LiquidButton(
                 shape = { Capsule() },
                 effects = {
                     vibrancy()
-                    blur((if (performanceMode) 1.5f else 3f).dp.toPx())
-                    lens((if (performanceMode) 8f else 14f).dp.toPx(), (if (performanceMode) 16f else 26f).dp.toPx())
+                    blur(GlassSafety.blurRadiusDp(performanceMode).dp.toPx() * 0.4f)
+                    if (GlassSafety.allowLens(performanceMode)) {
+                        lens((if (performanceMode) 8f else 14f).dp.toPx(), (if (performanceMode) 16f else 26f).dp.toPx())
+                    }
                 },
                 layerBlock = if (isInteractive) {
                     {
