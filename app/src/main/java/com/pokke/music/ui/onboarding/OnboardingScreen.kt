@@ -1,5 +1,8 @@
 package com.pokke.music.ui.onboarding
 
+import android.content.Intent
+import android.net.Uri
+
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.animateFloatAsState
@@ -43,9 +46,9 @@ import kotlinx.coroutines.flow.first
 import org.json.JSONArray
 import org.json.JSONObject
 
-private val Night = Color(0xFF000000)
-private val Accent = Color(0xFFFFFFFF)
-private val Muted = Color(0xFF8A8A8A)
+private val Night = Color(0xFF090A10)
+private val Violet = Color(0xFF9B8CFF)
+private val Pink = Color(0xFFFF91C8)
 
 @Composable
 fun OnboardingScreen(
@@ -126,9 +129,9 @@ fun OnboardingScreen(
         } else step--
     }
 
-    Box(Modifier.fillMaxSize().background(Color.Black)) {
-        Box(Modifier.size(280.dp).offset(x = 180.dp, y = (-100).dp).clip(CircleShape).background(Accent.copy(.13f)))
-        Box(Modifier.size(230.dp).align(Alignment.BottomStart).offset(x = (-100).dp, y = 80.dp).clip(CircleShape).background(Muted.copy(.09f)))
+    Box(Modifier.fillMaxSize().background(Brush.linearGradient(listOf(Night, Color(0xFF171328), Color(0xFF10111B))))) {
+        Box(Modifier.size(280.dp).offset(x = 180.dp, y = (-100).dp).clip(CircleShape).background(Violet.copy(.13f)))
+        Box(Modifier.size(230.dp).align(Alignment.BottomStart).offset(x = (-100).dp, y = 80.dp).clip(CircleShape).background(Pink.copy(.09f)))
 
         AnimatedContent(targetState = step, label = "pokke-onboarding-step") { page ->
             when (page) {
@@ -152,7 +155,7 @@ fun OnboardingScreen(
                             }
                         }, enabled = !searching && query.trim().length >= 2, shape = RoundedCornerShape(16.dp), contentPadding = PaddingValues(horizontal = 16.dp, vertical = 15.dp)) { Text(if (searching) "…" else "Buscar") }
                     }
-                    Text("${selectedArtists.size}/12 seleccionados", color = Accent, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                    Text("${selectedArtists.size}/12 seleccionados", color = Violet, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                     if (searchError != null) Text(searchError!!, color = Color(0xFFFF9B9B), fontSize = 12.sp)
                     if (artists.isNotEmpty()) {
                         LazyColumn(Modifier.fillMaxWidth().heightIn(max = 270.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
@@ -163,7 +166,7 @@ fun OnboardingScreen(
                                 }.padding(9.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(11.dp)) {
                                     AsyncImage(artist.imageUrl, artist.name, Modifier.size(46.dp).clip(CircleShape))
                                     Text(artist.name, Modifier.weight(1f), color = Color.White, fontWeight = FontWeight.Medium)
-                                    Checkbox(checked = selected, onCheckedChange = { checked -> selectedArtists = if (checked) (selectedArtists + artist).distinctBy { it.id }.take(12) else selectedArtists.filterNot { it.id == artist.id } }, colors = CheckboxDefaults.colors(checkedColor = Accent))
+                                    Checkbox(checked = selected, onCheckedChange = { checked -> selectedArtists = if (checked) (selectedArtists + artist).distinctBy { it.id }.take(12) else selectedArtists.filterNot { it.id == artist.id } }, colors = CheckboxDefaults.colors(checkedColor = Violet))
                                 }
                             }
                         }
@@ -174,9 +177,9 @@ fun OnboardingScreen(
                     }
                 }
                 2 -> OnboardingPage(title = "Conecta tu música", subtitle = "Elige los servicios que quieras conectar. Puedes hacerlo más tarde desde Ajustes.", page = 3, onBack = { step = 1 }, onNext = { persistProviderFlags(); providerIndex = 0; step = 3 }) {
-                    ProviderCard("spotify", "Spotify", "Conecta tu sesión para funciones compatibles con tu cuenta y Canvas externo.", "S", providers, Color.White) { providers = if (it in providers) providers - it else providers + it }
-                    ProviderCard("ytmusic", "YouTube Music", "Permite usar tu sesión y las funciones de catálogo compatibles.", "YT", providers, Color.White) { providers = if (it in providers) providers - it else providers + it }
-                    ProviderCard("discord", "Discord", "Conecta tu cuenta para las funciones sociales y la integración de Pokke.", "D", providers, Color.White) { providers = if (it in providers) providers - it else providers + it }
+                    ProviderCard("spotify", "Spotify", "Conecta tu sesión para funciones compatibles con tu cuenta y Canvas externo.", "♫", providers, Violet) { providers = if (it in providers) providers - it else providers + it }
+                    ProviderCard("ytmusic", "YouTube Music", "Permite usar tu sesión y las funciones de catálogo compatibles.", "▶", providers, Color(0xFFFF6B6B)) { providers = if (it in providers) providers - it else providers + it }
+                    ProviderCard("discord", "Discord", "Conecta tu cuenta para las funciones sociales y la integración de Pokke.", "◉", providers, Color(0xFF8EA4FF)) { providers = if (it in providers) providers - it else providers + it }
                 }
                 3 -> {
                     if (providers.isEmpty() && authSession == null) {
@@ -222,8 +225,8 @@ private fun OnboardingPage(
 ) {
     Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(horizontal = 24.dp, vertical = 22.dp), verticalArrangement = Arrangement.SpaceBetween) {
         Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
-            Text("POKKE", color = Accent, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 3.sp)
-            Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) { repeat(4) { i -> Box(Modifier.weight(1f).height(3.dp).clip(CircleShape).background(if (i < page) Accent else Color.White.copy(.13f))) } }
+            Text("POKKE", color = Violet, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 3.sp)
+            Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) { repeat(4) { i -> Box(Modifier.weight(1f).height(3.dp).clip(CircleShape).background(if (i < page) Violet else Color.White.copy(.13f))) } }
             Spacer(Modifier.height(16.dp))
             Text(title, color = Color.White, fontSize = 29.sp, lineHeight = 35.sp, fontWeight = FontWeight.Bold)
             Text(subtitle, color = Color.White.copy(.58f), fontSize = 14.sp, lineHeight = 20.sp)
@@ -231,7 +234,7 @@ private fun OnboardingPage(
         Column(Modifier.fillMaxWidth().weight(1f, fill = false).padding(vertical = 18.dp), verticalArrangement = Arrangement.spacedBy(13.dp), content = content)
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
             if (onBack != null) OutlinedButton(onClick = onBack, modifier = Modifier.weight(1f).height(54.dp), shape = RoundedCornerShape(18.dp), border = BorderStroke(1.dp, Color.White.copy(.2f)), colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)) { Text("Atrás") }
-            Button(onClick = onNext, enabled = nextEnabled, modifier = Modifier.weight(if (onBack == null) 1f else 1.5f).height(54.dp), shape = RoundedCornerShape(18.dp), colors = ButtonDefaults.buttonColors(containerColor = Accent, contentColor = Color(0xFF11101A))) { Text(nextLabel, fontWeight = FontWeight.Bold) }
+            Button(onClick = onNext, enabled = nextEnabled, modifier = Modifier.weight(if (onBack == null) 1f else 1.5f).height(54.dp), shape = RoundedCornerShape(18.dp), colors = ButtonDefaults.buttonColors(containerColor = Violet, contentColor = Color(0xFF11101A))) { Text(nextLabel, fontWeight = FontWeight.Bold) }
         }
     }
 }
@@ -272,7 +275,7 @@ private fun WelcomeScreen(nickname: String) {
     LaunchedEffect(Unit) { shown = true }
     val scale by animateFloatAsState(if (shown) 1f else .78f, spring(dampingRatio = .55f, stiffness = 180f), label = "welcome-scale")
     Column(Modifier.fillMaxSize().padding(28.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-        Box(Modifier.size(132.dp).scale(scale).clip(CircleShape).background(Brush.linearGradient(listOf(Accent, Muted))), contentAlignment = Alignment.Center) {
+        Box(Modifier.size(132.dp).scale(scale).clip(CircleShape).background(Brush.linearGradient(listOf(Violet, Pink))), contentAlignment = Alignment.Center) {
             Text("♪", color = Color.White, fontSize = 64.sp, fontWeight = FontWeight.Light)
         }
         Spacer(Modifier.height(34.dp))
@@ -280,16 +283,16 @@ private fun WelcomeScreen(nickname: String) {
         Spacer(Modifier.height(12.dp))
         Text("Gracias por unirte a Pokke.\nEsperamos que disfrutes tu música.", color = Color.White.copy(.68f), fontSize = 15.sp, lineHeight = 23.sp, textAlign = TextAlign.Center)
         Spacer(Modifier.height(42.dp))
-        CircularProgressIndicator(Modifier.size(22.dp), color = Accent, strokeWidth = 2.dp)
+        CircularProgressIndicator(Modifier.size(22.dp), color = Violet, strokeWidth = 2.dp)
     }
 }
 
 @Composable
 private fun onboardingFieldColors() = OutlinedTextFieldDefaults.colors(
     focusedTextColor = Color.White, unfocusedTextColor = Color.White,
-    focusedBorderColor = Accent, unfocusedBorderColor = Color.White.copy(.2f),
-    focusedLabelColor = Accent, unfocusedLabelColor = Color.White.copy(.5f),
-    cursorColor = Accent
+    focusedBorderColor = Violet, unfocusedBorderColor = Color.White.copy(.2f),
+    focusedLabelColor = Violet, unfocusedLabelColor = Color.White.copy(.5f),
+    cursorColor = Violet
 )
 
 
@@ -313,19 +316,77 @@ private fun YouTubeMusicConnectScreen(store: ExternalAuthStore, onConnected: () 
                 onClick = { captureRequest++ },
                 modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 54.dp),
                 shape = RoundedCornerShape(18.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Accent, contentColor = Color(0xFF11101A))
+                colors = ButtonDefaults.buttonColors(containerColor = Violet, contentColor = Color(0xFF11101A))
             ) { Text("Usar esta cuenta", fontWeight = FontWeight.Bold) }
         }
     }
 }
 
+/**
+ * Discord OAuth via polic.onrender.com:
+ * 1) App opens GET https://polic.onrender.com/api/auth/discord
+ * 2) Server redirects to Discord, then handles /api/auth/discord/callback
+ * 3) Server should deep-link back to pokke://discord/callback?status=success
+ * 4) MainActivity.handleDiscordCallback marks discordPolicLinked = true
+ */
 @Composable
 private fun DiscordOAuthPending(onContinue: () -> Unit) {
-    Column(Modifier.fillMaxSize().padding(horizontal = 28.dp, vertical = 110.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-        Text("Discord necesita una conexión segura", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+    val context = LocalContext.current
+    val prefs = remember(context) { UserPreferences(context.applicationContext) }
+    val linked by prefs.discordPolicLinked.collectAsState(initial = false)
+    var opened by remember { mutableStateOf(false) }
+
+    LaunchedEffect(linked) {
+        if (linked) onContinue()
+    }
+
+    Column(
+        Modifier.fillMaxSize().padding(horizontal = 28.dp, vertical = 110.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Text(
+            "Conectar Discord",
+            color = Color.White,
+            fontSize = 22.sp,
+            fontWeight = FontWeight.Bold,
+            textAlign = TextAlign.Center
+        )
         Spacer(Modifier.height(12.dp))
-        Text("Discord se conecta con OAuth2 oficial desde Ajustes → Cuentas externas, después de iniciar sesión en Pokke. Así vinculamos la cuenta correcta sin leer ni almacenar tokens privados de Discord.", color = Color.White.copy(.65f), textAlign = TextAlign.Center, fontSize = 13.sp, lineHeight = 20.sp)
+        Text(
+            "Te llevamos a Discord para autorizar Pokke. Al terminar, vuelve a la app automáticamente.",
+            color = Color.White.copy(.65f),
+            textAlign = TextAlign.Center,
+            fontSize = 13.sp,
+            lineHeight = 20.sp
+        )
         Spacer(Modifier.height(22.dp))
-        Button(onClick = onContinue, shape = RoundedCornerShape(18.dp), colors = ButtonDefaults.buttonColors(containerColor = Accent, contentColor = Color(0xFF11101A))) { Text("Continuar", fontWeight = FontWeight.Bold) }
+        Button(
+            onClick = {
+                opened = true
+                val intent = Intent(
+                    Intent.ACTION_VIEW,
+                    Uri.parse("https://polic.onrender.com/api/auth/discord")
+                )
+                context.startActivity(intent)
+            },
+            shape = RoundedCornerShape(18.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = Violet, contentColor = Color(0xFF11101A))
+        ) {
+            Text(if (opened) "Abrir Discord de nuevo" else "Conectar con Discord", fontWeight = FontWeight.Bold)
+        }
+        Spacer(Modifier.height(12.dp))
+        TextButton(onClick = onContinue) {
+            Text("Continuar sin Discord", color = Color.White.copy(.7f))
+        }
+        if (opened && !linked) {
+            Spacer(Modifier.height(16.dp))
+            Text(
+                "Esperando autorización… Si ya autorizaste, vuelve a Pokke desde Discord.",
+                color = Color.White.copy(.5f),
+                fontSize = 12.sp,
+                textAlign = TextAlign.Center
+            )
+        }
     }
 }
