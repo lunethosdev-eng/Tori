@@ -14,12 +14,7 @@ object CoverResolver {
             cache.put(song.id, it)
             return@withContext it
         }
-        val resolved = CoverUrls.resolveBest(
-            coverUrl = song.coverUrl,
-            youtubeId = song.youtubeId,
-            title = song.title,
-            artist = song.artist
-        )
+        val resolved = CoverUrls.resolveBest(song.coverUrl, song.youtubeId, song.title, song.artist)
         if (!resolved.isNullOrBlank()) cache.put(song.id, resolved)
         resolved
     }
