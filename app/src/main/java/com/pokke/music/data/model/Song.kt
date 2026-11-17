@@ -17,6 +17,16 @@ data class Song(
 ) {
     val hasAnimatedCover: Boolean get() = !animatedCoverUrl.isNullOrBlank()
     val durationMs: Long get() = durationSeconds * 1000L
+
+    /**
+     * Cover prioritario para UI.
+     * 1. coverUrl (servidor / absoluto)
+     * 2. animatedCoverUrl si es imagen estática
+     * 3. thumbnail de YouTube
+     *
+     * Si todo falla, la UI debe llamar a CoverUrls.resolveBest en background
+     * y cachear el resultado.
+     */
     val displayCoverUrl: String?
         get() = coverUrl?.takeIf(String::isNotBlank)
             ?: animatedCoverUrl?.takeIf(::isStillArtworkImage)
