@@ -56,6 +56,7 @@ import com.pokke.music.player.PlayerController
 import com.pokke.music.ui.liquid.LocalAppBackdrop
 import com.pokke.music.ui.liquid.pokkePressMotion
 import com.pokke.music.ui.liquid.LocalGlassPerformanceMode
+import com.pokke.music.ui.player.rememberResolvedCover
 
 /**
  * Floating pill mini-player (Apple Music style).
@@ -83,7 +84,7 @@ fun MiniPlayerBar(
     val duration by PlayerController.durationMs.collectAsState()
     val progress = if (duration > 0) (position.toFloat() / duration).coerceIn(0f, 1f) else 0f
     val coverSize by animateFloatAsState(
-        if (compact) 36f else 44f,
+        if (compact) 32f else 38f,
         spring(stiffness = Spring.StiffnessMediumLow),
         label = "cover"
     )
@@ -98,19 +99,19 @@ fun MiniPlayerBar(
         Box(
             Modifier
                 .fillMaxWidth()
-                .padding(horizontal = if (compact) 28.dp else 16.dp)
-                .shadow(if (glass) 18.dp else 8.dp, RoundedCornerShape(30.dp), clip = false)
-                .clip(RoundedCornerShape(30.dp))
+                .padding(horizontal = if (compact) 32.dp else 18.dp)
+                .shadow(if (glass) 18.dp else 8.dp, RoundedCornerShape(22.dp), clip = false)
+                .clip(RoundedCornerShape(22.dp))
                 .then(
                     if (glass && backdrop != null) {
                         Modifier
                             .drawBackdrop(
                                 backdrop = backdrop,
-                                shape = { RoundedCornerShape(30.dp) },
+                                shape = { RoundedCornerShape(22.dp) },
                                 effects = { blur((if (performanceMode) 10f else 18f).dp.toPx()) },
                                 onDrawSurface = { drawRect(surfaceColor.copy(alpha = 0.76f)) }
                             )
-                            .border(0.8.dp, MaterialTheme.colorScheme.primary.copy(0.40f), RoundedCornerShape(30.dp))
+                            .border(0.8.dp, MaterialTheme.colorScheme.primary.copy(0.40f), RoundedCornerShape(22.dp))
                     } else {
                         Modifier.background(MaterialTheme.colorScheme.surface)
                     }
@@ -127,11 +128,11 @@ fun MiniPlayerBar(
                 }
                 .pokkePressMotion(tapInteraction, enabled = true, pressedScale = 0.985f)
                 .clickable(interactionSource = tapInteraction, indication = null, onClick = onOpenPlayer)
-                .padding(horizontal = 10.dp, vertical = if (compact) 8.dp else 10.dp)
+                .padding(horizontal = 9.dp, vertical = if (compact) 6.dp else 7.dp)
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 AsyncImage(
-                    model = s.displayCoverUrl ?: s.coverUrl,
+                    model = rememberResolvedCover(s) ?: s.displayCoverUrl ?: s.coverUrl,
                     contentDescription = null,
                     modifier = Modifier
                         .size(coverSize.dp)
@@ -149,7 +150,7 @@ fun MiniPlayerBar(
                         s.title,
                         color = MaterialTheme.colorScheme.onSurface,
                         fontWeight = FontWeight.SemiBold,
-                        fontSize = if (compact) 13.sp else 14.sp,
+                        fontSize = if (compact) 12.sp else 13.sp,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
