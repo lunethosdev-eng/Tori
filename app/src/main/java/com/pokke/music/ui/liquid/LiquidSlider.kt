@@ -170,7 +170,7 @@ fun LiquidSlider(
                         lens(
                             (if (performanceMode) 5f else 10f).dp.toPx() * progress,
                             (if (performanceMode) 7f else 14f).dp.toPx() * progress,
-                            chromaticAberration = !performanceMode
+                            chromaticAberration = GlassSafety.allowChromatic(performanceMode)
                         )
                     },
                     highlight = {
