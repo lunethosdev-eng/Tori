@@ -22,6 +22,8 @@ import com.music.bitchord.ui.LyricsProviderState
 import com.music.bitchord.ui.player.NowPlayingScreen
 import com.pokke.music.data.model.Song
 import com.pokke.music.data.remote.MusicMetadataApi
+import com.pokke.music.data.remote.CoverResolver
+import com.pokke.music.data.remote.CoverUrls
 import com.pokke.music.data.repository.AuthRepository
 import com.pokke.music.data.repository.LocalLibraryStore
 import com.pokke.music.player.PlayerController
@@ -83,8 +85,15 @@ fun BitChordNowPlayingHost(
 
     val song = current ?: return
     PokkeAndroidPlayerHost.register(song)
-    val bitSong = remember(song) { song.toBitChordSong() }
-    val bitQueue = remember(queue) { queue.map(Song::toBitChordSong) }
+    // Resolve missing covers (server without cover_url / no youtubeId) via Deezer/iTunes cache
+    var resolvedCover by remember(song.id) { mutableStateOf(song.displayCoverUrl ?: CoverResolver.cached(song.id)) }
+    LaunchedEffect(song.id) {
+        if (resolvedCover.isNullOrBlank()) {
+            resolvedCover = withContext(Dispatchers.IO) { CoverResolver.resolve(song) }
+        }
+    }
+    val bitSong = remember(song, resolvedCover) { song.toBitChordSong(resolvedCover) }
+    val bitQueue = remember(queue) { queue.map { it.toBitChordSong(CoverResolver.cached(it.id)) } }
     val lyricSource = if (lyrics.isNullOrEmpty()) null else LyricsSource.LRCLIB
 
     fun toggleFavorite() {
@@ -176,12 +185,13 @@ fun BitChordNowPlayingHost(
     }
 }
 
-private fun Song.toBitChordSong() = BitChordSong(
+private fun Song.toBitChordSong(resolvedCover: String? = null) = BitChordSong(
     videoId = youtubeId ?: id,
     title = title,
     artist = artist,
-    // Prefer static cover, then animated still is not a thumbnail; fall back to YT hqdefault
-    thumbnailUrl = coverUrl?.takeIf { it.isNotBlank() }
+    // Prefer: explicit resolved → server cover → displayCoverUrl → YT → (caller may pass Deezer/iTunes)
+    thumbnailUrl = resolvedCover?.takeIf { it.isNotBlank() }
+        ?: coverUrl?.takeIf { it.isNotBlank() }
         ?: displayCoverUrl
         ?: youtubeId?.takeIf { it.isNotBlank() }?.let { "https://i.ytimg.com/vi/$it/hqdefault.jpg" },
     durationText = durationSeconds.takeIf { it > 0 }?.let { seconds -> "%d:%02d".format(seconds / 60, seconds % 60) },
