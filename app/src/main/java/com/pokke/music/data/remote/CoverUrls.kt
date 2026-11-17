@@ -15,19 +15,15 @@ object CoverUrls {
             else -> v
         }
     }
-
     fun fromYoutubeId(youtubeId: String?): String? =
         youtubeId?.takeIf { it.isNotBlank() }?.let { "https://i.ytimg.com/vi/$it/hqdefault.jpg" }
-
     fun best(coverUrl: String?, youtubeId: String?, sourceBaseUrl: String? = null): String? =
         absolute(coverUrl, sourceBaseUrl) ?: fromYoutubeId(youtubeId)
-
     fun fromDeezer(title: String?, artist: String?): String? {
         if (title.isNullOrBlank() || artist.isNullOrBlank()) return null
         return runCatching {
             val q = java.net.URLEncoder.encode("$artist $title", "UTF-8")
-            val url = "https://api.deezer.com/search/track?q=$q&limit=1"
-            val c = (java.net.URL(url).openConnection() as java.net.HttpURLConnection).apply {
+            val c = (java.net.URL("https://api.deezer.com/search/track?q=$q&limit=1").openConnection() as java.net.HttpURLConnection).apply {
                 connectTimeout = 3500; readTimeout = 3500; requestMethod = "GET"
                 setRequestProperty("User-Agent", "Pokke/1.0")
             }
@@ -42,13 +38,11 @@ object CoverUrls {
             } finally { c.disconnect() }
         }.getOrNull()
     }
-
     fun fromItunes(title: String?, artist: String?): String? {
         if (title.isNullOrBlank() || artist.isNullOrBlank()) return null
         return runCatching {
             val term = java.net.URLEncoder.encode("$artist $title", "UTF-8")
-            val url = "https://itunes.apple.com/search?term=$term&entity=song&limit=1"
-            val c = (java.net.URL(url).openConnection() as java.net.HttpURLConnection).apply {
+            val c = (java.net.URL("https://itunes.apple.com/search?term=$term&entity=song&limit=1").openConnection() as java.net.HttpURLConnection).apply {
                 connectTimeout = 3500; readTimeout = 3500; requestMethod = "GET"
                 setRequestProperty("User-Agent", "Pokke/1.0")
             }
@@ -61,7 +55,6 @@ object CoverUrls {
             } finally { c.disconnect() }
         }.getOrNull()
     }
-
     fun resolveBest(coverUrl: String?, youtubeId: String?, title: String?, artist: String?, sourceBaseUrl: String? = null): String? {
         best(coverUrl, youtubeId, sourceBaseUrl)?.let { return it }
         fromDeezer(title, artist)?.let { return it }
