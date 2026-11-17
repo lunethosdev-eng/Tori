@@ -5,7 +5,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -34,17 +33,11 @@ import com.pokke.music.player.PlayerController
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-/**
- * Pantalla de artista in-app.
- * - Bio + imagen desde MusicMetadataApi (Deezer + Wikipedia)
- * - Canciones del catálogo local / servidor + YT si está activo
- * - NO abre el navegador de Deezer
- */
 @Composable
 fun ArtistScreen(
     artistName: String,
     onBack: () -> Unit,
-    onSongClick: (Song) -> Unit = { PlayerController.play(it) }
+    onSongClick: (Song) -> Unit = { PlayerController.playSong(it) }
 ) {
     var info by remember { mutableStateOf<MusicMetadataApi.ArtistInfo?>(null) }
     var songs by remember { mutableStateOf<List<Song>>(emptyList()) }
@@ -93,16 +86,12 @@ fun ArtistScreen(
                     )
                     IconButton(
                         onClick = onBack,
-                        modifier = Modifier
-                            .statusBarsPadding()
-                            .padding(8.dp)
+                        modifier = Modifier.statusBarsPadding().padding(8.dp)
                     ) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = Color.White)
                     }
                     Column(
-                        Modifier
-                            .align(Alignment.BottomStart)
-                            .padding(20.dp)
+                        Modifier.align(Alignment.BottomStart).padding(20.dp)
                     ) {
                         Text(
                             info?.name ?: artistName,
@@ -146,9 +135,7 @@ fun ArtistScreen(
                 if (songs.isNotEmpty()) {
                     item {
                         Row(
-                            Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 20.dp, vertical = 8.dp),
+                            Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
@@ -159,7 +146,8 @@ fun ArtistScreen(
                                 modifier = Modifier.weight(1f)
                             )
                             IconButton(onClick = {
-                                songs.firstOrNull()?.let { onSongClick(it) }
+                                PlayerController.playQueue(songs, 0)
+                                songs.firstOrNull()?.let(onSongClick)
                             }) {
                                 Icon(Icons.Default.PlayArrow, "Reproducir", tint = MaterialTheme.colorScheme.primary)
                             }
@@ -169,7 +157,11 @@ fun ArtistScreen(
                         Row(
                             Modifier
                                 .fillMaxWidth()
-                                .clickable { onSongClick(song) }
+                                .clickable {
+                                    val index = songs.indexOfFirst { it.id == song.id }.coerceAtLeast(0)
+                                    PlayerController.playQueue(songs, index)
+                                    onSongClick(song)
+                                }
                                 .padding(horizontal = 20.dp, vertical = 10.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
