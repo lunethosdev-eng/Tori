@@ -16,7 +16,10 @@ import com.pokke.music.ui.backdrop.effects.blur
 import com.pokke.music.ui.backdrop.effects.lens
 import com.pokke.music.ui.backdrop.effects.vibrancy
 
-/** Shared glass panel used by phone and TV chrome; falls back cleanly when disabled. */
+/**
+ * Shared glass panel. Uses GlassSafety so mid-range devices (A71, etc.)
+ * never run the full lens + chromatic path that causes RenderThread SIGSEGV.
+ */
 @Composable
 fun LiquidGlassPanel(
     modifier: Modifier = Modifier,
@@ -26,26 +29,33 @@ fun LiquidGlassPanel(
 ) {
     val backdrop = LocalAppBackdrop.current
     val enabled = LocalGlassEnabled.current && LocalGlassScreenActive.current && backdrop != null
-    val performance = LocalGlassPerformanceMode.current
+    val performance = LocalGlassPerformanceMode.current || GlassSafety.preferSafeGlass
     val shape = RoundedCornerShape(cornerRadius)
 
     val surfaceModifier = if (enabled) {
+        val blurDp = GlassSafety.blurRadiusDp(performance)
+        val scale = GlassSafety.backdropScale(performance)
+        val useLens = GlassSafety.allowLens(performance)
+        val useChromatic = GlassSafety.allowChromatic(performance)
+
         Modifier.drawBackdrop(
             backdrop = requireNotNull(backdrop),
             shape = { shape },
             effects = {
                 vibrancy()
-                blur((if (performance) 4f else 9f).dp.toPx())
-                lens(
-                    refractionHeight = (if (performance) 8f else 14f).dp.toPx(),
-                    refractionAmount = (if (performance) 12f else 22f).dp.toPx(),
-                    chromaticAberration = !performance
-                )
+                blur(blurDp.dp.toPx())
+                if (useLens) {
+                    lens(
+                        refractionHeight = (if (performance) 6f else 12f).dp.toPx(),
+                        refractionAmount = (if (performance) 8f else 18f).dp.toPx(),
+                        chromaticAberration = useChromatic
+                    )
+                }
             },
             onDrawSurface = {
                 drawRect(Color(0xB81A1B24))
             },
-            backdropScale = if (performance) 0.55f else 1f
+            backdropScale = scale
         ).clip(shape)
     } else {
         Modifier.background(fallbackColor, shape).clip(shape)
