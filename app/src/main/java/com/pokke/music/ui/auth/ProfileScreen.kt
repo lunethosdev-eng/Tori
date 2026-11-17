@@ -404,13 +404,65 @@ fun ProfileScreen(repository: AuthRepository, onBack: () -> Unit, onSignedOut: (
                             Box(Modifier.size(30.dp).clip(CircleShape).background(color).border(if (nameColor == hex) 3.dp else 1.dp, if (nameColor == hex) Color.White else Color.White.copy(.25f), CircleShape).clickable { nameColor = hex })
                         }
                     }
-                    Text("Orden de tarjetas", color = ProfileMuted, fontSize = 12.sp, modifier = Modifier.padding(top = 12.dp, bottom = 6.dp))
+                    Text("Orden de bloques del perfil", color = ProfileMuted, fontSize = 12.sp, modifier = Modifier.padding(top = 12.dp, bottom = 4.dp))
+                    Text("Reordena cómo se ven en tu perfil público.", color = ProfileMuted.copy(0.8f), fontSize = 11.sp, modifier = Modifier.padding(bottom = 8.dp))
                     val orderedCards = profileCardOrder.split(',').filter { it in setOf("listening", "badges", "mangas") }.distinct().let { (it + listOf("listening", "badges", "mangas")).distinct() }
                     orderedCards.forEachIndexed { index, card ->
-                        Row(Modifier.fillMaxWidth().padding(vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Text(when (card) { "listening" -> "Actividad / escuchando"; "badges" -> "Colección de emblemas"; else -> "Favoritos de manga" }, color = ProfileInk, fontSize = 12.sp, modifier = Modifier.weight(1f))
-                            Text("↑", color = accentColor, modifier = Modifier.clickable(enabled = index > 0) { profileCardOrder = orderedCards.toMutableList().apply { add(index - 1, removeAt(index)) }.joinToString(",") }.padding(horizontal = 10.dp))
-                            Text("↓", color = accentColor, modifier = Modifier.clickable(enabled = index < orderedCards.lastIndex) { profileCardOrder = orderedCards.toMutableList().apply { add(index + 1, removeAt(index)) }.joinToString(",") }.padding(horizontal = 10.dp))
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp)
+                                .clip(RoundedCornerShape(14.dp))
+                                .background(Color.White.copy(0.06f))
+                                .border(1.dp, Color.White.copy(0.08f), RoundedCornerShape(14.dp))
+                                .padding(horizontal = 12.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                Modifier
+                                    .size(26.dp)
+                                    .clip(CircleShape)
+                                    .background(accentColor.copy(0.25f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text("${index + 1}", color = accentColor, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            }
+                            Spacer(Modifier.width(10.dp))
+                            Text(
+                                when (card) {
+                                    "listening" -> "Escuchando ahora"
+                                    "badges" -> "Emblemas"
+                                    else -> "Mangas favoritos"
+                                },
+                                color = ProfileInk,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Medium,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Text(
+                                "↑",
+                                color = if (index > 0) accentColor else ProfileMuted.copy(0.3f),
+                                fontSize = 18.sp,
+                                modifier = Modifier
+                                    .clickable(enabled = index > 0) {
+                                        profileCardOrder = orderedCards.toMutableList().apply {
+                                            add(index - 1, removeAt(index))
+                                        }.joinToString(",")
+                                    }
+                                    .padding(horizontal = 8.dp)
+                            )
+                            Text(
+                                "↓",
+                                color = if (index < orderedCards.lastIndex) accentColor else ProfileMuted.copy(0.3f),
+                                fontSize = 18.sp,
+                                modifier = Modifier
+                                    .clickable(enabled = index < orderedCards.lastIndex) {
+                                        profileCardOrder = orderedCards.toMutableList().apply {
+                                            add(index + 1, removeAt(index))
+                                        }.joinToString(",")
+                                    }
+                                    .padding(horizontal = 8.dp)
+                            )
                         }
                     }
                     Text("Foto y banner", color = ProfileMuted, fontSize = 12.sp, modifier = Modifier.padding(bottom = 8.dp))
