@@ -160,7 +160,7 @@ fun LiquidToggle(
                         lens(
                             5f.dp.toPx() * progress,
                             10f.dp.toPx() * progress,
-                            chromaticAberration = true
+                            chromaticAberration = GlassSafety.allowChromatic(LocalGlassPerformanceMode.current)
                         )
                     },
                     highlight = {
