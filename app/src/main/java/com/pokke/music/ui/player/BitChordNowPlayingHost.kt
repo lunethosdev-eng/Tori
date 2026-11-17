@@ -23,7 +23,6 @@ import com.music.bitchord.ui.player.NowPlayingScreen
 import com.pokke.music.data.model.Song
 import com.pokke.music.data.remote.MusicMetadataApi
 import com.pokke.music.data.remote.CoverResolver
-import com.pokke.music.data.remote.CoverUrls
 import com.pokke.music.data.repository.AuthRepository
 import com.pokke.music.data.repository.LocalLibraryStore
 import com.pokke.music.player.PlayerController
@@ -41,6 +40,7 @@ fun BitChordNowPlayingHost(
     onOpenQueue: () -> Unit,
     onOpenLyrics: () -> Unit,
     onRequireLogin: () -> Unit,
+    onOpenArtist: (artistName: String) -> Unit = {},
 ) {
     val context = LocalContext.current
     val configuration = LocalConfiguration.current
@@ -85,7 +85,6 @@ fun BitChordNowPlayingHost(
 
     val song = current ?: return
     PokkeAndroidPlayerHost.register(song)
-    // Resolve missing covers (server without cover_url / no youtubeId) via Deezer/iTunes cache
     var resolvedCover by remember(song.id) { mutableStateOf(song.displayCoverUrl ?: CoverResolver.cached(song.id)) }
     LaunchedEffect(song.id) {
         if (resolvedCover.isNullOrBlank()) {
@@ -142,7 +141,7 @@ fun BitChordNowPlayingHost(
         onClearQueue = PlayerController::clearQueue,
         onOpenMenu = { showMenu = true },
         onOpenAlbum = {},
-        onOpenArtist = { _, _ -> },
+        onOpenArtist = { name, _ -> if (name.isNotBlank()) onOpenArtist(name) },
         onOpenPlaybackSource = onClose,
         onListenTogether = {},
         lyrics = lyrics,
@@ -189,7 +188,6 @@ private fun Song.toBitChordSong(resolvedCover: String? = null) = BitChordSong(
     videoId = youtubeId ?: id,
     title = title,
     artist = artist,
-    // Prefer: explicit resolved → server cover → displayCoverUrl → YT → (caller may pass Deezer/iTunes)
     thumbnailUrl = resolvedCover?.takeIf { it.isNotBlank() }
         ?: coverUrl?.takeIf { it.isNotBlank() }
         ?: displayCoverUrl
