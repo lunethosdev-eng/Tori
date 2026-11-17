@@ -167,7 +167,7 @@ fun LiquidBottomTabs(
                     effects = {
                         vibrancy()
                         blur((if (performanceMode) 5f else 9f).dp.toPx())
-                        lens(24f.dp.toPx(), 24f.dp.toPx())
+                        if (GlassSafety.allowLens(LocalGlassPerformanceMode.current)) lens(24f.dp.toPx(), 24f.dp.toPx())
                     },
                     layerBlock = {
                         val progress = dampedDragAnimation.pressProgress
@@ -204,11 +204,13 @@ fun LiquidBottomTabs(
                         effects = {
                             val progress = dampedDragAnimation.pressProgress
                             vibrancy()
-                            blur((if (performanceMode) 5f else 9f).dp.toPx())
-                            lens(
-                                (if (performanceMode) 16f else 24f).dp.toPx() * progress,
-                                (if (performanceMode) 16f else 24f).dp.toPx() * progress
-                            )
+                            blur(GlassSafety.blurRadiusDp(performanceMode).dp.toPx())
+                            if (GlassSafety.allowLens(performanceMode)) {
+                                lens(
+                                    (if (performanceMode) 16f else 24f).dp.toPx() * progress,
+                                    (if (performanceMode) 16f else 24f).dp.toPx() * progress
+                                )
+                            }
                         },
                         highlight = {
                             val progress = dampedDragAnimation.pressProgress
@@ -240,11 +242,13 @@ fun LiquidBottomTabs(
                     shape = { Capsule() },
                     effects = {
                         val progress = dampedDragAnimation.pressProgress
-                        lens(
-                            (if (performanceMode) 7f else 10f).dp.toPx() * progress,
-                            (if (performanceMode) 10f else 14f).dp.toPx() * progress,
-                            chromaticAberration = true
-                        )
+                        if (GlassSafety.allowLens(performanceMode)) {
+                            lens(
+                                (if (performanceMode) 7f else 10f).dp.toPx() * progress,
+                                (if (performanceMode) 10f else 14f).dp.toPx() * progress,
+                                chromaticAberration = GlassSafety.allowChromatic(performanceMode)
+                            )
+                        }
                     },
                     highlight = {
                         val progress = dampedDragAnimation.pressProgress
