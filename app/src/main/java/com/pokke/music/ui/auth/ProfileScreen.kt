@@ -11,6 +11,12 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.offset
+import kotlin.math.roundToInt
+import androidx.compose.ui.zIndex
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
@@ -405,17 +411,77 @@ fun ProfileScreen(repository: AuthRepository, onBack: () -> Unit, onSignedOut: (
                         }
                     }
                     Text("Orden de bloques del perfil", color = ProfileMuted, fontSize = 12.sp, modifier = Modifier.padding(top = 12.dp, bottom = 4.dp))
-                    Text("Reordena cómo se ven en tu perfil público.", color = ProfileMuted.copy(0.8f), fontSize = 11.sp, modifier = Modifier.padding(bottom = 8.dp))
-                    val orderedCards = profileCardOrder.split(',').filter { it in setOf("listening", "badges", "mangas") }.distinct().let { (it + listOf("listening", "badges", "mangas")).distinct() }
+                    Text(
+                        "Mantén presionado un bloque y arrástralo para reordenar.",
+                        color = ProfileMuted.copy(0.85f),
+                        fontSize = 11.sp,
+                        modifier = Modifier.padding(bottom = 10.dp)
+                    )
+                    val orderedCards = remember(profileCardOrder) {
+                        profileCardOrder.split(',')
+                            .filter { it in setOf("listening", "badges", "mangas") }
+                            .distinct()
+                            .let { (it + listOf("listening", "badges", "mangas")).distinct() }
+                    }
+                    var draggingIndex by remember { mutableStateOf<Int?>(null) }
+                    var dragOffsetY by remember { mutableStateOf(0f) }
+                    val rowHeightPx = with(androidx.compose.ui.platform.LocalDensity.current) { 56.dp.toPx() }
+
                     orderedCards.forEachIndexed { index, card ->
+                        val isDragging = draggingIndex == index
                         Row(
                             Modifier
                                 .fillMaxWidth()
                                 .padding(vertical = 4.dp)
+                                .zIndex(if (isDragging) 2f else 0f)
+                                .offset {
+                                    IntOffset(
+                                        0,
+                                        if (isDragging) dragOffsetY.roundToInt() else 0
+                                    )
+                                }
                                 .clip(RoundedCornerShape(14.dp))
-                                .background(Color.White.copy(0.06f))
-                                .border(1.dp, Color.White.copy(0.08f), RoundedCornerShape(14.dp))
-                                .padding(horizontal = 12.dp, vertical = 10.dp),
+                                .background(
+                                    if (isDragging) accentColor.copy(0.18f)
+                                    else Color.White.copy(0.06f)
+                                )
+                                .border(
+                                    1.dp,
+                                    if (isDragging) accentColor.copy(0.55f) else Color.White.copy(0.08f),
+                                    RoundedCornerShape(14.dp)
+                                )
+                                .pointerInput(orderedCards, index) {
+                                    detectDragGesturesAfterLongPress(
+                                        onDragStart = {
+                                            draggingIndex = index
+                                            dragOffsetY = 0f
+                                        },
+                                        onDragCancel = {
+                                            draggingIndex = null
+                                            dragOffsetY = 0f
+                                        },
+                                        onDragEnd = {
+                                            draggingIndex = null
+                                            dragOffsetY = 0f
+                                        },
+                                        onDrag = { change, dragAmount ->
+                                            change.consume()
+                                            dragOffsetY += dragAmount.y
+                                            val from = draggingIndex ?: return@detectDragGesturesAfterLongPress
+                                            val shift = (dragOffsetY / rowHeightPx).toInt()
+                                            val to = (from + shift).coerceIn(0, orderedCards.lastIndex)
+                                            if (to != from) {
+                                                val mutable = orderedCards.toMutableList()
+                                                val item = mutable.removeAt(from)
+                                                mutable.add(to, item)
+                                                profileCardOrder = mutable.joinToString(",")
+                                                draggingIndex = to
+                                                dragOffsetY -= (to - from) * rowHeightPx
+                                            }
+                                        }
+                                    )
+                                }
+                                .padding(horizontal = 12.dp, vertical = 12.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Box(
@@ -427,7 +493,7 @@ fun ProfileScreen(repository: AuthRepository, onBack: () -> Unit, onSignedOut: (
                             ) {
                                 Text("${index + 1}", color = accentColor, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                             }
-                            Spacer(Modifier.width(10.dp))
+                            Spacer(Modifier.width(12.dp))
                             Text(
                                 when (card) {
                                     "listening" -> "Escuchando ahora"
@@ -439,30 +505,7 @@ fun ProfileScreen(repository: AuthRepository, onBack: () -> Unit, onSignedOut: (
                                 fontWeight = FontWeight.Medium,
                                 modifier = Modifier.weight(1f)
                             )
-                            Text(
-                                "↑",
-                                color = if (index > 0) accentColor else ProfileMuted.copy(0.3f),
-                                fontSize = 18.sp,
-                                modifier = Modifier
-                                    .clickable(enabled = index > 0) {
-                                        profileCardOrder = orderedCards.toMutableList().apply {
-                                            add(index - 1, removeAt(index))
-                                        }.joinToString(",")
-                                    }
-                                    .padding(horizontal = 8.dp)
-                            )
-                            Text(
-                                "↓",
-                                color = if (index < orderedCards.lastIndex) accentColor else ProfileMuted.copy(0.3f),
-                                fontSize = 18.sp,
-                                modifier = Modifier
-                                    .clickable(enabled = index < orderedCards.lastIndex) {
-                                        profileCardOrder = orderedCards.toMutableList().apply {
-                                            add(index + 1, removeAt(index))
-                                        }.joinToString(",")
-                                    }
-                                    .padding(horizontal = 8.dp)
-                            )
+                            Text("⠿", color = ProfileMuted, fontSize = 18.sp)
                         }
                     }
                     Text("Foto y banner", color = ProfileMuted, fontSize = 12.sp, modifier = Modifier.padding(bottom = 8.dp))
