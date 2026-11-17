@@ -17,6 +17,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.pokke.music.ui.backdrop.Backdrop
 import com.pokke.music.ui.backdrop.backdrops.layerBackdrop
 import com.pokke.music.ui.backdrop.backdrops.rememberLayerBackdrop
+import com.pokke.music.ui.backdrop.isRenderEffectSupported
 
 /** Shared visual runtime state for phone and Android TV. */
 val LocalAppBackdrop = staticCompositionLocalOf<Backdrop?> { null }
@@ -25,9 +26,9 @@ val LocalGlassPerformanceMode = staticCompositionLocalOf { true }
 val LocalGlassScreenActive = staticCompositionLocalOf { true }
 
 /**
- * Records one backdrop for the currently resumed app window. In performance mode the
- * recorder is detached whenever the activity is not STARTED, so hidden/background
- * screens do not keep a live glass capture running.
+ * Records one backdrop for the currently resumed app window.
+ * Hardened against the RenderThread SIGSEGV seen on Galaxy A71 / Android 12
+ * when complex lens + full-res capture run together.
  */
 @Composable
 fun GlassBackdropHost(
@@ -53,12 +54,18 @@ fun GlassBackdropHost(
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-    val captureActive = enabled && (!performanceMode || lifecycleActive)
+    // Never attempt capture if RenderEffect is unavailable or device is blacklisted.
+    val glassSupported = isRenderEffectSupported()
+    val forceSafe = GlassSafety.preferSafeGlass
+    val effectivePerformance = performanceMode || forceSafe || !glassSupported
+
+    val captureActive = enabled && glassSupported && (!effectivePerformance || lifecycleActive)
+
     if (!captureActive) {
         CompositionLocalProvider(
             LocalAppBackdrop provides null,
-            LocalGlassEnabled provides enabled,
-            LocalGlassPerformanceMode provides performanceMode,
+            LocalGlassEnabled provides (enabled && glassSupported),
+            LocalGlassPerformanceMode provides true,
             LocalGlassScreenActive provides lifecycleActive
         ) {
             Box(modifier.fillMaxSize()) { content() }
@@ -66,12 +73,12 @@ fun GlassBackdropHost(
         return
     }
 
-    // A single shared recording avoids one GPU capture per card or screen component.
+    // Single shared recording – avoids one GPU capture per surface.
     val source = rememberLayerBackdrop()
     CompositionLocalProvider(
         LocalAppBackdrop provides source,
-        LocalGlassEnabled provides enabled,
-        LocalGlassPerformanceMode provides performanceMode,
+        LocalGlassEnabled provides true,
+        LocalGlassPerformanceMode provides effectivePerformance,
         LocalGlassScreenActive provides lifecycleActive
     ) {
         Box(modifier.fillMaxSize().layerBackdrop(source)) { content() }
