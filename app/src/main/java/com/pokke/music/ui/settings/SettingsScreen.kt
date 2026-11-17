@@ -4,6 +4,7 @@ import com.pokke.music.player.PlayerController
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -717,19 +718,23 @@ fun SettingsScreen(
 
 @Composable
 private fun SettingsCategoryCard(title: String, subtitle: String, category: String, onClick: (String) -> Unit) {
+    val interaction = remember { MutableInteractionSource() }
     Row(
-        Modifier.fillMaxWidth()
-            .clip(RoundedCornerShape(20.dp))
-            .background(Color(0xFF19191F))
-            .clickable { onClick(category) }
-            .padding(horizontal = 18.dp, vertical = 17.dp),
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(Color(0xFF1C1C1E))
+            .clickable(interactionSource = interaction, indication = null) { onClick(category) }
+            .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(title, color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-            Text(subtitle, color = Color.White.copy(.52f), fontSize = 12.sp, lineHeight = 16.sp)
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            Text(title, color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Medium)
+            if (subtitle.isNotBlank()) {
+                Text(subtitle, color = Color.White.copy(.45f), fontSize = 12.sp, lineHeight = 16.sp, maxLines = 2)
+            }
         }
-        Text("›", color = Color.White.copy(.65f), fontSize = 28.sp)
+        Text("›", color = Color.White.copy(.35f), fontSize = 22.sp, fontWeight = FontWeight.Light)
     }
 }
 
@@ -778,11 +783,12 @@ private fun LiquidOrMaterialToggle(
 private fun Section(text: String) {
     Text(
         text,
-        color = Color.White.copy(.45f),
-        fontSize = 11.sp,
-        fontWeight = FontWeight.Bold,
-        letterSpacing = 1.4.sp,
-        modifier = Modifier.padding(start = 22.dp, top = 22.dp, bottom = 8.dp)
+        color = Color.White.copy(0.45f),
+        fontSize = 12.sp,
+        fontWeight = FontWeight.SemiBold,
+        letterSpacing = 0.6.sp,
+        modifier = Modifier
+            .padding(start = 22.dp, end = 22.dp, top = 22.dp, bottom = 8.dp)
     )
 }
 
