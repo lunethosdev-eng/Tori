@@ -405,7 +405,12 @@ fun PokkeNavHost(pluginDeepLinkUri: Uri? = null, onPluginDeepLinkHandled: () -> 
             composable(Screen.Library.route) {
                 LibraryScreen(repository = auth, isVisible = route == Screen.Library.route,
                     onLoginRequired = { nav.navigate(Screen.Auth.route) },
-                    onSongClick = { PlayerController.init(context); PlayerController.playSong(it); playerSheetMotion.open() })
+                    onSongClick = { PlayerController.init(context); PlayerController.playSong(it); playerSheetMotion.open() },
+                    onPlayQueue = { songs, index ->
+                        PlayerController.init(context)
+                        PlayerController.playQueue(songs, index)
+                        playerSheetMotion.open()
+                    })
             }
             composable(Screen.Chats.route) {
                 if (chatsEnabled) ChatScreen(authRepository = auth, onOpenMaps = { nav.navigate(Screen.Maps.route) }, onOpenStory = { nav.navigate(Screen.StoryPublish.route) })
@@ -417,22 +422,6 @@ fun PokkeNavHost(pluginDeepLinkUri: Uri? = null, onPluginDeepLinkHandled: () -> 
             composable(Screen.StoryPublish.route) {
                 StoryPublisherScreen(authRepository = auth, onBack = { nav.popBackStack() }, onPublished = { nav.popBackStack() })
             }
-            
-            composable(
-                route = Screen.Artist.route,
-                arguments = listOf(navArgument("name") { type = NavType.StringType })
-            ) { entry ->
-                val name = android.net.Uri.decode(entry.arguments?.getString("name").orEmpty())
-                ArtistScreen(
-                    artistName = name.ifBlank { "Artista" },
-                    onBack = { nav.popBackStack() },
-                    onSongClick = { song ->
-                        PlayerController.playSong(song)
-                        nav.navigate(Screen.Player.route)
-                    }
-                )
-            }
-
             composable(Screen.Settings.route) {
                 SettingsScreen(
                     onBack = { nav.popBackStack() },
@@ -462,11 +451,31 @@ fun PokkeNavHost(pluginDeepLinkUri: Uri? = null, onPluginDeepLinkHandled: () -> 
                             onOpenQueue = { nav.navigate(Screen.Queue.route) },
                             onOpenLyrics = { nav.navigate(Screen.Lyrics.route) },
                             onRequireLogin = { nav.navigate(Screen.Auth.route) },
+                            onOpenArtist = { name ->
+                                closePlayer()
+                                nav.navigate(Screen.Artist.create(name))
+                            },
                         )
                     }
                 }
             }
             composable(Screen.Queue.route) { QueueScreen(onBack = { nav.popBackStack() }) }
+            composable(
+                route = Screen.Artist.route,
+                arguments = listOf(navArgument("name") { type = NavType.StringType })
+            ) { entry ->
+                val name = android.net.Uri.decode(entry.arguments?.getString("name").orEmpty())
+                ArtistScreen(
+                    artistName = name.ifBlank { "Artista" },
+                    onBack = { nav.popBackStack() },
+                    onSongClick = { song ->
+                        PlayerController.init(context)
+                        PlayerController.playSong(song)
+                        playerSheetMotion.open()
+                    }
+                )
+            }
+
             composable(Screen.Lyrics.route) { LyricsScreen(onBack = { nav.popBackStack() }) }
                 }
             }
