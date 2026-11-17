@@ -94,8 +94,8 @@ fun OverflowMenuSheet(
                     this.alpha = alpha
                     this.scaleX = scaleX
                     this.scaleY = scaleY
-                    transformOrigin = TransformOrigin(1f, 0f)
-                    translationY = if (useLiquidMenu) (1f - scaleY) * -18f else 0f
+                    transformOrigin = TransformOrigin(0.92f, 0.02f)
+                    translationY = if (useLiquidMenu) (1f - scaleY) * -10f else 0f
                 }
                 .shadow(if (useLiquidMenu) 28.dp else 16.dp, shape, clip = false)
                 .clip(shape)
@@ -144,7 +144,7 @@ private fun MenuItem(icon: ImageVector, label: String, liquid: Boolean, onClick:
 /** Positions the popup from the actual overflow button bounds, clamped to the window. */
 private class AnchorAwareMenuPositionProvider(
     private val anchor: Rect?,
-    private val gapPx: Int = 8
+    private val gapPx: Int = 4
 ) : PopupPositionProvider {
     override fun calculatePosition(
         anchorBounds: androidx.compose.ui.unit.IntRect,
