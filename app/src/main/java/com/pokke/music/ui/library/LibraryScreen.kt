@@ -26,6 +26,7 @@ import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.QueueMusic
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.ArrowBack
@@ -60,6 +61,7 @@ fun LibraryScreen(
     repository: AuthRepository,
     isVisible: Boolean = true,
     onSongClick: (Song) -> Unit = {},
+    onPlayQueue: (List<Song>, Int) -> Unit = { songs, index -> songs.getOrNull(index)?.let(onSongClick) },
     onLoginRequired: () -> Unit = {}
 ) {
     val context = LocalContext.current
@@ -171,26 +173,35 @@ fun LibraryScreen(
                         ),
                         contentAlignment = Alignment.Center
                     ) {
-                        if (!playlist.coverUrl.isNullOrBlank()) AsyncImage(model = playlist.coverUrl, contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                        if (!playlist.coverUrl.isNullOrBlank()) AsyncImage(playlist.coverUrl, null, Modifier.fillMaxSize())
                         else Icon(Icons.Default.QueueMusic, null, tint = Color.White.copy(.9f), modifier = Modifier.size(52.dp))
                     }
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(7.dp)) {
                         Text(playlist.description.orEmpty().ifBlank { "Tu colección, a tu manera." }, color = Color.White.copy(.65f), fontSize = 12.sp, maxLines = 3, overflow = TextOverflow.Ellipsis)
                         Text("${playlistSongs.size} canciones", color = Color.White.copy(.55f), fontSize = 12.sp)
-                        OutlinedButton(onClick = {
-                            editingPlaylist = playlist
-                            playlistName = playlist.name
-                            playlistDescription = playlist.description.orEmpty()
-                            draftPlaylistCover = playlist.coverUrl.orEmpty()
-                            draftPlaylistPublic = playlist.isPublic
-                            draftPrimary = playlist.primaryColor
-                            draftSecondary = playlist.secondaryColor
-                            draftStyle = playlist.visualStyle
-                            showCreate = true
-                        }) {
-                            Icon(Icons.Default.Edit, null, modifier = Modifier.size(16.dp))
-                            Spacer(Modifier.width(6.dp))
-                            Text("Editar playlist")
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            if (playlistSongs.isNotEmpty()) {
+                                OutlinedButton(onClick = { onPlayQueue(playlistSongs, 0) }) {
+                                    Icon(Icons.Default.PlayArrow, null, modifier = Modifier.size(16.dp))
+                                    Spacer(Modifier.width(6.dp))
+                                    Text("Reproducir")
+                                }
+                            }
+                            OutlinedButton(onClick = {
+                                editingPlaylist = playlist
+                                playlistName = playlist.name
+                                playlistDescription = playlist.description.orEmpty()
+                                draftPlaylistCover = playlist.coverUrl.orEmpty()
+                                draftPlaylistPublic = playlist.isPublic
+                                draftPrimary = playlist.primaryColor
+                                draftSecondary = playlist.secondaryColor
+                                draftStyle = playlist.visualStyle
+                                showCreate = true
+                            }) {
+                                Icon(Icons.Default.Edit, null, modifier = Modifier.size(16.dp))
+                                Spacer(Modifier.width(6.dp))
+                                Text("Editar")
+                            }
                         }
                         if (playlist.isPublic) {
                             IconButton(onClick = { ShareLinks.share(context, ShareLinks.Kind.PLAYLIST, playlist.id, playlist.name) }) {
@@ -201,7 +212,10 @@ fun LibraryScreen(
                 }
             }
             items(playlistSongs, key = { "playlist_${it.id}" }) { song ->
-                SongRow(song, trailing = "Quitar", onClick = { onSongClick(song) }, onTrailing = {
+                SongRow(song, trailing = "Quitar", onClick = {
+                    val index = playlistSongs.indexOfFirst { it.id == song.id }.coerceAtLeast(0)
+                    onPlayQueue(playlistSongs, index)
+                }, onTrailing = {
                     scope.launch {
                         repository.removeSongFromPlaylist(selectedPlaylist!!.id, song.id)
                             .onSuccess { playlistSongs = playlistSongs.filterNot { it.id == song.id }; refreshRemote() }
@@ -493,12 +507,7 @@ private fun PlaylistGridCard(
             contentAlignment = Alignment.Center
         ) {
             if (!playlist.coverUrl.isNullOrBlank()) {
-                AsyncImage(
-                    model = playlist.coverUrl,
-                    contentDescription = playlist.name,
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop
-                )
+                AsyncImage(playlist.coverUrl, null, Modifier.fillMaxSize())
             } else {
                 Icon(Icons.Default.QueueMusic, null, tint = Color.White.copy(.9f), modifier = Modifier.size(42.dp))
             }
