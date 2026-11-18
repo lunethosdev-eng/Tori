@@ -37,12 +37,19 @@ import kotlinx.coroutines.withContext
 fun ArtistScreen(
     artistName: String,
     onBack: () -> Unit,
-    onSongClick: (Song) -> Unit = { PlayerController.playSong(it) }
+    onSongClick: (Song) -> Unit = { PlayerController.playSong(it) },
+    onAlbumClick: (String, String) -> Unit = { _, _ -> }
 ) {
     var info by remember { mutableStateOf<MusicMetadataApi.ArtistInfo?>(null) }
     var songs by remember { mutableStateOf<List<Song>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
     val multi = remember { MultiMusicRepository() }
+    val albumGroups = remember(songs) {
+        songs.filter { !it.album.isNullOrBlank() }
+            .groupBy { it.album!!.trim() to it.artist }
+            .map { (key, tracks) -> Triple(key.first, key.second, tracks.first()) }
+            .distinctBy { (album, artist, _) -> album.lowercase() + "|" + artist.lowercase() }
+    }
 
     LaunchedEffect(artistName) {
         loading = true
@@ -129,6 +136,40 @@ fun ArtistScreen(
                             lineHeight = 20.sp,
                             modifier = Modifier.padding(start = 20.dp, end = 20.dp, bottom = 16.dp)
                         )
+                    }
+                }
+
+                if (albumGroups.isNotEmpty()) {
+                    item {
+                        Text(
+                            "Álbumes",
+                            color = MaterialTheme.colorScheme.onSurface,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 18.sp,
+                            modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 10.dp, bottom = 8.dp)
+                        )
+                    }
+                    items(albumGroups, key = { it.first + "|" + it.second }) { group ->
+                        val (albumName, albumArtist, coverSong) = group
+                        Row(
+                            Modifier.fillMaxWidth().clickable { onAlbumClick(albumName, albumArtist) }
+                                .padding(horizontal = 20.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            AsyncImage(
+                                model = coverSong.displayCoverUrl ?: coverSong.coverUrl,
+                                contentDescription = null,
+                                modifier = Modifier.size(52.dp).clip(RoundedCornerShape(8.dp))
+                                    .background(MaterialTheme.colorScheme.surfaceVariant),
+                                contentScale = ContentScale.Crop
+                            )
+                            Spacer(Modifier.width(12.dp))
+                            Column(Modifier.weight(1f)) {
+                                Text(albumName, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.SemiBold,
+                                    maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Text("Álbum · $albumArtist", color = MaterialTheme.colorScheme.onSurface.copy(.55f), fontSize = 12.sp)
+                            }
+                        }
                     }
                 }
 
