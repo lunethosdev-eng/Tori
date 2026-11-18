@@ -1,5 +1,7 @@
 package com.pokke.music.ui.home
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -7,11 +9,13 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
@@ -36,12 +40,11 @@ import com.pokke.music.ui.liquid.MoshiiGlass
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.withContext
-import java.util.Calendar
 
-/**
- * Home estilo Moshii / Apple Music:
- * saludo, atajos, rieles horizontales de recientes y recomendaciones.
- * Sin tarjetas enormes de "Vuelve a escuchar". Player BitChord intacto.
+private val MoshiiAccent = Color(0xFFFC3C44)
+
+/** Home translated from Moshii's compact-header + horizontal-rail composition.
+ * Data remains connected to Tori's enabled music sources and PlayerController.
  */
 @Composable
 fun HomeScreen(
@@ -54,183 +57,113 @@ fun HomeScreen(
     onScrollStateChanged: (Boolean) -> Unit = {},
     authRepository: AuthRepository
 ) {
-    val multi = remember { MultiMusicRepository() }
+    val repository = remember { MultiMusicRepository() }
     var recent by remember { mutableStateOf<List<Song>>(emptyList()) }
-    var recommended by remember { mutableStateOf<List<Song>>(emptyList()) }
+    var forYou by remember { mutableStateOf<List<Song>>(emptyList()) }
+    var popular by remember { mutableStateOf<List<Song>>(emptyList()) }
+    var trending by remember { mutableStateOf<List<Song>>(emptyList()) }
+    var newReleases by remember { mutableStateOf<List<Song>>(emptyList()) }
+    var avatar by remember { mutableStateOf<String?>(null) }
     var loading by remember { mutableStateOf(true) }
-    var displayName by remember { mutableStateOf("") }
+    var headerCollapsed by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
-    val ctx = LocalContext.current
-    val prefs = remember { UserPreferences(ctx) }
-    val glass by prefs.liquidGlassEnabled.collectAsState(false)
-    val current by PlayerController.currentSong.collectAsState()
-
-    val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
-    val greeting = when {
-        hour < 12 -> "Buenos días"
-        hour < 19 -> "Buenas tardes"
-        else -> "Buenas noches"
-    }
+    val context = LocalContext.current
+    val preferences = remember(context) { UserPreferences(context) }
+    val glass by preferences.liquidGlassEnabled.collectAsState(false)
 
     LaunchedEffect(Unit) {
-        recent = multi.getRecentAll().getOrDefault(emptyList()).take(24)
-        recommended = withContext(Dispatchers.IO) {
-            multi.searchAll("top hits", limit = 20).getOrDefault(emptyList())
+        loading = true
+        val results = withContext(Dispatchers.IO) {
+            val catalog = repository.getRecentAll(100).getOrDefault(emptyList())
+            val personalizedFallback = repository.searchAll("top hits", 24).getOrDefault(emptyList())
+            listOf(catalog, personalizedFallback)
         }
-        val profileName = authRepository.getProfile().getOrNull()?.displayName
-        val nick = prefs.onboardingNickname.firstOrNull().orEmpty()
-        displayName = when {
-            !profileName.isNullOrBlank() -> profileName
-            nick.isNotBlank() -> nick
-            else -> ""
+        val catalog = results[0]
+        recent = catalog.take(24)
+        forYou = results[1].ifEmpty { recent }
+        // Moshii builds these editorial rails from the available catalogue.
+        popular = catalog.shuffled().take(24)
+        trending = catalog.take(24)
+        newReleases = catalog.asReversed().take(24)
+        authRepository.getProfile().onSuccess { avatar = it?.avatarUrl }
+        if (avatar.isNullOrBlank()) {
+            val nick = preferences.onboardingNickname.firstOrNull()
+            if (!nick.isNullOrBlank()) avatar = null
         }
         loading = false
     }
 
     LaunchedEffect(listState.firstVisibleItemIndex, listState.firstVisibleItemScrollOffset) {
-        onScrollStateChanged(listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 40)
+        val collapsed = listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 48
+        headerCollapsed = collapsed
+        onScrollStateChanged(collapsed)
     }
 
-    Box(Modifier.fillMaxSize().background(Color(0xFF07070A))) {
+    Box(Modifier.fillMaxSize().background(Color(0xFF0C0C0E))) {
         LazyColumn(
             state = listState,
-            contentPadding = PaddingValues(bottom = 140.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
+            contentPadding = PaddingValues(bottom = 150.dp),
+            verticalArrangement = Arrangement.spacedBy(0.dp)
         ) {
             item {
-                Row(
-                    Modifier
-                        .fillMaxWidth()
-                        .statusBarsPadding()
-                        .padding(horizontal = 16.dp, vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                val headerHeight by animateDpAsState(if (headerCollapsed) 40.dp else 56.dp, label = "moshii-header-height")
+                MoshiiGlass(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = if (headerCollapsed) 2.dp else 8.dp),
+                    enabled = glass,
+                    shape = RoundedCornerShape(18.dp),
+                    opacity = 0.09f,
+                    borderWidth = 0.55.dp
                 ) {
-                    Column(Modifier.weight(1f)) {
-                        Text(
-                            if (displayName.isNotBlank()) "$greeting, $displayName" else greeting,
-                            color = Color.White,
-                            fontSize = 26.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            "Tu música, a tu manera",
-                            color = Color.White.copy(0.45f),
-                            fontSize = 13.sp
-                        )
-                    }
-                    IconButton(onClick = onOpenSearch) {
-                        Icon(Icons.Default.Search, null, tint = Color.White)
-                    }
-                    IconButton(onClick = onOpenSettings) {
-                        Icon(Icons.Default.Settings, null, tint = Color.White.copy(0.85f))
-                    }
-                }
-            }
-
-            // Quick shortcuts (Moshii-style chips)
-            item {
-                Row(
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    QuickChip("Biblioteca", Icons.Default.LibraryMusic, Modifier.weight(1f), glass, onOpenLibrary)
-                    QuickChip("Buscar", Icons.Default.Search, Modifier.weight(1f), glass, onOpenSearch)
-                }
-            }
-
-            // Now playing compact (optional strip, not huge card)
-            current?.let { song ->
-                item {
-                    MoshiiGlass(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 8.dp)
-                            .clickable(onClick = onOpenPlayer),
-                        enabled = glass,
-                        shape = RoundedCornerShape(16.dp),
-                        opacity = 0.12f
+                    Row(
+                        Modifier.fillMaxWidth().height(headerHeight).padding(start = 14.dp, end = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(
-                            Modifier.padding(12.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            AsyncImage(
-                                model = song.displayCoverUrl ?: song.coverUrl,
-                                contentDescription = null,
-                                modifier = Modifier
-                                    .size(48.dp)
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .background(Color(0xFF22222A)),
-                                contentScale = ContentScale.Crop
-                            )
-                            Spacer(Modifier.width(12.dp))
-                            Column(Modifier.weight(1f)) {
-                                Text("En reproducción", color = Color.White.copy(0.45f), fontSize = 11.sp)
-                                Text(
-                                    song.title,
-                                    color = Color.White,
-                                    fontWeight = FontWeight.SemiBold,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                                Text(
-                                    song.artist,
-                                    color = Color.White.copy(0.55f),
-                                    fontSize = 12.sp,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
+                        Text("Inicio", Modifier.weight(1f), color = Color.White, fontSize = if (headerCollapsed) 16.sp else 20.sp, fontWeight = FontWeight.ExtraBold)
+                        AnimatedVisibility(visible = !headerCollapsed) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                IconButton(onClick = onOpenSearch) { Icon(Icons.Default.Search, "Buscar", tint = Color.White.copy(.78f)) }
+                                IconButton(onClick = onOpenSettings) { Icon(Icons.Default.Settings, "Configuración", tint = Color.White.copy(.78f)) }
+                                IconButton(onClick = onOpenProfile) {
+                                    if (!avatar.isNullOrBlank()) {
+                                        AsyncImage(avatar, "Perfil", Modifier.size(32.dp).clip(CircleShape), contentScale = ContentScale.Crop)
+                                    } else {
+                                        Icon(Icons.Default.Person, "Perfil", tint = Color.White.copy(.78f))
+                                    }
+                                }
                             }
                         }
                     }
                 }
             }
-
             if (recent.isNotEmpty()) {
-                item { SectionTitle("Recientes") }
+                item { MoshiiSectionTitle("Escuchado recientemente") }
+                item { SongRail(recent, onSongClick) }
+            }
+            if (forYou.isNotEmpty()) {
+                item { MoshiiSectionTitle("Para ti") }
+                item { SongRail(forYou, onSongClick) }
+            }
+            if (popular.isNotEmpty()) {
+                item { MoshiiSectionTitle("Popular hoy") }
+                item { SongRail(popular, onSongClick) }
+            }
+            if (trending.isNotEmpty()) {
+                item { MoshiiSectionTitle("Tendencias en Pokke") }
+                item { SongRail(trending, onSongClick) }
+            }
+            if (newReleases.isNotEmpty()) {
+                item { MoshiiSectionTitle("Novedades") }
+                item { SongRail(newReleases, onSongClick) }
+            }
+            if (loading) {
                 item {
-                    LazyRow(
-                        contentPadding = PaddingValues(horizontal = 14.dp),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        items(recent, key = { "r_${it.id}" }) { song ->
-                            SongCard(song) {
-                                val idx = recent.indexOfFirst { it.id == song.id }.coerceAtLeast(0)
-                                PlayerController.playQueue(recent, idx)
-                                onSongClick(song)
-                            }
-                        }
+                    Box(Modifier.fillMaxWidth().padding(36.dp), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(color = MoshiiAccent, strokeWidth = 2.dp)
                     }
                 }
-            }
-
-            if (recommended.isNotEmpty()) {
-                item { SectionTitle("Para ti") }
+            } else if (recent.isEmpty() && forYou.isEmpty() && popular.isEmpty() && trending.isEmpty() && newReleases.isEmpty()) {
                 item {
-                    LazyRow(
-                        contentPadding = PaddingValues(horizontal = 14.dp),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        items(recommended, key = { "p_${it.id}" }) { song ->
-                            SongCard(song) {
-                                val idx = recommended.indexOfFirst { it.id == song.id }.coerceAtLeast(0)
-                                PlayerController.playQueue(recommended, idx)
-                                onSongClick(song)
-                            }
-                        }
-                    }
-                }
-            }
-
-            if (!loading && recent.isEmpty() && recommended.isEmpty()) {
-                item {
-                    Text(
-                        "Explora o busca música para empezar.",
-                        color = Color.White.copy(0.45f),
-                        modifier = Modifier.padding(24.dp)
-                    )
+                    Text("Explora o busca música para empezar.", color = Color.White.copy(.5f), modifier = Modifier.padding(20.dp))
                 }
             }
         }
@@ -238,72 +171,41 @@ fun HomeScreen(
 }
 
 @Composable
-private fun SectionTitle(title: String) {
+private fun MoshiiSectionTitle(title: String) {
     Text(
         title,
+        modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 18.dp, bottom = 12.dp),
         color = Color.White,
-        fontWeight = FontWeight.Bold,
-        fontSize = 20.sp,
-        modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 18.dp, bottom = 10.dp)
+        fontSize = 22.sp,
+        fontWeight = FontWeight.Bold
     )
 }
 
 @Composable
-private fun QuickChip(
-    label: String,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    modifier: Modifier,
-    glass: Boolean,
-    onClick: () -> Unit
-) {
-    MoshiiGlass(
-        modifier = modifier.clickable(onClick = onClick),
-        enabled = glass,
-        shape = RoundedCornerShape(14.dp),
-        opacity = 0.10f
+private fun SongRail(songs: List<Song>, onSongClick: (Song) -> Unit) {
+    LazyRow(
+        contentPadding = PaddingValues(horizontal = 14.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Row(
-            Modifier.padding(horizontal = 14.dp, vertical = 14.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(icon, null, tint = Color.White, modifier = Modifier.size(20.dp))
-            Spacer(Modifier.width(10.dp))
-            Text(label, color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+        items(songs.take(24), key = { "${it.id}_${it.title}" }) { song ->
+            Column(
+                Modifier.width(140.dp).clickable {
+                    val index = songs.indexOfFirst { it.id == song.id }.coerceAtLeast(0)
+                    PlayerController.playQueue(songs, index)
+                    onSongClick(song)
+                }
+            ) {
+                AsyncImage(
+                    model = song.displayCoverUrl ?: song.coverUrl,
+                    contentDescription = song.title,
+                    modifier = Modifier.size(140.dp).clip(RoundedCornerShape(12.dp)).background(Color(0xFF24242A)),
+                    contentScale = ContentScale.Crop
+                )
+                Spacer(Modifier.height(8.dp))
+                Text(song.title, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(song.artist, color = Color.White.copy(.5f), fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
         }
     }
 }
 
-@Composable
-private fun SongCard(song: Song, onClick: () -> Unit) {
-    Column(
-        Modifier
-            .width(140.dp)
-            .clickable(onClick = onClick)
-    ) {
-        AsyncImage(
-            model = song.displayCoverUrl ?: song.coverUrl,
-            contentDescription = null,
-            modifier = Modifier
-                .size(140.dp)
-                .clip(RoundedCornerShape(14.dp))
-                .background(Color(0xFF1A1A22)),
-            contentScale = ContentScale.Crop
-        )
-        Spacer(Modifier.height(8.dp))
-        Text(
-            song.title,
-            color = Color.White,
-            fontSize = 13.sp,
-            fontWeight = FontWeight.Medium,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
-        Text(
-            song.artist,
-            color = Color.White.copy(0.5f),
-            fontSize = 12.sp,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
-    }
-}
