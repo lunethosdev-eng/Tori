@@ -41,6 +41,7 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -523,17 +524,40 @@ fun PokkeNavHost(pluginDeepLinkUri: Uri? = null, onPluginDeepLinkHandled: () -> 
                     val selected = route == item.screen.route
                     val interaction = remember(item.screen.route) { MutableInteractionSource() }
                     val iconScale by animateFloatAsState(if (selected) 1.08f else 1f, spring(dampingRatio = 0.62f, stiffness = 420f), label = "nav-icon-${item.screen.route}")
-                    Box(
-                        Modifier.size(if (navCompact) 44.dp else 50.dp)
-                            .clip(CircleShape)
-                            .background(if (selected) Color.White.copy(if (glass) .22f else .14f) else Color.Transparent)
-                            .pokkePressMotion(interaction, pressedScale = 0.88f)
+                    Column(
+                        Modifier
+                            .width(if (navCompact) 48.dp else 58.dp)
+                            .height(if (navCompact) 44.dp else 54.dp)
+                            .clip(RoundedCornerShape(18.dp))
+                            .background(if (selected) Color(0x24FC3C44) else Color.Transparent)
+                            .pokkePressMotion(interaction, pressedScale = 0.90f)
                             .clickable(interactionSource = interaction, indication = null) {
                                 nav.navigate(item.screen.route) { popUpTo(nav.graph.findStartDestination().id) { saveState = true }; launchSingleTop = true; restoreState = true }
                             },
-                        contentAlignment = Alignment.Center
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
                     ) {
-                        Icon(if (selected) item.selected else item.normal, item.screen.route, tint = if (selected) Color.White else Color(0xFF929297), modifier = Modifier.size(24.dp).graphicsLayer { scaleX = iconScale; scaleY = iconScale })
+                        Icon(
+                            if (selected) item.selected else item.normal,
+                            item.screen.route,
+                            tint = if (selected) Color(0xFFFC3C44) else Color.White.copy(0.78f),
+                            modifier = Modifier.size(if (navCompact) 21.dp else 22.dp).graphicsLayer { scaleX = iconScale; scaleY = iconScale }
+                        )
+                        if (!navCompact) {
+                            Text(
+                                when (item.screen) {
+                                    Screen.Home -> "Home"
+                                    Screen.Library -> "Library"
+                                    Screen.Search -> "Search"
+                                    Screen.Chats -> "Chats"
+                                    else -> item.screen.route
+                                },
+                                color = if (selected) Color(0xFFFC3C44) else Color.White.copy(0.72f),
+                                fontSize = 9.sp,
+                                fontWeight = if (selected) androidx.compose.ui.text.font.FontWeight.Bold else androidx.compose.ui.text.font.FontWeight.Medium,
+                                maxLines = 1
+                            )
+                        }
                     }
                 }
                 if (!navCompact) {
