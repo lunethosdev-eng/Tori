@@ -80,7 +80,7 @@ fun ArtistScreen(
                             .fillMaxSize()
                             .background(
                                 Brush.verticalGradient(
-                                    listOf(Color.Transparent, Color.Black.copy(0.85f))
+                                    listOf(Color.Transparent, Color.Black.copy(alpha = 0.85f))
                                 )
                             )
                     )
@@ -124,10 +124,10 @@ fun ArtistScreen(
                         )
                         Text(
                             bio,
-                            color = MaterialTheme.colorScheme.onSurface.copy(0.75f),
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.75f),
                             fontSize = 14.sp,
                             lineHeight = 20.sp,
-                            modifier = Modifier.padding(horizontal = 20.dp, bottom = 16.dp)
+                            modifier = Modifier.padding(start = 20.dp, end = 20.dp, bottom = 16.dp)
                         )
                     }
                 }
@@ -185,7 +185,7 @@ fun ArtistScreen(
                                 )
                                 Text(
                                     song.album ?: song.artist,
-                                    color = MaterialTheme.colorScheme.onSurface.copy(0.55f),
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f),
                                     fontSize = 13.sp,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
@@ -197,7 +197,7 @@ fun ArtistScreen(
                     item {
                         Text(
                             "No se encontraron canciones de este artista en tu catálogo.",
-                            color = MaterialTheme.colorScheme.onSurface.copy(0.5f),
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
                             modifier = Modifier.padding(20.dp)
                         )
                     }
