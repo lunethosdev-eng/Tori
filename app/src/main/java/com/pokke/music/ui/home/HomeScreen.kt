@@ -1,38 +1,29 @@
 package com.pokke.music.ui.home
 
-import androidx.compose.animation.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.LibraryMusic
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
@@ -41,18 +32,16 @@ import com.pokke.music.data.preferences.UserPreferences
 import com.pokke.music.data.repository.AuthRepository
 import com.pokke.music.data.repository.MultiMusicRepository
 import com.pokke.music.player.PlayerController
-import com.pokke.music.ui.liquid.LocalAppBackdrop
-import com.pokke.music.ui.liquid.pokkePressMotion
+import com.pokke.music.ui.liquid.MoshiiGlass
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.firstOrNull
-import org.json.JSONArray
+import kotlinx.coroutines.withContext
 import java.util.Calendar
 
 /**
- * Home rediseñado – estilo Apple Music / Spotify minimalista.
- * - Sin tarjeta grande "Vuelve a escuchar"
- * - Sin bloque "Reproduciendo" destacado
- * - Secciones limpias: saludo, accesos rápidos, recientes, para ti
- * - Liquid Glass respetado
+ * Home estilo Moshii / Apple Music:
+ * saludo, atajos, rieles horizontales de recientes y recomendaciones.
+ * Sin tarjetas enormes de "Vuelve a escuchar". Player BitChord intacto.
  */
 @Composable
 fun HomeScreen(
@@ -67,43 +56,14 @@ fun HomeScreen(
 ) {
     val multi = remember { MultiMusicRepository() }
     var recent by remember { mutableStateOf<List<Song>>(emptyList()) }
+    var recommended by remember { mutableStateOf<List<Song>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
-    var displayName by remember { mutableStateOf("tú") }
+    var displayName by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
     val ctx = LocalContext.current
     val prefs = remember { UserPreferences(ctx) }
-
     val glass by prefs.liquidGlassEnabled.collectAsState(false)
-    val showQuickAccess by prefs.homeShowQuickAccess.collectAsState(true)
-    val showRecent by prefs.homeShowRecent.collectAsState(true)
-    val showRecommendations by prefs.homeShowRecommendations.collectAsState(true)
-    val showLibraryShortcuts by prefs.homeShowLibraryShortcuts.collectAsState(true)
-    val density by prefs.homeDensity.collectAsState("medium")
-    val favoriteArtistsRaw by prefs.onboardingArtists.collectAsState("[]")
-
-    val favoriteArtists = remember(favoriteArtistsRaw) {
-        runCatching {
-            val array = JSONArray(favoriteArtistsRaw)
-            buildList {
-                for (index in 0 until array.length()) {
-                    val item = array.optJSONObject(index) ?: continue
-                    val id = item.optLong("id", -1L)
-                    val name = item.optString("name").trim()
-                    if (id > 0 && name.isNotBlank()) {
-                        add(Triple(id, name, item.optString("image").takeIf { it.startsWith("http") }))
-                    }
-                }
-            }.take(16)
-        }.getOrDefault(emptyList())
-    }
-
-    val backdrop = LocalAppBackdrop.current
-
-    val coverSize: Dp = when (density) {
-        "small" -> 108.dp
-        "large" -> 142.dp
-        else -> 124.dp
-    }
+    val current by PlayerController.currentSong.collectAsState()
 
     val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
     val greeting = when {
@@ -113,13 +73,16 @@ fun HomeScreen(
     }
 
     LaunchedEffect(Unit) {
-        multi.getRecentAll().onSuccess { recent = it.take(40) }
-        val onboardingName = prefs.onboardingNickname.firstOrNull().orEmpty()
+        recent = multi.getRecentAll().getOrDefault(emptyList()).take(24)
+        recommended = withContext(Dispatchers.IO) {
+            multi.searchAll("top hits", limit = 20).getOrDefault(emptyList())
+        }
         val profileName = authRepository.getProfile().getOrNull()?.displayName
+        val nick = prefs.onboardingNickname.firstOrNull().orEmpty()
         displayName = when {
             !profileName.isNullOrBlank() -> profileName
-            onboardingName.isNotBlank() -> onboardingName
-            else -> displayName
+            nick.isNotBlank() -> nick
+            else -> ""
         }
         loading = false
     }
@@ -128,97 +91,93 @@ fun HomeScreen(
         onScrollStateChanged(listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 40)
     }
 
-    val current by PlayerController.currentSong.collectAsState()
-
-    Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+    Box(Modifier.fillMaxSize().background(Color(0xFF07070A))) {
         LazyColumn(
             state = listState,
-            modifier = Modifier.fillMaxSize().statusBarsPadding(),
-            contentPadding = PaddingValues(bottom = 130.dp)
+            contentPadding = PaddingValues(bottom = 140.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
-            // ── Header limpio ──────────────────────────────────────────────
             item {
                 Row(
                     Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 20.dp, vertical = 14.dp),
+                        .statusBarsPadding()
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column(Modifier.weight(1f)) {
                         Text(
-                            greeting,
-                            color = MaterialTheme.colorScheme.onSurface.copy(0.55f),
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Medium
-                        )
-                        Text(
-                            displayName.replaceFirstChar { it.uppercase() },
-                            color = MaterialTheme.colorScheme.onSurface,
+                            if (displayName.isNotBlank()) "$greeting, $displayName" else greeting,
+                            color = Color.White,
                             fontSize = 26.sp,
                             fontWeight = FontWeight.Bold
                         )
+                        Text(
+                            "Tu música, a tu manera",
+                            color = Color.White.copy(0.45f),
+                            fontSize = 13.sp
+                        )
                     }
                     IconButton(onClick = onOpenSearch) {
-                        Icon(Icons.Default.Search, contentDescription = "Buscar", tint = MaterialTheme.colorScheme.onSurface)
+                        Icon(Icons.Default.Search, null, tint = Color.White)
                     }
                     IconButton(onClick = onOpenSettings) {
-                        Icon(Icons.Default.Settings, contentDescription = "Ajustes", tint = MaterialTheme.colorScheme.onSurface)
+                        Icon(Icons.Default.Settings, null, tint = Color.White.copy(0.85f))
                     }
                 }
             }
 
-            // ── Accesos rápidos (chips) ────────────────────────────────────
-            if (showQuickAccess) {
-                item {
-                    LazyRow(
-                        contentPadding = PaddingValues(horizontal = 20.dp),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        modifier = Modifier.padding(bottom = 8.dp)
-                    ) {
-                        item {
-                            QuickChip(Icons.Default.Shuffle, "Aleatorio", glass) {
-                                // shuffle recent or library
-                                recent.firstOrNull()?.let { onSongClick(it) }
-                            }
-                        }
-                        item {
-                            QuickChip(Icons.Default.Favorite, "Favoritos", glass, onOpenLibrary)
-                        }
-                        item {
-                            QuickChip(Icons.Default.LibraryMusic, "Biblioteca", glass, onOpenLibrary)
-                        }
-                    }
+            // Quick shortcuts (Moshii-style chips)
+            item {
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    QuickChip("Biblioteca", Icons.Default.LibraryMusic, Modifier.weight(1f), glass, onOpenLibrary)
+                    QuickChip("Buscar", Icons.Default.Search, Modifier.weight(1f), glass, onOpenSearch)
                 }
             }
 
-            // ── Artistas favoritos (si existen) ────────────────────────────
-            if (favoriteArtists.isNotEmpty()) {
+            // Now playing compact (optional strip, not huge card)
+            current?.let { song ->
                 item {
-                    SectionTitle("Artistas", 18.dp)
-                }
-                item {
-                    LazyRow(
-                        contentPadding = PaddingValues(horizontal = 20.dp),
-                        horizontalArrangement = Arrangement.spacedBy(14.dp)
+                    MoshiiGlass(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 8.dp)
+                            .clickable(onClick = onOpenPlayer),
+                        enabled = glass,
+                        shape = RoundedCornerShape(16.dp),
+                        opacity = 0.12f
                     ) {
-                        items(favoriteArtists, key = { it.first }) { (id, name, image) ->
-                            Column(
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                modifier = Modifier.width(76.dp)
-                            ) {
-                                AsyncImage(
-                                    model = image,
-                                    contentDescription = name,
-                                    modifier = Modifier
-                                        .size(72.dp)
-                                        .clip(CircleShape)
-                                        .background(MaterialTheme.colorScheme.surfaceVariant),
-                                    contentScale = ContentScale.Crop
-                                )
-                                Spacer(Modifier.height(6.dp))
+                        Row(
+                            Modifier.padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            AsyncImage(
+                                model = song.displayCoverUrl ?: song.coverUrl,
+                                contentDescription = null,
+                                modifier = Modifier
+                                    .size(48.dp)
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(Color(0xFF22222A)),
+                                contentScale = ContentScale.Crop
+                            )
+                            Spacer(Modifier.width(12.dp))
+                            Column(Modifier.weight(1f)) {
+                                Text("En reproducción", color = Color.White.copy(0.45f), fontSize = 11.sp)
                                 Text(
-                                    name,
-                                    color = MaterialTheme.colorScheme.onSurface,
+                                    song.title,
+                                    color = Color.White,
+                                    fontWeight = FontWeight.SemiBold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Text(
+                                    song.artist,
+                                    color = Color.White.copy(0.55f),
                                     fontSize = 12.sp,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
@@ -229,40 +188,49 @@ fun HomeScreen(
                 }
             }
 
-            // ── Recientes ──────────────────────────────────────────────────
-            if (showRecent && recent.isNotEmpty()) {
-                item {
-                    SectionTitle("Recientes", 22.dp)
-                }
+            if (recent.isNotEmpty()) {
+                item { SectionTitle("Recientes") }
                 item {
                     LazyRow(
-                        contentPadding = PaddingValues(horizontal = 20.dp),
-                        horizontalArrangement = Arrangement.spacedBy(14.dp)
+                        contentPadding = PaddingValues(horizontal = 14.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        items(recent.take(12), key = { it.id }) { song ->
-                            RecentCard(song = song, coverSize = coverSize, onClick = { onSongClick(song) })
+                        items(recent, key = { "r_${it.id}" }) { song ->
+                            SongCard(song) {
+                                val idx = recent.indexOfFirst { it.id == song.id }.coerceAtLeast(0)
+                                PlayerController.playQueue(recent, idx)
+                                onSongClick(song)
+                            }
                         }
                     }
                 }
             }
 
-            // ── Para ti / recomendaciones ──────────────────────────────────
-            if (showRecommendations && recent.size > 4) {
+            if (recommended.isNotEmpty()) {
+                item { SectionTitle("Para ti") }
                 item {
-                    SectionTitle("Para ti", 24.dp)
-                }
-                items(recent.drop(4).take(10), key = { "ft-${it.id}" }) { song ->
-                    SongListRow(song = song, onClick = { onSongClick(song) })
+                    LazyRow(
+                        contentPadding = PaddingValues(horizontal = 14.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        items(recommended, key = { "p_${it.id}" }) { song ->
+                            SongCard(song) {
+                                val idx = recommended.indexOfFirst { it.id == song.id }.coerceAtLeast(0)
+                                PlayerController.playQueue(recommended, idx)
+                                onSongClick(song)
+                            }
+                        }
+                    }
                 }
             }
 
-            // ── Atajos de biblioteca ───────────────────────────────────────
-            if (showLibraryShortcuts) {
+            if (!loading && recent.isEmpty() && recommended.isEmpty()) {
                 item {
-                    SectionTitle("Tu biblioteca", 22.dp)
-                }
-                item {
-                    LibraryShortcutsRow(glass = glass, onOpenLibrary = onOpenLibrary)
+                    Text(
+                        "Explora o busca música para empezar.",
+                        color = Color.White.copy(0.45f),
+                        modifier = Modifier.padding(24.dp)
+                    )
                 }
             }
         }
@@ -270,64 +238,61 @@ fun HomeScreen(
 }
 
 @Composable
-private fun SectionTitle(text: String, top: Dp) {
+private fun SectionTitle(title: String) {
     Text(
-        text,
-        color = MaterialTheme.colorScheme.onSurface,
-        fontSize = 20.sp,
+        title,
+        color = Color.White,
         fontWeight = FontWeight.Bold,
-        modifier = Modifier.padding(start = 20.dp, top = top, bottom = 12.dp)
+        fontSize = 20.sp,
+        modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 18.dp, bottom = 10.dp)
     )
 }
 
 @Composable
 private fun QuickChip(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
     label: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    modifier: Modifier,
     glass: Boolean,
     onClick: () -> Unit
 ) {
-    val interaction = remember { MutableInteractionSource() }
-    Row(
-        Modifier
-            .pokkePressMotion(interaction)
-            .clip(RoundedCornerShape(50))
-            .background(
-                if (glass) MaterialTheme.colorScheme.surface.copy(0.55f)
-                else MaterialTheme.colorScheme.surfaceVariant.copy(0.7f)
-            )
-            .clickable(interactionSource = interaction, indication = null, onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 9.dp),
-        verticalAlignment = Alignment.CenterVertically
+    MoshiiGlass(
+        modifier = modifier.clickable(onClick = onClick),
+        enabled = glass,
+        shape = RoundedCornerShape(14.dp),
+        opacity = 0.10f
     ) {
-        Icon(icon, null, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurface)
-        Spacer(Modifier.width(7.dp))
-        Text(label, color = MaterialTheme.colorScheme.onSurface, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+        Row(
+            Modifier.padding(horizontal = 14.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(icon, null, tint = Color.White, modifier = Modifier.size(20.dp))
+            Spacer(Modifier.width(10.dp))
+            Text(label, color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+        }
     }
 }
 
 @Composable
-private fun RecentCard(song: Song, coverSize: Dp, onClick: () -> Unit) {
-    val interaction = remember { MutableInteractionSource() }
+private fun SongCard(song: Song, onClick: () -> Unit) {
     Column(
         Modifier
-            .width(coverSize)
-            .pokkePressMotion(interaction)
-            .clickable(interactionSource = interaction, indication = null, onClick = onClick)
+            .width(140.dp)
+            .clickable(onClick = onClick)
     ) {
         AsyncImage(
             model = song.displayCoverUrl ?: song.coverUrl,
             contentDescription = null,
             modifier = Modifier
-                .size(coverSize)
-                .clip(RoundedCornerShape(12.dp))
-                .background(MaterialTheme.colorScheme.surfaceVariant),
+                .size(140.dp)
+                .clip(RoundedCornerShape(14.dp))
+                .background(Color(0xFF1A1A22)),
             contentScale = ContentScale.Crop
         )
         Spacer(Modifier.height(8.dp))
         Text(
             song.title,
-            color = MaterialTheme.colorScheme.onSurface,
+            color = Color.White,
             fontSize = 13.sp,
             fontWeight = FontWeight.Medium,
             maxLines = 1,
@@ -335,63 +300,10 @@ private fun RecentCard(song: Song, coverSize: Dp, onClick: () -> Unit) {
         )
         Text(
             song.artist,
-            color = MaterialTheme.colorScheme.onSurface.copy(0.55f),
+            color = Color.White.copy(0.5f),
             fontSize = 12.sp,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
-    }
-}
-
-@Composable
-private fun SongListRow(song: Song, onClick: () -> Unit) {
-    val interaction = remember { MutableInteractionSource() }
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .pokkePressMotion(interaction)
-            .clickable(interactionSource = interaction, indication = null, onClick = onClick)
-            .padding(horizontal = 20.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        AsyncImage(
-            model = song.displayCoverUrl ?: song.coverUrl,
-            contentDescription = null,
-            modifier = Modifier
-                .size(52.dp)
-                .clip(RoundedCornerShape(10.dp))
-                .background(MaterialTheme.colorScheme.surfaceVariant),
-            contentScale = ContentScale.Crop
-        )
-        Spacer(Modifier.width(12.dp))
-        Column(Modifier.weight(1f)) {
-            Text(
-                song.title,
-                color = MaterialTheme.colorScheme.onSurface,
-                fontWeight = FontWeight.Medium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            Text(
-                song.artist,
-                color = MaterialTheme.colorScheme.onSurface.copy(0.55f),
-                fontSize = 13.sp,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
-    }
-}
-
-@Composable
-private fun LibraryShortcutsRow(glass: Boolean, onOpenLibrary: () -> Unit) {
-    LazyRow(
-        contentPadding = PaddingValues(horizontal = 20.dp),
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-        modifier = Modifier.padding(bottom = 16.dp)
-    ) {
-        item { QuickChip(Icons.Default.Favorite, "Me gusta", glass, onOpenLibrary) }
-        item { QuickChip(Icons.Default.LibraryMusic, "Playlists", glass, onOpenLibrary) }
-        item { QuickChip(Icons.Default.PlayArrow, "Recientes", glass, onOpenLibrary) }
     }
 }
