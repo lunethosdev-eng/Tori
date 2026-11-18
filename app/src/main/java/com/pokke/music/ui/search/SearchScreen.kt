@@ -9,6 +9,7 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import com.pokke.music.ui.liquid.pokkePressMotion
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -57,7 +58,7 @@ import com.pokke.music.ui.theme.PokkeBlack
 import kotlinx.coroutines.delay
 
 private enum class SearchKind(val label: String) {
-    SONGS("Canciones"), ARTISTS("Artistas"), ALBUMS("Álbumes"), USERS("Usuarios")
+    ALL("Todo"), SONGS("Canciones"), ARTISTS("Artistas"), ALBUMS("Álbumes"), USERS("Usuarios")
 }
 private data class SearchDetail(val title: String, val artist: String? = null, val isArtist: Boolean)
 
@@ -82,7 +83,7 @@ fun SearchScreen(
     var query by remember { mutableStateOf("") }
     var searchExpanded by remember { mutableStateOf(false) }
     val focusRequester = remember { FocusRequester() }
-    var kind by remember { mutableStateOf(SearchKind.SONGS) }
+    var kind by remember { mutableStateOf(SearchKind.ALL) }
     var songs by remember { mutableStateOf<List<Song>>(emptyList()) }
     var artists by remember { mutableStateOf<List<Artist>>(emptyList()) }
     var albums by remember { mutableStateOf<List<Album>>(emptyList()) }
@@ -159,7 +160,10 @@ fun SearchScreen(
         } else {
             CompactSearchBar(
                 query = query,
-                onQueryChange = { query = it },
+                onQueryChange = {
+                    query = it
+                    if (it.isBlank()) kind = SearchKind.ALL
+                },
                 expanded = searchExpanded,
                 onExpandedChange = { searchExpanded = it },
                 focusRequester = focusRequester,
@@ -184,7 +188,7 @@ fun SearchScreen(
             query.isBlank() -> {
                 Column(Modifier.fillMaxSize()) {
                     Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        FilterChip(selected = true, enabled = false, onClick = { }, label = { Text("Ukiyo · Supabase") })
+                        FilterChip(selected = true, enabled = false, onClick = { }, label = { Text("Catálogo Tori") })
                         FilterChip(selected = ytCatalogEnabled, onClick = { scope.launch { prefs.setYoutubeCatalogEnabled(!ytCatalogEnabled) } }, label = { Text(if (ytCatalogEnabled) "YouTube Music activo" else "Activar YouTube Music") })
                     }
                     if (searchHistory.isEmpty()) {
@@ -192,7 +196,7 @@ fun SearchScreen(
                     } else {
                         Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 16.dp, top = 14.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                             Text("BÚSQUEDAS RECIENTES", color = Color.White.copy(.55f), fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                            Text("Borrar todo", color = Color(0xFFB8A6FF), fontSize = 12.sp, modifier = Modifier.clickable { scope.launch { prefs.clearSearchHistory() } }.padding(6.dp))
+                            Text("Borrar todo", color = Color(0xFFFC3C44), fontSize = 12.sp, modifier = Modifier.clickable { scope.launch { prefs.clearSearchHistory() } }.padding(6.dp))
                         }
                         LazyColumn(contentPadding = PaddingValues(bottom = 112.dp)) {
                             itemsIndexed(searchHistory, key = { _, item -> item }) { _, item ->
@@ -212,9 +216,32 @@ fun SearchScreen(
             else -> {
                 LazyColumn(contentPadding = PaddingValues(bottom = 112.dp)) {
                     item {
-                        Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            FilterChip(selected = true, enabled = false, onClick = { }, label = { Text("Ukiyo · Supabase") })
-                            FilterChip(selected = ytCatalogEnabled, onClick = { scope.launch { prefs.setYoutubeCatalogEnabled(!ytCatalogEnabled) } }, label = { Text(if (ytCatalogEnabled) "YouTube Music activo" else "Activar YouTube Music") })
+                        Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) {
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                FilterChip(selected = true, enabled = false, onClick = { }, label = { Text("Catálogo Tori") })
+                                FilterChip(selected = ytCatalogEnabled, onClick = { scope.launch { prefs.setYoutubeCatalogEnabled(!ytCatalogEnabled) } }, label = { Text(if (ytCatalogEnabled) "YouTube Music activo" else "Activar YouTube Music") })
+                            }
+                            Row(Modifier.fillMaxWidth().padding(top = 5.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                SearchKind.values().forEach { option ->
+                                    FilterChip(
+                                        selected = kind == option,
+                                        onClick = { kind = option },
+                                        label = { Text(option.label, fontSize = 11.sp) }
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    val categoryHasResults = when (kind) {
+                        SearchKind.ALL -> true
+                        SearchKind.SONGS -> songs.isNotEmpty()
+                        SearchKind.ARTISTS -> artists.isNotEmpty()
+                        SearchKind.ALBUMS -> albums.isNotEmpty()
+                        SearchKind.USERS -> users.isNotEmpty()
+                    }
+                    if (!categoryHasResults) {
+                        item {
+                            Text("Sin resultados de ${kind.label.lowercase()} para \"$query\"", color = Color.White.copy(.45f), fontSize = 14.sp, modifier = Modifier.fillMaxWidth().padding(24.dp))
                         }
                     }
                     val autocomplete = (songs.take(3).map { it.title } + artists.take(2).map { it.name } + albums.take(2).map { it.name }).distinct().filter { it.isNotBlank() && !it.equals(query, true) }.take(5)
@@ -232,25 +259,25 @@ fun SearchScreen(
                             }
                         }
                     }
-                    if (users.isNotEmpty()) {
+                    if ((kind == SearchKind.ALL || kind == SearchKind.USERS) && users.isNotEmpty()) {
                         item { Text("USUARIOS", color = Color.White.copy(.5f), fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) }
                         itemsIndexed(users, key = { _, u -> "u-${u.id}" }) { _, user ->
                             UserRow(user) { scope.launch { prefs.addSearchHistory(query) }; user.username?.let(onUserClick) }
                         }
                     }
-                    if (artists.isNotEmpty()) {
+                    if ((kind == SearchKind.ALL || kind == SearchKind.ARTISTS) && artists.isNotEmpty()) {
                         item { Text("ARTISTAS", color = Color.White.copy(.5f), fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) }
                         itemsIndexed(artists, key = { _, a -> "a-${a.id.ifBlank { a.name }}" }) { _, artist ->
                             ArtistRow(artist) { scope.launch { prefs.addSearchHistory(query) }; detail = SearchDetail(artist.name, isArtist = true) }
                         }
                     }
-                    if (albums.isNotEmpty()) {
+                    if ((kind == SearchKind.ALL || kind == SearchKind.ALBUMS) && albums.isNotEmpty()) {
                         item { Text("ÁLBUMES", color = Color.White.copy(.5f), fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) }
                         itemsIndexed(albums, key = { _, al -> "al-${al.name}-${al.artist}" }) { _, album ->
                             AlbumRow(album) { scope.launch { prefs.addSearchHistory(query) }; detail = SearchDetail(album.name, album.artist, isArtist = false) }
                         }
                     }
-                    if (songs.isNotEmpty()) {
+                    if ((kind == SearchKind.ALL || kind == SearchKind.SONGS) && songs.isNotEmpty()) {
                         item { Text("CANCIONES", color = Color.White.copy(.5f), fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) }
                         itemsIndexed(songs, key = { _, song -> song.id }) { index, song ->
                             SongRow(song, favoriteIds.contains(song.id), { toggleFavorite(song) }) { scope.launch { prefs.addSearchHistory(query) }; onPlayQueue(songs, index) }
@@ -273,10 +300,10 @@ private fun SearchField(query: String, onQueryChange: (String) -> Unit) {
             Spacer(Modifier.width(12.dp))
             BasicTextField(
                 value = query, onValueChange = onQueryChange, singleLine = true,
-                textStyle = TextStyle(color = Color.White, fontSize = 16.sp), cursorBrush = SolidColor(Color.White),
+                textStyle = TextStyle(color = Color.White, fontSize = 16.sp), cursorBrush = SolidColor(Color(0xFFFC3C44)),
                 modifier = Modifier.weight(1f),
                 decorationBox = { inner ->
-                    if (query.isEmpty()) Text("Buscar en Ukiyo…", color = Color.White.copy(alpha = .4f), fontSize = 16.sp)
+                    if (query.isEmpty()) Text("Canción, artista, álbum o usuario…", color = Color.White.copy(alpha = .4f), fontSize = 16.sp)
                     inner()
                 }
             )
@@ -469,8 +496,9 @@ private fun CompactSearchBar(
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 10.dp)
             .height(height)
-            .clip(RoundedCornerShape(24.dp))
+            .clip(RoundedCornerShape(16.dp))
             .background(if (glass) Color(0xAA1C1C1E) else Color(0xFF1C1C1E))
+            .then(if (glass) Modifier.border(0.7.dp, Color.White.copy(.12f), RoundedCornerShape(16.dp)) else Modifier)
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null
@@ -481,7 +509,7 @@ private fun CompactSearchBar(
             .padding(horizontal = 14.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(Icons.Default.Search, null, tint = Color.White.copy(.55f), modifier = Modifier.size(20.dp))
+        Icon(Icons.Default.Search, null, tint = Color(0xFFFC3C44), modifier = Modifier.size(20.dp))
         Spacer(Modifier.width(10.dp))
         BasicTextField(
             value = query,
@@ -491,7 +519,7 @@ private fun CompactSearchBar(
             },
             singleLine = true,
             textStyle = TextStyle(color = Color.White, fontSize = 16.sp),
-            cursorBrush = SolidColor(Color.White),
+            cursorBrush = SolidColor(Color(0xFFFC3C44)),
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
             keyboardActions = KeyboardActions(onSearch = { onSearch(query) }),
             modifier = Modifier
