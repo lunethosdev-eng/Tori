@@ -63,6 +63,7 @@ import com.pokke.music.ui.player.PlayerScreenPersistenceGate
 import com.pokke.music.ui.player.LyricsScreen
 import com.pokke.music.ui.queue.QueueScreen
 import com.pokke.music.ui.artist.ArtistScreen
+import com.pokke.music.ui.album.AlbumScreen
 import com.pokke.music.ui.search.SearchScreen
 import com.pokke.music.ui.settings.SettingsScreen
 import com.pokke.music.ui.admin.AdminPanelScreen
@@ -127,6 +128,10 @@ sealed class Screen(val route: String) {
     data object Maps : Screen("maps")
     data object Artist : Screen("artist/{name}") {
         fun create(name: String) = "artist/${android.net.Uri.encode(name.trim())}"
+    }
+    data object Album : Screen("album/{name}?artist={artist}") {
+        fun create(name: String, artist: String? = null) =
+            "album/${android.net.Uri.encode(name.trim())}?artist=${android.net.Uri.encode(artist.orEmpty())}"
     }
 }
 
@@ -354,7 +359,8 @@ fun PokkeNavHost(pluginDeepLinkUri: Uri? = null, onPluginDeepLinkHandled: () -> 
                     isVisible = route == Screen.Search.route,
                     onSongClick = { PlayerController.init(context); PlayerController.playSong(it); playerSheetMotion.open() },
                     onPlayQueue = { songs, index -> PlayerController.init(context); PlayerController.playQueue(songs, index); playerSheetMotion.open() },
-                    onUserClick = { username -> nav.navigate(Screen.PublicProfile.create(username)) }
+                    onUserClick = { username -> nav.navigate(Screen.PublicProfile.create(username)) },
+                    onAlbumClick = { album -> nav.navigate(Screen.Album.create(album.name, album.artist)) }
                 )
             }
             composable(Screen.PublicProfile.route) { entry ->
@@ -470,14 +476,27 @@ fun PokkeNavHost(pluginDeepLinkUri: Uri? = null, onPluginDeepLinkHandled: () -> 
                 ArtistScreen(
                     artistName = name.ifBlank { "Artista" },
                     onBack = { nav.popBackStack() },
-                    onSongClick = { song ->
-                        PlayerController.init(context)
-                        PlayerController.playSong(song)
-                        playerSheetMotion.open()
-                    }
+                    onSongClick = { PlayerController.init(context); playerSheetMotion.open() },
+                    onAlbumClick = { album, artist -> nav.navigate(Screen.Album.create(album, artist)) }
                 )
             }
 
+            composable(
+                route = Screen.Album.route,
+                arguments = listOf(
+                    navArgument("name") { type = NavType.StringType },
+                    navArgument("artist") { type = NavType.StringType; defaultValue = "" }
+                )
+            ) { entry ->
+                val name = android.net.Uri.decode(entry.arguments?.getString("name").orEmpty())
+                val artist = android.net.Uri.decode(entry.arguments?.getString("artist").orEmpty()).ifBlank { null }
+                AlbumScreen(
+                    albumName = name,
+                    artistName = artist,
+                    onBack = { nav.popBackStack() },
+                    onSongClick = { PlayerController.init(context); playerSheetMotion.open() }
+                )
+            }
             composable(Screen.Lyrics.route) { LyricsScreen(onBack = { nav.popBackStack() }) }
                 }
             }
