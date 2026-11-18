@@ -141,7 +141,7 @@ fun BitChordNowPlayingHost(
         onClearQueue = PlayerController::clearQueue,
         onOpenMenu = { showMenu = true },
         onOpenAlbum = {},
-        onOpenArtist = { name, _ -> if (name.isNotBlank()) onOpenArtist(name) },
+        onOpenArtist = { _, name -> if (name.isNotBlank()) onOpenArtist(name) },
         onOpenPlaybackSource = onClose,
         onListenTogether = {},
         lyrics = lyrics,
