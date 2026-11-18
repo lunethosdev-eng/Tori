@@ -3,6 +3,7 @@ package com.pokke.music.ui.settings
 import com.pokke.music.player.PlayerController
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
@@ -28,6 +29,7 @@ import com.pokke.music.data.pairing.DeviceLinkRepository
 import kotlinx.coroutines.launch
 import com.pokke.music.ui.liquid.LocalAppBackdrop
 import com.pokke.music.ui.liquid.LiquidToggle
+import com.pokke.music.ui.liquid.LiquidGlassPanel
 import com.pokke.music.ui.motion.MotionSettings
 import android.net.Uri
 import com.pokke.music.ui.plugins.PluginStoreSection
@@ -95,7 +97,7 @@ fun SettingsScreen(
                 Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = Color.White)
             }
             Column {
-                Text(categoryTitle, color = Color.White, fontSize = 23.sp, fontWeight = FontWeight.Bold)
+                Text(categoryTitle, color = Color.White, fontSize = 21.sp, fontWeight = FontWeight.Bold)
                 Text(
                     if (selectedCategory == null) "Todo lo que puedes personalizar en Pokke"
                     else "Los cambios se aplican al instante y conservan tus preferencias",
@@ -200,7 +202,7 @@ fun SettingsScreen(
                 val selected = motion.profile == id
                 Box(
                     Modifier.weight(1f).clip(RoundedCornerShape(12.dp))
-                        .background(if (selected) Color.White else Color(0xFF202024))
+                        .background(if (selected) Color(0xFFFC3C44) else Color(0xFF202024))
                         .clickable { scope.launch { prefs.setMotionProfile(id) } }
                         .padding(vertical = 11.dp),
                     contentAlignment = Alignment.Center
@@ -416,7 +418,7 @@ fun SettingsScreen(
                 Text("Historial de búsqueda", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Medium)
                 Text("${searchHistory.size} búsquedas recientes guardadas en este dispositivo", color = Color.White.copy(.48f), fontSize = 11.sp)
             }
-            TextButton(onClick = { scope.launch { prefs.clearSearchHistory() } }, enabled = searchHistory.isNotEmpty()) { Text("Borrar", color = Color(0xFFBBA5FF)) }
+            TextButton(onClick = { scope.launch { prefs.clearSearchHistory() } }, enabled = searchHistory.isNotEmpty()) { Text("Borrar", color = Color(0xFFFC3C44)) }
         }
         Text("El historial es local y no se comparte con otros dispositivos. Las preferencias visuales y la distribución de Home sí se sincronizan con tu cuenta.", color = Color.White.copy(.4f), fontSize = 11.sp, modifier = Modifier.padding(horizontal = 22.dp, vertical = 4.dp))
 
@@ -702,7 +704,7 @@ fun SettingsScreen(
                     .fillMaxWidth()
                     .padding(horizontal = 22.dp, vertical = 8.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFFE5C17A),
+                    containerColor = Color(0xFFFC3C44),
                     contentColor = Color.Black
                 )
             ) {
@@ -719,22 +721,28 @@ fun SettingsScreen(
 @Composable
 private fun SettingsCategoryCard(title: String, subtitle: String, category: String, onClick: (String) -> Unit) {
     val interaction = remember { MutableInteractionSource() }
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .background(Color(0xFF1C1C1E))
-            .clickable(interactionSource = interaction, indication = null) { onClick(category) }
-            .padding(horizontal = 16.dp, vertical = 14.dp),
-        verticalAlignment = Alignment.CenterVertically
+    LiquidGlassPanel(
+        modifier = Modifier.fillMaxWidth(),
+        enabled = true,
+        shape = RoundedCornerShape(14.dp)
     ) {
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-            Text(title, color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Medium)
-            if (subtitle.isNotBlank()) {
-                Text(subtitle, color = Color.White.copy(.45f), fontSize = 12.sp, lineHeight = 16.sp, maxLines = 2)
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .clickable(interactionSource = interaction, indication = null) { onClick(category) }
+                .padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(Modifier.width(3.dp).height(38.dp).clip(RoundedCornerShape(4.dp)).background(Color(0xFFFC3C44)))
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                Text(title, color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Medium)
+                if (subtitle.isNotBlank()) {
+                    Text(subtitle, color = Color.White.copy(.52f), fontSize = 12.sp, lineHeight = 16.sp, maxLines = 2)
+                }
             }
+            Text("›", color = Color(0xFFFC3C44), fontSize = 22.sp, fontWeight = FontWeight.Light)
         }
-        Text("›", color = Color.White.copy(.35f), fontSize = 22.sp, fontWeight = FontWeight.Light)
     }
 }
 
@@ -747,34 +755,39 @@ private fun LiquidOrMaterialToggle(
     onChange: (Boolean) -> Unit
 ) {
     val appBackdrop = LocalAppBackdrop.current
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 22.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically
+    LiquidGlassPanel(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 5.dp),
+        enabled = true,
+        shape = RoundedCornerShape(14.dp)
     ) {
-        Column(Modifier.weight(1f).clickable { onChange(!checked) }) {
-            Text(title, color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Medium)
-            Text(
-                subtitle,
-                color = Color.White.copy(.5f),
-                fontSize = 12.sp,
-                lineHeight = 17.sp,
-                modifier = Modifier.padding(top = 3.dp)
-            )
-        }
-        if (glass && appBackdrop != null) {
-            LiquidToggle(selected = { checked }, onSelect = onChange, backdrop = appBackdrop, modifier = Modifier.size(width = 54.dp, height = 34.dp))
-        } else {
-            Switch(
-                checked = checked,
-                onCheckedChange = onChange,
-                colors = SwitchDefaults.colors(
-                    checkedThumbColor = Color.Black,
-                    checkedTrackColor = Color.White,
-                    uncheckedTrackColor = Color(0xFF333338)
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 11.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(Modifier.weight(1f).clickable { onChange(!checked) }) {
+                Text(title, color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Medium)
+                Text(
+                    subtitle,
+                    color = Color.White.copy(.52f),
+                    fontSize = 12.sp,
+                    lineHeight = 17.sp,
+                    modifier = Modifier.padding(top = 3.dp)
                 )
-            )
+            }
+            if (glass && appBackdrop != null) {
+                LiquidToggle(selected = { checked }, onSelect = onChange, backdrop = appBackdrop, modifier = Modifier.size(width = 54.dp, height = 34.dp))
+            } else {
+                Switch(
+                    checked = checked,
+                    onCheckedChange = onChange,
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = Color.White,
+                        checkedTrackColor = Color(0xFFFC3C44),
+                        uncheckedThumbColor = Color(0xFFB8B8C0),
+                        uncheckedTrackColor = Color(0xFF333338)
+                    )
+                )
+            }
         }
     }
 }
@@ -783,8 +796,8 @@ private fun LiquidOrMaterialToggle(
 private fun Section(text: String) {
     Text(
         text,
-        color = Color.White.copy(0.45f),
-        fontSize = 12.sp,
+        color = Color(0xFFFC3C44).copy(alpha = 0.9f),
+        fontSize = 11.sp,
         fontWeight = FontWeight.SemiBold,
         letterSpacing = 0.6.sp,
         modifier = Modifier
