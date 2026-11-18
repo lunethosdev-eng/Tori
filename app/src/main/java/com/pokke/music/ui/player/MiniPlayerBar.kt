@@ -1,30 +1,13 @@
 package com.pokke.music.ui.player
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.gestures.detectVerticalDragGestures
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Pause
@@ -32,7 +15,6 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -40,169 +22,128 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
-import com.pokke.music.ui.backdrop.drawBackdrop
-import com.pokke.music.ui.backdrop.effects.blur
 import com.pokke.music.player.PlayerController
-import com.pokke.music.ui.liquid.LocalAppBackdrop
-import com.pokke.music.ui.liquid.pokkePressMotion
-import com.pokke.music.ui.liquid.LocalGlassPerformanceMode
-import com.pokke.music.ui.player.rememberResolvedCover
+import com.pokke.music.ui.liquid.MoshiiGlass
 
 /**
- * Floating pill mini-player (Apple Music style).
- * glass=true → liquid glass look; glass=false → Material solid.
- * No SharedTransition API (crashes on device / fails compile without OptIn).
+ * Mini player compacto estilo Moshii — barra baja con glass, cover 44dp, progreso fino.
+ * No toca el full player (BitChord).
  */
 @Composable
 fun MiniPlayerBar(
     visible: Boolean,
     glass: Boolean,
-    onOpenPlayer: () -> Unit,
     compact: Boolean = false,
+    onOpenPlayer: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val backdrop = LocalAppBackdrop.current
-    val playerDock = LocalPlayerDock.current
-    val bitChordDock = com.music.bitchord.ui.player.LocalPlayerDock.current
-    val playerPull = LocalMiniPlayerPull.current
-    val surfaceColor = MaterialTheme.colorScheme.surface
-    val performanceMode = LocalGlassPerformanceMode.current
-    val tapInteraction = androidx.compose.runtime.remember { MutableInteractionSource() }
     val song by PlayerController.currentSong.collectAsState()
     val playing by PlayerController.isPlaying.collectAsState()
-    val position by PlayerController.positionMs.collectAsState()
-    val duration by PlayerController.durationMs.collectAsState()
-    val progress = if (duration > 0) (position.toFloat() / duration).coerceIn(0f, 1f) else 0f
-    val coverSize by animateFloatAsState(
-        if (compact) 32f else 38f,
-        spring(stiffness = Spring.StiffnessMediumLow),
-        label = "cover"
-    )
+    val pos by PlayerController.positionMs.collectAsState()
+    val dur by PlayerController.durationMs.collectAsState()
+    val progress = if (dur > 0) (pos.toFloat() / dur).coerceIn(0f, 1f) else 0f
+    val s = song
 
     AnimatedVisibility(
-        visible = visible && song != null,
-        enter = slideInVertically(tween(180)) { it / 3 } + fadeIn(tween(140)),
-        exit = slideOutVertically(tween(130)) { it / 3 } + fadeOut(tween(110)),
+        visible = visible && s != null,
+        enter = fadeIn() + slideInVertically { it / 2 },
+        exit = fadeOut() + slideOutVertically { it / 2 },
         modifier = modifier
     ) {
-        val s = song ?: return@AnimatedVisibility
-        Box(
-            Modifier
+        if (s == null) return@AnimatedVisibility
+        MoshiiGlass(
+            modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = if (compact) 32.dp else 18.dp)
-                .shadow(if (glass) 18.dp else 8.dp, RoundedCornerShape(22.dp), clip = false)
-                .clip(RoundedCornerShape(22.dp))
-                .then(
-                    if (glass && backdrop != null) {
-                        Modifier
-                            .drawBackdrop(
-                                backdrop = backdrop,
-                                shape = { RoundedCornerShape(22.dp) },
-                                effects = { blur((if (performanceMode) 10f else 18f).dp.toPx()) },
-                                onDrawSurface = { drawRect(surfaceColor.copy(alpha = 0.76f)) }
-                            )
-                            .border(0.8.dp, MaterialTheme.colorScheme.primary.copy(0.40f), RoundedCornerShape(22.dp))
-                    } else {
-                        Modifier.background(MaterialTheme.colorScheme.surface)
-                    }
-                )
-                .pointerInput(playerPull) {
-                    detectVerticalDragGestures(
-                        onDragEnd = { playerPull?.release(0f) },
-                        onDragCancel = { playerPull?.release(0f) },
-                        onVerticalDrag = { change, dragAmount ->
-                            change.consume()
-                            playerPull?.drag(dragAmount)
-                        },
-                    )
-                }
-                .pokkePressMotion(tapInteraction, enabled = true, pressedScale = 0.985f)
-                .clickable(interactionSource = tapInteraction, indication = null, onClick = onOpenPlayer)
-                .padding(horizontal = 9.dp, vertical = if (compact) 6.dp else 7.dp)
+                .padding(horizontal = 12.dp)
+                .clickable(onClick = onOpenPlayer),
+            enabled = glass,
+            shape = RoundedCornerShape(16.dp),
+            opacity = 0.14f,
+            elevation = 6.dp
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                AsyncImage(
-                    model = rememberResolvedCover(s) ?: s.displayCoverUrl ?: s.coverUrl,
-                    contentDescription = null,
-                    modifier = Modifier
-                        .size(coverSize.dp)
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(Color(0xFF2A2A30))
-                        .onGloballyPositioned { coordinates ->
-                            playerDock?.reportMiniArt(coordinates, 10.dp)
-                            bitChordDock?.reportMiniArt(coordinates, 10.dp)
-                        },
-                    contentScale = ContentScale.Crop
-                )
-                Spacer(Modifier.width(10.dp))
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        s.title,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = if (compact) 12.sp else 13.sp,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+            Column {
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 10.dp, vertical = if (compact) 8.dp else 10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    AsyncImage(
+                        model = s.displayCoverUrl ?: s.coverUrl,
+                        contentDescription = null,
+                        modifier = Modifier
+                            .size(if (compact) 40.dp else 44.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(Color(0xFF22222A)),
+                        contentScale = ContentScale.Crop
                     )
-                    if (!compact) {
+                    Spacer(Modifier.width(10.dp))
+                    Column(Modifier.weight(1f)) {
                         Text(
-                            s.artist,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.62f),
-                            fontSize = 12.sp,
+                            s.title,
+                            color = Color.White,
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 13.sp,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
+                        if (!compact) {
+                            Text(
+                                s.artist,
+                                color = Color.White.copy(0.55f),
+                                fontSize = 11.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
                     }
-                    Spacer(Modifier.height(4.dp))
-                    Box(
-                        Modifier
-                            .fillMaxWidth()
-                            .height(2.dp)
-                            .clip(RoundedCornerShape(1.dp))
-                            .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.18f))
+                    IconButton(
+                        onClick = { PlayerController.togglePlayPause() },
+                        modifier = Modifier.size(40.dp)
                     ) {
-                        Box(
-                            Modifier
-                                .fillMaxWidth(progress)
-                                .fillMaxHeight()
-                                .background(
-                                    Brush.horizontalGradient(
-                                        listOf(
-                                            MaterialTheme.colorScheme.primary,
-                                            MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
-                                        )
-                                    )
-                                )
-                        )
-                    }
-                }
-                IconButton(onClick = { PlayerController.togglePlayPause() }, modifier = Modifier.size(40.dp)) {
-                    Icon(
-                        if (playing) Icons.Default.Pause else Icons.Default.PlayArrow,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.size(22.dp)
-                    )
-                }
-                if (!compact) {
-                    IconButton(onClick = { PlayerController.playNext() }, modifier = Modifier.size(40.dp)) {
                         Icon(
-                            Icons.Default.SkipNext,
+                            if (playing) Icons.Default.Pause else Icons.Default.PlayArrow,
                             contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurface,
+                            tint = Color.White,
                             modifier = Modifier.size(22.dp)
                         )
                     }
+                    if (!compact) {
+                        IconButton(
+                            onClick = { PlayerController.playNext() },
+                            modifier = Modifier.size(40.dp)
+                        ) {
+                            Icon(Icons.Default.SkipNext, null, tint = Color.White, modifier = Modifier.size(22.dp))
+                        }
+                    }
+                }
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp)
+                        .padding(bottom = 8.dp)
+                        .height(2.dp)
+                        .clip(RoundedCornerShape(1.dp))
+                        .background(Color.White.copy(0.12f))
+                ) {
+                    Box(
+                        Modifier
+                            .fillMaxWidth(progress)
+                            .fillMaxHeight()
+                            .background(
+                                Brush.horizontalGradient(
+                                    listOf(Color(0xFFFC3C44), Color(0xFFFC3C44).copy(0.6f))
+                                )
+                            )
+                    )
                 }
             }
         }
