@@ -68,7 +68,8 @@ fun SearchScreen(
     isVisible: Boolean = true,
     onSongClick: (Song) -> Unit = {},
     onPlayQueue: (List<Song>, Int) -> Unit = { songs, index -> songs.getOrNull(index)?.let(onSongClick) },
-    onUserClick: (String) -> Unit = {}
+    onUserClick: (String) -> Unit = {},
+    onAlbumClick: (Album) -> Unit = {}
 ) {
     val repo = remember { MusicRepository() }
     val multiRepo = remember { MultiMusicRepository() }
@@ -274,7 +275,7 @@ fun SearchScreen(
                     if ((kind == SearchKind.ALL || kind == SearchKind.ALBUMS) && albums.isNotEmpty()) {
                         item { Text("ÁLBUMES", color = Color.White.copy(.5f), fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) }
                         itemsIndexed(albums, key = { _, al -> "al-${al.name}-${al.artist}" }) { _, album ->
-                            AlbumRow(album) { scope.launch { prefs.addSearchHistory(query) }; detail = SearchDetail(album.name, album.artist, isArtist = false) }
+                            AlbumRow(album) { scope.launch { prefs.addSearchHistory(query) }; onAlbumClick(album) }
                         }
                     }
                     if ((kind == SearchKind.ALL || kind == SearchKind.SONGS) && songs.isNotEmpty()) {
