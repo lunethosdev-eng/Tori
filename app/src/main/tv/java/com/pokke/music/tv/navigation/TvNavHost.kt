@@ -210,7 +210,7 @@ fun TvNavHost(deepLinkUri: Uri? = null, onDeepLinkHandled: () -> Unit = {}) {
                                 .clip(RoundedCornerShape(24.dp))
                                 .background(
                                     when {
-                                        selected -> Color.White.copy(0.14f)
+                                        selected -> Color(0xFFFC3C44).copy(0.18f)
                                         focused -> Color.White.copy(0.08f)
                                         else -> Color.Transparent
                                     }
@@ -222,9 +222,9 @@ fun TvNavHost(deepLinkUri: Uri? = null, onDeepLinkHandled: () -> Unit = {}) {
                                 .padding(horizontal = 16.dp, vertical = 10.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(tab.icon, null, tint = if (selected) Color.White else Color(0xFF9A9AA3), modifier = Modifier.size(20.dp))
+                            Icon(tab.icon, null, tint = if (selected) Color(0xFFFC3C44) else Color(0xFF9A9AA3), modifier = Modifier.size(20.dp))
                             Spacer(Modifier.width(8.dp))
-                            Text(tab.label, color = if (selected) Color.White else Color(0xFF9A9AA3), fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal)
+                            Text(tab.label, color = if (selected) Color(0xFFFC3C44) else Color(0xFF9A9AA3), fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal)
                         }
                     }
                     Spacer(Modifier.weight(1f))
