@@ -1,6 +1,7 @@
+package com.pokke.music.ui.navigation
+
 import androidx.navigation.NavType
 import androidx.navigation.navArgument
-package com.pokke.music.ui.navigation
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.EnterTransition
