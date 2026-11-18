@@ -266,6 +266,7 @@ fun TvNavHost(deepLinkUri: Uri? = null, onDeepLinkHandled: () -> Unit = {}) {
                     }
                     composable(TvRoutes.Library) {
                         TvLibraryScreen(
+                            repository = auth,
                             onPlay = { song ->
                                 PlayerController.init(context)
                                 PlayerController.playSong(song)
