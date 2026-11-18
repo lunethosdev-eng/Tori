@@ -115,8 +115,12 @@ fun HomeScreen(
     LaunchedEffect(Unit) {
         multi.getRecentAll().onSuccess { recent = it.take(40) }
         val onboardingName = prefs.onboardingNickname.firstOrNull().orEmpty()
-        authRepository.currentUser()?.displayName?.let { displayName = it }
-            ?: run { if (onboardingName.isNotBlank()) displayName = onboardingName }
+        val profileName = authRepository.getProfile().getOrNull()?.displayName
+        displayName = when {
+            !profileName.isNullOrBlank() -> profileName
+            onboardingName.isNotBlank() -> onboardingName
+            else -> displayName
+        }
         loading = false
     }
 
