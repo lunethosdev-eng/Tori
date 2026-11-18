@@ -4,6 +4,7 @@ import androidx.compose.animation.animateContentSize
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import android.net.Uri
+import android.content.Intent
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -38,6 +39,7 @@ import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Shield
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -90,10 +92,10 @@ fun ProfileScreen(repository: AuthRepository, onBack: () -> Unit, onSignedOut: (
     var badge by remember { mutableStateOf("none") }
     var pronouns by remember { mutableStateOf("") }
     var status by remember { mutableStateOf("") }
-    var accent by remember { mutableStateOf("violet") }
+    var accent by remember { mutableStateOf("red") }
     var cardStyle by remember { mutableStateOf("glass") }
     var badges by remember { mutableStateOf("Pokke listener,Music lover") }
-    var primaryColor by remember { mutableStateOf("#AAA0FF") }
+    var primaryColor by remember { mutableStateOf("#FC3C44") }
     var secondaryColor by remember { mutableStateOf("#1A1C26") }
     var gradientEnabled by remember { mutableStateOf(true) }
     var customBg by remember { mutableStateOf("") }
@@ -109,7 +111,7 @@ fun ProfileScreen(repository: AuthRepository, onBack: () -> Unit, onSignedOut: (
     var profileLinks by remember { mutableStateOf<List<Pair<String, String>>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
     var saving by remember { mutableStateOf(false) }
-    var editing by remember { mutableStateOf(false) }
+    var editing by remember { mutableStateOf(true) }
     var tab by remember { mutableStateOf(0) }
     var message by remember { mutableStateOf<String?>(null) }
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -200,9 +202,9 @@ fun ProfileScreen(repository: AuthRepository, onBack: () -> Unit, onSignedOut: (
             displayName = p?.displayName.orEmpty(); username = p?.username.orEmpty(); bio = p?.bio.orEmpty()
             avatar = p?.avatarUrl.orEmpty(); banner = p?.bannerUrl.orEmpty(); theme = p?.theme ?: "midnight"
             frame = p?.frame ?: "none"; badge = p?.badge ?: "none"; pronouns = p?.pronouns.orEmpty()
-            status = p?.statusText.orEmpty(); accent = p?.accentColor ?: "violet"; cardStyle = p?.cardStyle ?: "glass"
+            status = p?.statusText.orEmpty(); accent = p?.accentColor ?: "red"; cardStyle = p?.cardStyle ?: "glass"
             badges = p?.badges ?: "Pokke listener,Music lover"; isPublic = p?.isPublic ?: true
-            primaryColor = p?.primaryColor ?: "#AAA0FF"
+            primaryColor = p?.primaryColor ?: "#FC3C44"
             secondaryColor = p?.secondaryColor ?: "#1A1C26"
             gradientEnabled = p?.gradientEnabled ?: true
             customBg = p?.customBgUrl.orEmpty()
@@ -232,13 +234,63 @@ fun ProfileScreen(repository: AuthRepository, onBack: () -> Unit, onSignedOut: (
         loading = false
     }
 
+    val saveProfileNow: () -> Unit = {
+        if (!saving && !loading) {
+            saving = true
+            message = null
+            scope.launch {
+                repository.updateProfile(
+                    displayName, username, bio, avatar, banner, theme, frame, badge, pronouns, status,
+                    accent, cardStyle, badges, isPublic,
+                    profileLinks.firstOrNull()?.first ?: linkLabel,
+                    profileLinks.firstOrNull()?.second ?: linkUrl,
+                    showListening,
+                    org.json.JSONArray().apply {
+                        profileLinks.drop(1).forEach { (label, url) ->
+                            put(org.json.JSONObject().put("label", label).put("url", url))
+                        }
+                    }.toString(),
+                    favoriteMangasJson,
+                    primaryColor = primaryColor,
+                    secondaryColor = secondaryColor,
+                    gradientEnabled = gradientEnabled,
+                    customBgUrl = customBg,
+                    nameplateStyle = nameplateStyle,
+                    nameFont = nameFont,
+                    nameColor = nameColor,
+                    profileCardOrder = profileCardOrder
+                ).onSuccess { profile = it; message = "Cambios guardados correctamente" }
+                    .onFailure { message = it.localizedMessage ?: "No se pudo guardar el perfil" }
+                saving = false
+            }
+        }
+    }
+    val shareProfileNow: () -> Unit = {
+        val shareText = "Mira mi perfil en Pokke: pokke://user/${session?.userId.orEmpty()}"
+        runCatching {
+            val intent = Intent(Intent.ACTION_SEND).apply {
+                type = "text/plain"
+                putExtra(Intent.EXTRA_TEXT, shareText)
+            }
+            context.startActivity(Intent.createChooser(intent, "Compartir perfil"))
+        }.onFailure { message = it.localizedMessage ?: "No se pudo compartir el perfil" }
+    }
+
     val accentColor = when (accent) {
-        "blue" -> Color(0xFF8CB7FF); "pink" -> Color(0xFFFF9FCB); "cyan" -> Color(0xFF7EDCEB)
+        "red" -> Color(0xFFFC3C44); "blue" -> Color(0xFF8CB7FF); "pink" -> Color(0xFFFF9FCB); "cyan" -> Color(0xFF7EDCEB)
         "green" -> Color(0xFF8ED9B0); "gold" -> Color(0xFFE5C17A); else -> Color(0xFFAAA0FF)
     }
     val pageBackground = when (theme) {
-        "ocean" -> Color(0xFF101B2C); "violet" -> Color(0xFF1B142A); "rose" -> Color(0xFF291824)
-        "amoled" -> Color.Black; else -> Color(0xFF171A28)
+        "sunset" -> Color(0xFF2D1B0E)
+        "ocean" -> Color(0xFF101B2C)
+        "violet" -> Color(0xFF1B142A)
+        "mint" -> Color(0xFF0A1F1A)
+        "gold" -> Color(0xFF1A1508)
+        "rose" -> Color(0xFF291824)
+        "cyber" -> Color(0xFF050510)
+        "ember" -> Color(0xFF1A0C05)
+        "amoled" -> Color.Black
+        else -> Color(0xFF171A28)
     }
     val cardBackground = when (cardStyle) {
         "solid" -> if (liquidGlass) Color(0xCC252A3D) else Color(0xFF252A3D); "outline" -> pageBackground.copy(alpha = .55f); else -> if (liquidGlass) Color(0xAA252A40) else Color(0xCC252A40)
@@ -259,7 +311,7 @@ fun ProfileScreen(repository: AuthRepository, onBack: () -> Unit, onSignedOut: (
         if (bgFull.isNotBlank()) {
             // drawn in outer box via parent - header uses banner separately
         }
-        Box(Modifier.fillMaxWidth().height(236.dp)) {
+        Box(Modifier.fillMaxWidth().height(140.dp).padding(horizontal = 16.dp).clip(RoundedCornerShape(16.dp)).clickable { pickBanner.launch("image/*") }) {
             // Banner is ONLY the header strip (not the same as custom bg)
             if (banner.isNotBlank()) {
                 AsyncImage(banner, "Banner del perfil", Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
@@ -275,16 +327,25 @@ fun ProfileScreen(repository: AuthRepository, onBack: () -> Unit, onSignedOut: (
                 Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(pCol.copy(alpha = 0.55f), sCol.copy(alpha = 0.45f), Color.Black.copy(alpha = 0.55f)))))
             }
             Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color.Black.copy(.05f), Color.Black.copy(.35f)))))
-            Row(Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 12.dp, vertical = 8.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+            Surface(
+                color = Color.Black.copy(.42f),
+                shape = RoundedCornerShape(50),
+                modifier = Modifier.align(Alignment.BottomEnd).padding(10.dp)
+            ) { Text("Cambiar banner", color = Color.White, fontSize = 11.sp, modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp)) }
+            Row(Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 ProfileTopButton(onClick = { if (editing) editing = false else onBack() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Volver", tint = Color.White) }
+                Spacer(Modifier.width(8.dp))
+                Text("Editar perfil", color = Color.White, fontSize = 19.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                TextButton(onClick = shareProfileNow) { Text("Compartir", color = Color.White) }
+                TextButton(onClick = saveProfileNow, enabled = !saving && !loading) { Text(if (saving) "Guardando…" else "Guardar", color = Color(0xFFFC3C44), fontWeight = FontWeight.Bold) }
                 ProfileTopButton(onClick = { scope.launch { repository.signOut(); onSignedOut() } }) { Icon(Icons.Default.Logout, "Cerrar sesión", tint = Color.White) }
             }
-            Box(Modifier.align(Alignment.BottomStart).padding(start = 18.dp, bottom = 0.dp)) {
+            Box(Modifier.align(Alignment.BottomCenter).padding(bottom = 0.dp).clickable { pickAvatar.launch("image/*") }) {
                 FramedAvatar(
                     avatarUrl = avatar.ifBlank { null },
                     displayName = displayName,
                     frameId = frame,
-                    size = 108.dp,
+                    size = 48.dp,
                     borderColor = accentColor,
                     borderWidth = 3.dp
                 )
@@ -300,7 +361,7 @@ fun ProfileScreen(repository: AuthRepository, onBack: () -> Unit, onSignedOut: (
             }
         }
 
-        Column(Modifier.fillMaxWidth().padding(horizontal = 22.dp)) {
+        if (!editing) Column(Modifier.fillMaxWidth().padding(horizontal = 22.dp)) {
             Spacer(Modifier.height(12.dp))
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 val displayNameColor = runCatching { Color(android.graphics.Color.parseColor(nameColor)) }.getOrDefault(ProfileInk)
@@ -368,13 +429,36 @@ fun ProfileScreen(repository: AuthRepository, onBack: () -> Unit, onSignedOut: (
                     Text(hostLabel(linkUrl), color = ProfileMuted, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
             }
-            Button(onClick = { editing = !editing }, modifier = Modifier.fillMaxWidth().padding(top = 22.dp).height(52.dp), shape = RoundedCornerShape(16.dp), colors = ButtonDefaults.buttonColors(containerColor = accentColor, contentColor = Color(0xFF171827))) {
-                Icon(Icons.Default.Edit, null, modifier = Modifier.size(18.dp)); Spacer(Modifier.width(9.dp)); Text(if (editing) "Cerrar editor" else "Editar perfil principal", fontWeight = FontWeight.Bold)
+            Button(onClick = { editing = true }, modifier = Modifier.fillMaxWidth().padding(top = 22.dp).height(52.dp), shape = RoundedCornerShape(16.dp), colors = ButtonDefaults.buttonColors(containerColor = accentColor, contentColor = Color(0xFF171827))) {
+                Icon(Icons.Default.Edit, null, modifier = Modifier.size(18.dp)); Spacer(Modifier.width(9.dp)); Text("Editar perfil principal", fontWeight = FontWeight.Bold)
             }
-            AnimatedVisibility(editing, enter = fadeIn(), exit = fadeOut()) {
+        }
+        AnimatedVisibility(editing, enter = fadeIn(), exit = fadeOut()) {
                 Column(Modifier.fillMaxWidth().padding(top = 16.dp).clip(RoundedCornerShape(22.dp)).background(cardBackground).padding(16.dp)) {
-                    Text("PERSONALIZACIÓN DEL PERFIL", color = accentColor, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.3.sp)
-                    Spacer(Modifier.height(12.dp))
+                    Text("Tema del perfil", color = ProfileInk, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                    Spacer(Modifier.height(8.dp))
+                    ProfileChoice("Tema", theme, listOf("midnight", "sunset", "ocean", "violet", "mint", "gold", "rose", "cyber", "ember"), listOf("Noche", "Atardecer", "Océano", "Violeta", "Menta", "Dorado", "Rosa", "Cyber", "Brasas"), Color(0xFFFC3C44)) { theme = it }
+                    Spacer(Modifier.height(14.dp))
+                    Text("Efecto del perfil", color = ProfileInk, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                    Spacer(Modifier.height(8.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(7.dp), modifier = Modifier.fillMaxWidth()) {
+                        listOf("none" to "Ninguno", "glass" to "Glass", "parallax" to "Parallax", "glow" to "Glow").forEach { (value, label) ->
+                            val selected = cardStyle == value || (value == "none" && cardStyle == "solid")
+                            Surface(
+                                onClick = {
+                                    cardStyle = value
+                                    if (value == "parallax") scope.launch { prefs.setMotionParallax(true) }
+                                    if (value == "glow") scope.launch { prefs.setMotionReflections(true) }
+                                },
+                                color = if (selected) Color(0xFFFC3C44) else Color.White.copy(.09f),
+                                shape = RoundedCornerShape(50),
+                                modifier = Modifier.weight(1f)
+                            ) { Text(label, color = Color.White, fontSize = 11.sp, modifier = Modifier.padding(horizontal = 9.dp, vertical = 9.dp)) }
+                        }
+                    }
+                    Spacer(Modifier.height(14.dp))
+                    Text("Editar perfil", color = ProfileInk, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                    Spacer(Modifier.height(8.dp))
                     ProfileField("Nombre visible", displayName) { displayName = it }
                     ProfileField("Nombre de usuario (3–24 caracteres)", username) { username = it }
                     ProfileField("Pronombres", pronouns) { pronouns = it }
@@ -384,10 +468,11 @@ fun ProfileScreen(repository: AuthRepository, onBack: () -> Unit, onSignedOut: (
                     Text("IDENTIDAD VISUAL", color = accentColor, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.2.sp)
                     Text("Plantillas predeterminadas", color = ProfileMuted, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp, bottom = 6.dp))
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                        listOf("aurora" to "Aurora", "cyber" to "Cyber", "minimal" to "Minimal").forEach { (id, label) ->
+                        listOf("moshii" to "Moshii", "aurora" to "Aurora", "cyber" to "Cyber", "minimal" to "Minimal").forEach { (id, label) ->
                             Text(label, color = ProfileInk, fontSize = 11.sp, modifier = Modifier.weight(1f).clip(RoundedCornerShape(10.dp)).background(Color.White.copy(.08f)).clickable {
                                 nameplateStyle = id
                                 when (id) {
+                                    "moshii" -> { accent = "red"; theme = "rose"; cardStyle = "glass"; primaryColor = "#FC3C44"; secondaryColor = "#1A0C0E" }
                                     "cyber" -> { accent = "pink"; cardStyle = "solid"; primaryColor = "#7B2448"; secondaryColor = "#1A1018" }
                                     "minimal" -> { accent = "blue"; cardStyle = "outline"; primaryColor = "#263247"; secondaryColor = "#10141C" }
                                     else -> { accent = "violet"; cardStyle = "glass"; primaryColor = "#7658B5"; secondaryColor = "#202C4A" }
@@ -589,8 +674,7 @@ fun ProfileScreen(repository: AuthRepository, onBack: () -> Unit, onSignedOut: (
                     }
                     MangaFavoritesEditor(favoriteMangasJson, { favoriteMangasJson = it }, accentColor, ProfileInk, ProfileMuted)
                     Text("Los emblemas los otorga el Owner desde Admin (no se escriben a mano).", color = ProfileMuted, fontSize = 12.sp, modifier = Modifier.padding(bottom = 10.dp))
-                    ProfileChoice("Tema", theme, listOf("midnight", "ocean", "violet", "rose", "amoled"), listOf("Noche", "Océano", "Violeta", "Rosa", "AMOLED"), accentColor) { theme = it }
-                    ProfileChoice("Color de acento", accent, listOf("violet", "blue", "pink", "cyan", "green", "gold"), listOf("Violeta", "Azul", "Rosa", "Cian", "Verde", "Dorado"), accentColor) { accent = it }
+                    ProfileChoice("Color de acento", accent, listOf("red", "violet", "blue", "pink", "cyan", "green", "gold"), listOf("Rojo", "Violeta", "Azul", "Rosa", "Cian", "Verde", "Dorado"), accentColor) { accent = it }
                     Text("Marco del avatar", color = ProfileMuted, fontSize = 12.sp, modifier = Modifier.padding(top = 10.dp, bottom = 8.dp))
                     FramePicker(selected = frame, accent = accentColor, onSelect = { frame = it })
                     ProfileChoice("Emblema principal", badge, listOf("none", "music", "star", "crown", "verified"), listOf("Ninguno", "Música", "Estrella", "Corona", "Verificado"), accentColor) { badge = it }
@@ -639,6 +723,7 @@ fun ProfileScreen(repository: AuthRepository, onBack: () -> Unit, onSignedOut: (
                 }
             }
 
+        if (!editing) {
             Row(Modifier.fillMaxWidth().padding(top = 25.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 ProfileTab("Principal", tab == 0, accentColor, Modifier.weight(1f)) { tab = 0 }
                 ProfileTab("Favoritos", tab == 1, accentColor, Modifier.weight(1f)) { tab = 1 }
@@ -696,7 +781,8 @@ fun ProfileScreen(repository: AuthRepository, onBack: () -> Unit, onSignedOut: (
                             }, Icons.Default.Public)
                     }
             }
-            Spacer(Modifier.height(40.dp))
+        }
+        Spacer(Modifier.height(40.dp))
         }
     }
 }
@@ -708,21 +794,23 @@ fun ProfileScreen(repository: AuthRepository, onBack: () -> Unit, onSignedOut: (
 
 @Composable private fun ProfileField(label: String, value: String, multiline: Boolean = false, onChange: (String) -> Unit) {
     OutlinedTextField(value, onChange, label = { Text(label) }, singleLine = !multiline, minLines = if (multiline) 3 else 1,
-        modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp), shape = RoundedCornerShape(13.dp),
+        modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp), shape = RoundedCornerShape(14.dp),
         colors = OutlinedTextFieldDefaults.colors(focusedTextColor = ProfileInk, unfocusedTextColor = ProfileInk,
-            focusedBorderColor = Color(0xFFAAA0FF), unfocusedBorderColor = Color.White.copy(.16f),
-            focusedLabelColor = Color(0xFFAAA0FF), unfocusedLabelColor = ProfileMuted, cursorColor = Color(0xFFAAA0FF)))
+            focusedContainerColor = Color.White.copy(.085f), unfocusedContainerColor = Color.White.copy(.055f),
+            focusedBorderColor = Color.White.copy(.34f), unfocusedBorderColor = Color.White.copy(.13f),
+            focusedLabelColor = Color(0xFFFC3C44), unfocusedLabelColor = ProfileMuted, cursorColor = Color(0xFFFC3C44)))
 }
 
 @Composable private fun ProfileChoice(title: String, selected: String, values: List<String>, labels: List<String>, accent: Color, onSelect: (String) -> Unit) {
     Text(title, color = ProfileMuted, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp, bottom = 7.dp))
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        values.forEachIndexed { index, value ->
+    LazyRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        items(values.size) { index ->
+            val value = values[index]
             val active = selected == value
-            Box(Modifier.weight(1f).clip(RoundedCornerShape(9.dp)).background(if (active) accent.copy(.25f) else Color.White.copy(.055f))
+            Box(Modifier.clip(RoundedCornerShape(9.dp)).background(if (active) accent.copy(.25f) else Color.White.copy(.055f))
                 .border(if (active) 1.dp else 0.dp, if (active) accent else Color.Transparent, RoundedCornerShape(9.dp))
-                .clickable { onSelect(value) }.padding(vertical = 10.dp), contentAlignment = Alignment.Center) {
-                Text(labels[index], color = if (active) accent else ProfileMuted, fontSize = 9.sp, fontWeight = if (active) FontWeight.Bold else FontWeight.Normal, maxLines = 1)
+                .clickable { onSelect(value) }.padding(horizontal = 12.dp, vertical = 10.dp), contentAlignment = Alignment.Center) {
+                Text(labels[index], color = if (active) accent else ProfileMuted, fontSize = 10.sp, fontWeight = if (active) FontWeight.Bold else FontWeight.Normal, maxLines = 1)
             }
         }
     }
@@ -749,7 +837,7 @@ fun ProfileScreen(repository: AuthRepository, onBack: () -> Unit, onSignedOut: (
 }
 
 private fun frameColor(frame: String) = when (frame) {
-    "blue" -> Color(0xFF8CB7FF); "pink" -> Color(0xFFFF9FCB); "gold" -> Color(0xFFE5C17A); else -> Color(0xFFAAA0FF)
+    "red" -> Color(0xFFFC3C44); "blue" -> Color(0xFF8CB7FF); "pink" -> Color(0xFFFF9FCB); "gold" -> Color(0xFFE5C17A); else -> Color(0xFFAAA0FF)
 }
 
 @Composable
