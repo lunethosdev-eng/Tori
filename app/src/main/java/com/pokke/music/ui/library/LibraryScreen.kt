@@ -13,6 +13,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -30,6 +31,7 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -67,6 +69,7 @@ fun LibraryScreen(
     val context = LocalContext.current
     val localStore = remember { LocalLibraryStore(context.applicationContext) }
     val scope = rememberCoroutineScope()
+    val listState = rememberLazyListState()
     val session by repository.session.collectAsState()
     val downloads by localStore.downloads.collectAsState(initial = emptyList())
     val downloadTasks by DownloadQueueManager.get(context.applicationContext).tasks.collectAsState()
@@ -137,7 +140,10 @@ fun LibraryScreen(
         LibraryTab.HISTORY -> history
     }
 
+    val tabSectionIndex = 4 + (if (session == null || playlists.isEmpty()) 1 else 0) + playlists.chunked(2).size
+
     LazyColumn(
+        state = listState,
         modifier = Modifier.fillMaxSize().animateContentSize().background(PokkeBlack).statusBarsPadding(),
         contentPadding = PaddingValues(bottom = 110.dp)
     ) {
@@ -226,15 +232,36 @@ fun LibraryScreen(
             if (playlistSongs.isEmpty()) item { EmptyLibraryText(if (loading) "Cargando playlist…" else "Esta playlist todavía está vacía.") }
         } else {
             item {
-                Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    LibraryShortcut("Descargas", downloads.size, Icons.Default.Download, Modifier.weight(1f)) { tab = LibraryTab.DOWNLOADS }
-                    LibraryShortcut("Favoritos", favorites.size, Icons.Default.Favorite, Modifier.weight(1f)) {
+                Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp)) {
+                    LibraryMenuRow("Playlists", if (session == null) "Inicia sesión para sincronizar" else "${playlists.size} listas", Icons.Default.QueueMusic) {
+                        scope.launch { listState.animateScrollToItem(3) }
+                    }
+                    LibraryMenuRow("Descargas", "${downloads.size} en este dispositivo", Icons.Default.Download) {
+                        tab = LibraryTab.DOWNLOADS
+                        scope.launch { listState.animateScrollToItem(tabSectionIndex) }
+                    }
+                    LibraryMenuRow("Favoritos", "${favorites.size} canciones guardadas", Icons.Default.Favorite) {
                         tab = LibraryTab.FAVORITES
                         refreshRemote()
+                        scope.launch { listState.animateScrollToItem(tabSectionIndex) }
                     }
-                    LibraryShortcut("Historial", history.size, Icons.Default.History, Modifier.weight(1f)) { tab = LibraryTab.HISTORY }
+                    LibraryMenuRow("Historial", "${history.size} reproducciones", Icons.Default.History) {
+                        tab = LibraryTab.HISTORY
+                        scope.launch { listState.animateScrollToItem(tabSectionIndex) }
+                    }
                 }
-                Spacer(Modifier.height(22.dp))
+            }
+            item {
+                Column(Modifier.fillMaxWidth().padding(top = 18.dp, bottom = 8.dp)) {
+                    Text("Recientes", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp))
+                    if (history.isEmpty()) {
+                        EmptyLibraryText("Tu historial de reproducción aparecerá aquí.")
+                    } else {
+                        history.take(5).forEach { recentSong ->
+                            SongRow(recentSong, trailing = null, onClick = { onSongClick(recentSong) }, onTrailing = {})
+                        }
+                    }
+                }
             }
             item {
                 Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -539,20 +566,35 @@ private fun playlistBrush(playlist: Playlist): Brush {
 }
 
 @Composable
-private fun LibraryShortcut(title: String, count: Int, icon: androidx.compose.ui.graphics.vector.ImageVector, modifier: Modifier, onClick: () -> Unit) {
+private fun LibraryMenuRow(
+    title: String,
+    subtitle: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    onClick: () -> Unit
+) {
     val interaction = remember { MutableInteractionSource() }
-    Column(modifier.clip(RoundedCornerShape(15.dp)).background(Color(0xFF191919)).pokkePressMotion(interaction).clickable(interactionSource = interaction, indication = null, onClick = onClick).padding(12.dp)) {
-        Icon(icon, null, tint = Color.White, modifier = Modifier.size(23.dp))
-        Spacer(Modifier.height(12.dp))
-        Text(title, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-        Text("$count", color = Color.White.copy(.5f), fontSize = 12.sp)
+    Row(
+        Modifier.fillMaxWidth()
+            .pokkePressMotion(interaction)
+            .clickable(interactionSource = interaction, indication = null, onClick = onClick)
+            .padding(vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(icon, contentDescription = null, tint = Color(0xFFFC3C44), modifier = Modifier.size(27.dp))
+        Spacer(Modifier.width(14.dp))
+        Column(Modifier.weight(1f)) {
+            Text(title, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Medium)
+            Text(subtitle, color = Color.White.copy(.42f), fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+        Icon(Icons.Default.ChevronRight, contentDescription = null, tint = Color.White.copy(.24f), modifier = Modifier.size(20.dp))
     }
 }
 
 @Composable
 private fun SongRow(song: Song, trailing: String?, onClick: () -> Unit, onTrailing: () -> Unit) {
     val interaction = remember { MutableInteractionSource() }
-    Row(Modifier.fillMaxWidth().pokkePressMotion(interaction, enabled = !song.audioUrl.isNullOrBlank()).clickable(interactionSource = interaction, indication = null, enabled = !song.audioUrl.isNullOrBlank(), onClick = onClick).padding(horizontal = 20.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+    val playable = !song.audioUrl.isNullOrBlank() || !song.youtubeId.isNullOrBlank()
+    Row(Modifier.fillMaxWidth().pokkePressMotion(interaction, enabled = playable).clickable(interactionSource = interaction, indication = null, enabled = playable, onClick = onClick).padding(horizontal = 20.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
         AsyncImage(model = song.displayCoverUrl, contentDescription = null, modifier = Modifier.size(50.dp).clip(RoundedCornerShape(8.dp)))
         Column(Modifier.weight(1f).padding(start = 12.dp)) {
             Text(song.title, color = Color.White, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
