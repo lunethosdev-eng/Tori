@@ -52,6 +52,7 @@ fun LiquidToggle(
     backdrop: Backdrop,
     modifier: Modifier = Modifier
 ) {
+    val glassPerf = LocalGlassPerformanceMode.current
     val isLightTheme = !isSystemInDarkTheme()
     val accentColor = MaterialTheme.colorScheme.primary
     val trackColor =
@@ -160,7 +161,7 @@ fun LiquidToggle(
                         lens(
                             5f.dp.toPx() * progress,
                             10f.dp.toPx() * progress,
-                            chromaticAberration = GlassSafety.allowChromatic(LocalGlassPerformanceMode.current)
+                            chromaticAberration = GlassSafety.allowChromatic(glassPerf)
                         )
                     },
                     highlight = {
